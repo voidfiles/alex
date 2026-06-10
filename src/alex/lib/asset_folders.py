@@ -1,0 +1,461 @@
+from __future__ import annotations
+
+import hashlib
+import json
+import os
+import re
+import shutil
+from dataclasses import dataclass
+from pathlib import Path
+from typing import TYPE_CHECKING, Protocol
+
+from alex.lib.document_sources import canonicalize_name, copy_file, split_authors
+from alex.lib.process_doc_assets import MarkdownHeader, parse_markdown_headers
+
+if TYPE_CHECKING:
+    from alex.lib.converters.to_markdown import MarkdownOutput, ToMarkdownConfig
+
+
+DEFAULT_VAULT_ASSET_ROOT = Path("/Users/alex/Dropbox/obsidian/Alex3/assets")
+DEFAULT_ASSET_NAMING_MODEL = "claude-sonnet-4-6"
+ASSET_NAMING_MODEL_ENV = "PROCESS_DOC_ASSET_NAMING_MODEL"
+
+
+class PdfMarkdowner(Protocol):
+    def __call__(self, config: ToMarkdownConfig) -> MarkdownOutput:
+        ...
+
+
+class EpubMarkdowner(Protocol):
+    def __call__(self, config: ToMarkdownConfig) -> MarkdownOutput:
+        ...
+
+
+class TextCompleter(Protocol):
+    def complete(self, *, prompt: str, model: str, max_tokens: int) -> str:
+        ...
+
+
+class AssetNamer(Protocol):
+    def __call__(self, asset_input: "AssetNameInput") -> "AssetName":
+        ...
+
+
+class AssetDirectoryExistsError(FileExistsError):
+    pass
+
+
+class AssetNamingError(ValueError):
+    pass
+
+
+@dataclass(frozen=True)
+class ToAssetConfig:
+    source: Path
+    asset_root: Path = DEFAULT_VAULT_ASSET_ROOT
+    force: bool = False
+
+
+@dataclass(frozen=True)
+class ToAssetOutput:
+    asset_dir: Path
+    source_path: Path
+    markdown_path: Path
+    headers_path: Path
+    metadata_path: Path | None = None
+    canonical_name_path: Path | None = None
+
+
+@dataclass(frozen=True)
+class AssetNameInput:
+    source: Path
+    markdown: str
+    headers: str
+
+
+@dataclass(frozen=True)
+class AssetName:
+    title: str
+    authors: tuple[str, ...]
+    canonical_name: str
+
+
+@dataclass(frozen=True)
+class LlmAssetNamer:
+    completer: TextCompleter
+    model: str = DEFAULT_ASSET_NAMING_MODEL
+    max_tokens: int = 200
+
+    def __call__(self, asset_input: AssetNameInput) -> AssetName:
+        response = self.completer.complete(
+            prompt=asset_name_prompt(asset_input),
+            model=self.model,
+            max_tokens=self.max_tokens,
+        )
+        return asset_name_from_llm_response(response)
+
+
+def build_pdf_asset(
+    config: ToAssetConfig,
+    *,
+    pdf_markdowner: PdfMarkdowner,
+    asset_namer: AssetNamer,
+) -> ToAssetOutput:
+    return build_markdown_asset(
+        config=config,
+        markdowner=pdf_markdowner,
+        asset_namer=asset_namer,
+    )
+
+
+def build_epub_asset(
+    config: ToAssetConfig,
+    *,
+    epub_markdowner: EpubMarkdowner,
+    asset_namer: AssetNamer,
+) -> ToAssetOutput:
+    return build_markdown_asset(
+        config=config,
+        markdowner=epub_markdowner,
+        asset_namer=asset_namer,
+    )
+
+
+def build_markdown_asset(
+    *,
+    config: ToAssetConfig,
+    markdowner: PdfMarkdowner | EpubMarkdowner,
+    asset_namer: AssetNamer,
+) -> ToAssetOutput:
+    from alex.lib.converters.to_markdown import ToMarkdownConfig
+
+    work_dir = temporary_asset_dir(asset_root=config.asset_root, source=config.source)
+    prepare_work_dir(work_dir=work_dir, source=config.source)
+
+    markdown_path = work_dir / f"{config.source.stem}.md"
+    result = markdowner(
+        ToMarkdownConfig(
+            source=config.source,
+            output_dir=work_dir,
+            name=config.source.stem,
+        )
+    )
+    if result.asset != markdown_path:
+        copy_file(result.asset, markdown_path)
+
+    markdown = markdown_path.read_text(encoding="utf-8")
+    headers = table_of_contents_markdown(markdown)
+    headers_path = work_dir / "headers.md"
+    headers_path.write_text(
+        headers,
+        encoding="utf-8",
+    )
+
+    asset_name = asset_namer(
+        AssetNameInput(source=config.source, markdown=markdown, headers=headers)
+    )
+    final_dir = config.asset_root / asset_name.canonical_name
+    prepare_final_asset_dir(
+        final_dir=final_dir,
+        source=config.source,
+        work_dir=work_dir,
+        force=config.force,
+    )
+    write_asset_name_cache(work_dir=work_dir, asset_name=asset_name)
+    final_markdown = rename_markdown_to_canonical_name(
+        markdown_path=markdown_path,
+        canonical_name=asset_name.canonical_name,
+    )
+    source_path = move_source_to_canonical_asset_path(
+        source=config.source,
+        asset_dir=work_dir,
+        canonical_name=asset_name.canonical_name,
+    )
+    shutil.move(str(work_dir), str(final_dir))
+    cleanup_tmp_parent(work_dir)
+
+    return ToAssetOutput(
+        asset_dir=final_dir,
+        source_path=final_dir / source_path.name,
+        markdown_path=final_dir / final_markdown.name,
+        headers_path=final_dir / headers_path.name,
+        metadata_path=final_dir / "metadata.json",
+        canonical_name_path=final_dir / "canonical_name.txt",
+    )
+
+
+def build_asset(
+    config: ToAssetConfig,
+    *,
+    pdf_markdowner: PdfMarkdowner,
+    epub_markdowner: EpubMarkdowner,
+    asset_namer: AssetNamer,
+) -> ToAssetOutput:
+    if config.source.suffix.lower() == ".epub":
+        return build_epub_asset(
+            config,
+            epub_markdowner=epub_markdowner,
+            asset_namer=asset_namer,
+        )
+    return build_pdf_asset(
+        config,
+        pdf_markdowner=pdf_markdowner,
+        asset_namer=asset_namer,
+    )
+
+
+def llm_asset_namer(asset_input: AssetNameInput) -> AssetName:
+    from alex.lib.process_doc_assets import AnthropicMessagesSummarizer
+
+    return LlmAssetNamer(
+        completer=AnthropicMessagesSummarizer(max_workers=1),
+        model=asset_naming_model(),
+    )(asset_input)
+
+
+def asset_naming_model() -> str:
+    return (
+        os.getenv(ASSET_NAMING_MODEL_ENV)
+        or os.getenv("LLM_MODEL")
+        or os.getenv("ANTHROPIC_MODEL")
+        or DEFAULT_ASSET_NAMING_MODEL
+    )
+
+
+def asset_name_prompt(asset_input: AssetNameInput) -> str:
+    preview = "\n".join(asset_input.markdown.splitlines()[:1000])
+    return f"""Extract the canonical title and primary author(s) from this document.
+
+DOCUMENT PREVIEW (first portion):
+---
+{preview}
+---
+
+TABLE OF CONTENTS:
+---
+{asset_input.headers}
+---
+
+Extract:
+1. The official title of this book/document
+2. The primary author(s) name(s)
+
+Respond with ONLY a JSON object in this exact format:
+{{
+  "title": "The Official Book Title",
+  "authors": "Author Name"
+}}
+
+If there are multiple authors, include all primary authors in the authors field (e.g., "John Doe and Jane Smith").
+Do not include any explanation, only the JSON object."""
+
+
+def asset_name_from_llm_response(response: str) -> AssetName:
+    payload = parse_asset_name_response_json(response)
+    title_value = payload.get("title")
+    authors_value = payload.get("authors")
+    if not isinstance(title_value, str) or not title_value.strip():
+        raise AssetNamingError("LLM asset naming response did not include a title.")
+
+    authors = authors_from_response(authors_value)
+    title = title_value.strip()
+    canonical = canonicalize_name([title, *authors])
+    return AssetName(title=title, authors=authors, canonical_name=canonical)
+
+
+def parse_asset_name_response_json(response: str) -> dict[str, object]:
+    stripped = response.strip()
+    if not stripped.startswith("{"):
+        match = re.search(r"\{.*\}", stripped, re.DOTALL)
+        if match:
+            stripped = match.group(0)
+    try:
+        payload = json.loads(stripped)
+    except json.JSONDecodeError as error:
+        raise AssetNamingError(
+            f"Could not parse LLM asset naming response as JSON: {response}"
+        ) from error
+    if not isinstance(payload, dict):
+        raise AssetNamingError("LLM asset naming response must be a JSON object.")
+    return payload
+
+
+def authors_from_response(value: object) -> tuple[str, ...]:
+    if isinstance(value, str):
+        return split_authors(value)
+    if isinstance(value, list):
+        return tuple(author.strip() for author in value if isinstance(author, str))
+    return ()
+
+
+def write_asset_name_cache(*, work_dir: Path, asset_name: AssetName) -> None:
+    metadata_path = work_dir / "metadata.json"
+    metadata_path.write_text(
+        json.dumps(
+            {
+                "title": asset_name.title,
+                "authors": list(asset_name.authors),
+            },
+            indent=2,
+            sort_keys=False,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    (work_dir / "canonical_name.txt").write_text(
+        f"{asset_name.canonical_name}\n",
+        encoding="utf-8",
+    )
+
+
+def temporary_asset_dir(*, asset_root: Path, source: Path) -> Path:
+    digest = hashlib.md5(str(source.resolve()).encode("utf-8")).hexdigest()[:12]
+    return asset_root / ".tmp" / digest
+
+
+def prepare_work_dir(*, work_dir: Path, source: Path) -> None:
+    if work_dir.exists():
+        if path_contains(parent=work_dir, child=source):
+            raise ValueError(
+                f"Cannot replace temporary asset directory that contains the source file: {work_dir}"
+            )
+        shutil.rmtree(work_dir)
+    work_dir.mkdir(parents=True)
+
+
+def prepare_final_asset_dir(
+    *,
+    final_dir: Path,
+    source: Path,
+    work_dir: Path,
+    force: bool,
+) -> None:
+    if not final_dir.exists():
+        return
+    if not force:
+        shutil.rmtree(work_dir)
+        cleanup_tmp_parent(work_dir)
+        raise AssetDirectoryExistsError(f"Asset directory already exists: {final_dir}")
+    if path_contains(parent=final_dir, child=source):
+        raise ValueError(
+            f"Cannot replace asset directory that contains the source file: {final_dir}"
+        )
+    shutil.rmtree(final_dir)
+
+
+def rename_markdown_to_canonical_name(
+    *,
+    markdown_path: Path,
+    canonical_name: str,
+) -> Path:
+    canonical_path = markdown_path.with_name(f"{canonical_name}.md")
+    if markdown_path != canonical_path:
+        markdown_path.rename(canonical_path)
+    return canonical_path
+
+
+def move_source_to_canonical_asset_path(
+    *,
+    source: Path,
+    asset_dir: Path,
+    canonical_name: str,
+) -> Path:
+    destination = asset_dir / f"{canonical_name}{source.suffix}"
+    if source.resolve() == destination.resolve():
+        return destination
+    if destination.exists():
+        raise FileExistsError(f"Asset source already exists: {destination}")
+
+    shutil.move(str(source), str(destination))
+    return destination
+
+
+def cleanup_tmp_parent(work_dir: Path) -> None:
+    tmp_parent = work_dir.parent
+    if tmp_parent.exists() and not list(tmp_parent.iterdir()):
+        tmp_parent.rmdir()
+
+
+def prepare_asset_dir(*, asset_dir: Path, source: Path, force: bool) -> None:
+    if asset_dir.exists():
+        if not force:
+            raise AssetDirectoryExistsError(
+                f"Asset directory already exists: {asset_dir}"
+            )
+        if path_contains(parent=asset_dir, child=source):
+            raise ValueError(
+                f"Cannot replace asset directory that contains the source file: {asset_dir}"
+            )
+        shutil.rmtree(asset_dir)
+
+    asset_dir.mkdir(parents=True)
+
+
+def path_contains(*, parent: Path, child: Path) -> bool:
+    try:
+        child.resolve().relative_to(parent.resolve())
+    except ValueError:
+        return False
+    return True
+
+
+def move_source_into_asset_dir(*, source: Path, asset_dir: Path) -> Path:
+    destination = asset_dir / source.name
+    if source.resolve() == destination.resolve():
+        return destination
+    if destination.exists():
+        raise FileExistsError(f"Asset source already exists: {destination}")
+
+    shutil.move(str(source), str(destination))
+    return destination
+
+
+def table_of_contents_markdown(markdown: str) -> str:
+    lines = markdown.splitlines()
+    headers = parse_markdown_headers(markdown)
+    toc_lines = [
+        table_of_contents_line(
+            header=header,
+            line_count=section_line_count(
+                header=header,
+                headers=headers,
+                total_lines=len(lines),
+            ),
+        )
+        for header in headers
+    ]
+
+    return "\n".join(
+        [
+            "# Document Structure",
+            "",
+            "Table of Contents:",
+            "",
+            *toc_lines,
+        ]
+    ).rstrip() + "\n"
+
+
+def table_of_contents_line(*, header: MarkdownHeader, line_count: int) -> str:
+    indent = "  " * (header.level - 1)
+    line_number = header.line_index + 1
+    return (
+        f"{indent}- {header.title} "
+        f"(H{header.level}, line {line_number}, {line_count} lines)"
+    )
+
+
+def section_line_count(
+    *,
+    header: MarkdownHeader,
+    headers: tuple[MarkdownHeader, ...],
+    total_lines: int,
+) -> int:
+    end_index = total_lines
+    for next_header in headers:
+        if next_header.line_index <= header.line_index:
+            continue
+        if next_header.level <= header.level:
+            end_index = next_header.line_index
+            break
+    return max(end_index - header.line_index, 1)

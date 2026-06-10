@@ -1,0 +1,191 @@
+import json
+import zipfile
+from pathlib import Path
+
+import pytest
+
+from alex.lib.converters.to_markdown import MarkdownOutput, ToMarkdownConfig
+from alex.lib.summary_assets import (
+    SummaryAssetConfig,
+    SummaryAssetExistsError,
+    UnsupportedSummarySourceError,
+    process_summary_asset,
+)
+
+
+def test_process_markdown_summary_creates_stem_named_workspace(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "deep-work.md"
+    source.write_text("# Deep Work\n\nBy Cal Newport\n\nBody text.\n", encoding="utf-8")
+
+    result = process_summary_asset(
+        SummaryAssetConfig(source=source, output_path=tmp_path / "summaries"),
+    )
+
+    asset_dir = tmp_path / "summaries" / "deep-work"
+    assert result.asset_dir == asset_dir
+    assert result.source_copy == asset_dir / "deep-work.md"
+    assert result.full_markdown == asset_dir / "deep-work.md"
+    assert result.metadata_path == asset_dir / "metadata.json"
+
+    assert result.full_markdown.read_text(encoding="utf-8") == source.read_text(
+        encoding="utf-8"
+    )
+
+    metadata = json.loads(result.metadata_path.read_text(encoding="utf-8"))
+    assert metadata == {
+        "title": "Deep Work",
+        "authors": ["Cal Newport"],
+        "source_format": "markdown",
+        "source_file": "deep-work.md",
+        "full_markdown": "deep-work.md",
+    }
+
+
+def test_process_pdf_summary_converts_inside_stem_named_workspace(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "Paper Draft.pdf"
+    source.write_bytes(b"%PDF-1.7\n")
+    captured_configs: list[ToMarkdownConfig] = []
+
+    def fake_markdowner(config: ToMarkdownConfig) -> MarkdownOutput:
+        captured_configs.append(config)
+        config.output_dir.mkdir(parents=True, exist_ok=True)
+        config.image_path.mkdir(parents=True, exist_ok=True)
+        (config.image_path / "page-1.png").write_bytes(b"image")
+        config.asset_path.write_text(
+            "# Paper Draft\n\nExtracted text.\n",
+            encoding="utf-8",
+        )
+        return MarkdownOutput(config=config, asset=config.asset_path)
+
+    result = process_summary_asset(
+        SummaryAssetConfig(source=source, output_path=tmp_path / "summaries"),
+        pdf_markdowner=fake_markdowner,
+    )
+
+    asset_dir = tmp_path / "summaries" / "Paper Draft"
+    assert captured_configs == [
+        ToMarkdownConfig(source=source, output_dir=asset_dir, name="Paper Draft")
+    ]
+    assert result.asset_dir == asset_dir
+    assert result.source_copy == asset_dir / "Paper Draft.pdf"
+    assert result.full_markdown == asset_dir / "Paper Draft.md"
+    assert (asset_dir / "images" / "page-1.png").read_bytes() == b"image"
+
+    metadata = json.loads(result.metadata_path.read_text(encoding="utf-8"))
+    assert metadata["source_format"] == "pdf"
+    assert metadata["source_file"] == "Paper Draft.pdf"
+
+
+def test_process_epub_summary_extracts_markdown_and_preserves_source(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "sample.epub"
+    write_minimal_epub(source)
+
+    result = process_summary_asset(
+        SummaryAssetConfig(source=source, output_path=tmp_path / "summaries"),
+    )
+
+    asset_dir = tmp_path / "summaries" / "sample"
+    assert result.source_copy == asset_dir / "sample.epub"
+    assert result.full_markdown == asset_dir / "sample.md"
+    assert result.source_copy.read_bytes() == source.read_bytes()
+    assert result.full_markdown.read_text(encoding="utf-8") == (
+        "# Example Book\n\n"
+        "By Jane Writer\n\n"
+        "# Opening\n\n"
+        "The first paragraph.\n\n"
+        "The second paragraph.\n"
+    )
+
+
+def test_process_summary_refuses_existing_workspace_without_force(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "notes.md"
+    source.write_text("# Notes\n", encoding="utf-8")
+    existing_asset = tmp_path / "summaries" / "notes"
+    existing_asset.mkdir(parents=True)
+
+    with pytest.raises(SummaryAssetExistsError, match="already exists"):
+        process_summary_asset(
+            SummaryAssetConfig(source=source, output_path=tmp_path / "summaries"),
+        )
+
+
+def write_minimal_epub(path: Path) -> None:
+    with zipfile.ZipFile(path, "w") as archive:
+        archive.writestr("mimetype", "application/epub+zip")
+        archive.writestr(
+            "META-INF/container.xml",
+            """<?xml version="1.0"?>
+<container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container">
+  <rootfiles>
+    <rootfile full-path="OEBPS/content.opf" media-type="application/oebps-package+xml"/>
+  </rootfiles>
+</container>
+""",
+        )
+        archive.writestr(
+            "OEBPS/content.opf",
+            """<?xml version="1.0"?>
+<package xmlns="http://www.idpf.org/2007/opf" unique-identifier="bookid" version="3.0">
+  <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
+    <dc:title>Example Book</dc:title>
+    <dc:creator>Jane Writer</dc:creator>
+  </metadata>
+  <manifest>
+    <item id="chapter" href="chapter.xhtml" media-type="application/xhtml+xml"/>
+  </manifest>
+  <spine>
+    <itemref idref="chapter"/>
+  </spine>
+</package>
+""",
+        )
+        archive.writestr(
+            "OEBPS/chapter.xhtml",
+            """<html xmlns="http://www.w3.org/1999/xhtml">
+  <body>
+    <h1>Opening</h1>
+    <p>The first paragraph.</p>
+    <p>The second paragraph.</p>
+  </body>
+</html>
+""",
+        )
+
+
+def test_process_summary_force_replaces_existing_workspace(tmp_path: Path) -> None:
+    source = tmp_path / "notes.md"
+    source.write_text("# Notes\n", encoding="utf-8")
+    existing_asset = tmp_path / "summaries" / "notes"
+    existing_asset.mkdir(parents=True)
+    stale_file = existing_asset / "stale.md"
+    stale_file.write_text("stale", encoding="utf-8")
+
+    result = process_summary_asset(
+        SummaryAssetConfig(
+            source=source,
+            output_path=tmp_path / "summaries",
+            force=True,
+        ),
+    )
+
+    assert result.asset_dir == existing_asset
+    assert not stale_file.exists()
+    assert result.metadata_path.exists()
+
+
+def test_process_summary_rejects_unsupported_sources(tmp_path: Path) -> None:
+    source = tmp_path / "data.csv"
+    source.write_text("name,value\n", encoding="utf-8")
+
+    with pytest.raises(UnsupportedSummarySourceError, match="Supported file types"):
+        process_summary_asset(
+            SummaryAssetConfig(source=source, output_path=tmp_path / "summaries"),
+        )
