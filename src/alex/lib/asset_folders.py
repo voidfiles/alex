@@ -22,23 +22,19 @@ ASSET_NAMING_MODEL_ENV = "PROCESS_DOC_ASSET_NAMING_MODEL"
 
 
 class PdfMarkdowner(Protocol):
-    def __call__(self, config: ToMarkdownConfig) -> MarkdownOutput:
-        ...
+    def __call__(self, config: ToMarkdownConfig) -> MarkdownOutput: ...
 
 
 class EpubMarkdowner(Protocol):
-    def __call__(self, config: ToMarkdownConfig) -> MarkdownOutput:
-        ...
+    def __call__(self, config: ToMarkdownConfig) -> MarkdownOutput: ...
 
 
 class TextCompleter(Protocol):
-    def complete(self, *, prompt: str, model: str, max_tokens: int) -> str:
-        ...
+    def complete(self, *, prompt: str, model: str, max_tokens: int) -> str: ...
 
 
 class AssetNamer(Protocol):
-    def __call__(self, asset_input: "AssetNameInput") -> "AssetName":
-        ...
+    def __call__(self, asset_input: AssetNameInput) -> AssetName: ...
 
 
 class AssetDirectoryExistsError(FileExistsError):
@@ -317,7 +313,8 @@ def prepare_work_dir(*, work_dir: Path, source: Path) -> None:
     if work_dir.exists():
         if path_contains(parent=work_dir, child=source):
             raise ValueError(
-                f"Cannot replace temporary asset directory that contains the source file: {work_dir}"
+                "Cannot replace temporary asset directory that contains "
+                f"the source file: {work_dir}"
             )
         shutil.rmtree(work_dir)
     work_dir.mkdir(parents=True)
@@ -384,7 +381,8 @@ def prepare_asset_dir(*, asset_dir: Path, source: Path, force: bool) -> None:
             )
         if path_contains(parent=asset_dir, child=source):
             raise ValueError(
-                f"Cannot replace asset directory that contains the source file: {asset_dir}"
+                "Cannot replace asset directory that contains "
+                f"the source file: {asset_dir}"
             )
         shutil.rmtree(asset_dir)
 
@@ -425,15 +423,18 @@ def table_of_contents_markdown(markdown: str) -> str:
         for header in headers
     ]
 
-    return "\n".join(
-        [
-            "# Document Structure",
-            "",
-            "Table of Contents:",
-            "",
-            *toc_lines,
-        ]
-    ).rstrip() + "\n"
+    return (
+        "\n".join(
+            [
+                "# Document Structure",
+                "",
+                "Table of Contents:",
+                "",
+                *toc_lines,
+            ]
+        ).rstrip()
+        + "\n"
+    )
 
 
 def table_of_contents_line(*, header: MarkdownHeader, line_count: int) -> str:

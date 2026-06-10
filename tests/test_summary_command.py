@@ -3,6 +3,7 @@ from pathlib import Path
 from click.testing import CliRunner
 
 from alex.commands.summary import build_summary_command
+from alex.lib.converters.to_markdown import MarkdownOutput, ToMarkdownConfig
 from alex.lib.summary_assets import SummaryAssetConfig, SummaryAssetOutput
 
 
@@ -58,11 +59,11 @@ def test_summary_command_miner_option_selects_miner_pdf_markdowner(
     source.write_bytes(b"%PDF-1.7\n")
     selected_markdowners: list[object] = []
 
-    def default_markdowner(config: object) -> object:
-        return config
+    def default_markdowner(config: ToMarkdownConfig) -> MarkdownOutput:
+        return MarkdownOutput(config=config, asset=config.asset_path)
 
-    def miner_markdowner(config: object) -> object:
-        return config
+    def miner_markdowner(config: ToMarkdownConfig) -> MarkdownOutput:
+        return MarkdownOutput(config=config, asset=config.asset_path)
 
     def fake_processor(
         config: SummaryAssetConfig,

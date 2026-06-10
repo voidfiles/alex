@@ -273,9 +273,7 @@ class MarkdownHTMLParser(HTMLParser):
             return
         if self.skip_depth:
             return
-        if re.fullmatch(r"h[1-6]", normalized):
-            self.ensure_blank_line()
-        elif normalized in {
+        if re.fullmatch(r"h[1-6]", normalized) or normalized in {
             "p",
             "div",
             "section",

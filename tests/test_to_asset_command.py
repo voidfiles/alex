@@ -4,7 +4,7 @@ from pathlib import Path
 from click.testing import CliRunner
 
 from alex.commands.to_asset import build_to_asset_command
-from alex.lib.asset_folders import AssetName, AssetNameInput
+from alex.lib.asset_folders import AssetName, AssetNameInput, AssetNamer
 from alex.lib.converters.to_markdown import (
     DatalabApiError,
     MarkdownOutput,
@@ -18,7 +18,7 @@ def fixed_asset_namer(
     title: str = "Canonical Title",
     authors: tuple[str, ...] = ("Canonical Author",),
     captured_inputs: list[AssetNameInput] | None = None,
-):
+) -> AssetNamer:
     def namer(asset_input: AssetNameInput) -> AssetName:
         if captured_inputs is not None:
             captured_inputs.append(asset_input)
@@ -329,9 +329,7 @@ def test_to_asset_reports_datalab_api_errors_without_traceback(
     )
 
     assert result.exit_code == 1
-    assert (
-        "Error: Datalab API request failed with HTTP 403: forbidden" in result.output
-    )
+    assert "Error: Datalab API request failed with HTTP 403: forbidden" in result.output
     assert "Traceback" not in result.output
     assert source.exists()
 

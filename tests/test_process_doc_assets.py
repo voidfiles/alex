@@ -48,9 +48,7 @@ class RecordingSummarizer:
             if isinstance(response, str):
                 return tuple(response for _ in prompts)
             return response
-        return tuple(
-            f"Summary for chunk {index + 1}." for index in range(len(prompts))
-        )
+        return tuple(f"Summary for chunk {index + 1}." for index in range(len(prompts)))
 
     def complete(
         self,
@@ -200,8 +198,7 @@ def test_process_doc_asset_recursively_compresses_large_chunk_summaries(
         encoding="utf-8",
     )
     (asset_dir / "headers.md").write_text(
-        "- Large Summary (H1, line 1, 7 lines)\n"
-        "  - First (H2, line 5, 3 lines)\n",
+        "- Large Summary (H1, line 1, 7 lines)\n  - First (H2, line 5, 3 lines)\n",
         encoding="utf-8",
     )
     summarizer = RecordingSummarizer(
@@ -228,6 +225,7 @@ def test_process_doc_asset_recursively_compresses_large_chunk_summaries(
     )
     assert any("Long summary." in prompt for prompt in compression_call.prompts)
 
+    assert result.chunk_summary_path is not None
     chunk_summary = result.chunk_summary_path.read_text(encoding="utf-8")
     assert "Compressed summary." in chunk_summary
     assert "Long summary. Long summary." not in chunk_summary
@@ -245,8 +243,7 @@ def test_process_doc_asset_can_rerun_after_generated_files_exist(
         encoding="utf-8",
     )
     (asset_dir / "headers.md").write_text(
-        "- Rerunnable (H1, line 1, 5 lines)\n"
-        "  - First (H2, line 3, 2 lines)\n",
+        "- Rerunnable (H1, line 1, 5 lines)\n  - First (H2, line 3, 2 lines)\n",
         encoding="utf-8",
     )
     summarizer = RecordingSummarizer()
@@ -274,7 +271,7 @@ def test_process_doc_asset_requires_headers_markdown_and_original(
     asset_dir = tmp_path / "incomplete"
     asset_dir.mkdir()
 
-    with pytest.raises(ProcessDocAssetError, match="headers.md"):
+    with pytest.raises(ProcessDocAssetError, match=r"headers\.md"):
         process_doc_asset(ProcessDocAssetConfig(asset_path=asset_dir))
 
     (asset_dir / "headers.md").write_text("# Document Structure\n", encoding="utf-8")

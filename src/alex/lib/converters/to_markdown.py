@@ -13,12 +13,10 @@ from typing import Protocol
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
-import pymupdf4llm
 from pydantic import BaseModel, Field
 
 from alex.lib.document_sources import read_epub_source
 from alex.lib.metadata import package_version
-
 
 DATALAB_CONVERT_API_URL = "https://www.datalab.to/api/v1/convert"
 DATALAB_API_KEY_ENV = "DATALAB_API_KEY"
@@ -59,13 +57,19 @@ BOLD_HEADER_PATTERN = re.compile(
 
 
 class SaveableImage(Protocol):
-    def save(self, path: Path, image_format: str) -> None:
-        ...
+    def save(self, path: Path, image_format: str) -> None: ...
+
+
+def pymupdf_to_markdown(source: str, **kwargs: object) -> object:
+    # Imported lazily so `alex --help` never pays the PyMuPDF import cost.
+    import pymupdf4llm
+
+    return pymupdf4llm.to_markdown(source, **kwargs)
 
 
 def pymupdf4llm_markdowner(config: ToMarkdownConfig) -> MarkdownOutput:
     with suppress_stdout():
-        markdown = pymupdf4llm.to_markdown(
+        markdown = pymupdf_to_markdown(
             str(config.source),
             write_images=True,
             image_path=str(config.image_path),
@@ -130,7 +134,9 @@ def datalab_pdf_markdowner(config: ToMarkdownConfig) -> MarkdownOutput:
 
     check_url = submit_response.get("request_check_url")
     if not isinstance(check_url, str) or not check_url:
-        raise TypeError("Expected Datalab submit response to include request_check_url.")
+        raise TypeError(
+            "Expected Datalab submit response to include request_check_url."
+        )
 
     result = poll_datalab_result(check_url, api_key)
     markdown = result.get("markdown")
@@ -157,7 +163,7 @@ def datalab_pdf_markdowner(config: ToMarkdownConfig) -> MarkdownOutput:
 def get_datalab_api_key() -> str:
     api_key = os.environ.get(DATALAB_API_KEY_ENV)
     if not api_key:
-        raise EnvironmentError(
+        raise OSError(
             f"{DATALAB_API_KEY_ENV} environment variable is not set. "
             "Create an API key at https://www.datalab.to/."
         )
@@ -220,11 +226,11 @@ def encode_multipart_form(
     for name, value in fields.items():
         chunks.extend(
             [
-                f"--{boundary}\r\n".encode("utf-8"),
+                f"--{boundary}\r\n".encode(),
                 (
-                    'Content-Disposition: form-data; '
+                    "Content-Disposition: form-data; "
                     f'name="{escape_multipart_header_value(name)}"\r\n\r\n'
-                ).encode("utf-8"),
+                ).encode(),
                 value.encode("utf-8"),
                 b"\r\n",
             ]
@@ -232,16 +238,16 @@ def encode_multipart_form(
 
     chunks.extend(
         [
-            f"--{boundary}\r\n".encode("utf-8"),
+            f"--{boundary}\r\n".encode(),
             (
                 "Content-Disposition: form-data; "
                 f'name="{escape_multipart_header_value(file_field)}"; '
                 f'filename="{escape_multipart_header_value(file_path.name)}"\r\n'
-            ).encode("utf-8"),
-            f"Content-Type: {content_type}\r\n\r\n".encode("utf-8"),
+            ).encode(),
+            f"Content-Type: {content_type}\r\n\r\n".encode(),
             file_path.read_bytes(),
             b"\r\n",
-            f"--{boundary}--\r\n".encode("utf-8"),
+            f"--{boundary}--\r\n".encode(),
         ]
     )
 
@@ -256,11 +262,16 @@ def read_datalab_json(
     request_or_url: Request | str,
     api_key: str | None = None,
 ) -> dict[str, object]:
-    request = (
-        Request(request_or_url, headers=datalab_request_headers(api_key), method="GET")
-        if isinstance(request_or_url, str)
-        else request_or_url
-    )
+    if isinstance(request_or_url, str):
+        if api_key is None:
+            raise ValueError("api_key is required when polling a Datalab URL.")
+        request = Request(
+            request_or_url,
+            headers=datalab_request_headers(api_key),
+            method="GET",
+        )
+    else:
+        request = request_or_url
     try:
         with urlopen(request) as response:
             payload = response.read()

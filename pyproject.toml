@@ -16,9 +16,38 @@ alex = "alex.commands.main:main"
 
 [dependency-groups]
 dev = [
+    "mypy>=2.1.0",
     "pytest>=9.0.1",
+    "ruff>=0.15.16",
 ]
 
 [build-system]
 requires = ["uv_build>=0.11.7,<0.12.0"]
 build-backend = "uv_build"
+
+[tool.ruff]
+target-version = "py312"
+line-length = 88
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
+
+[tool.ruff.lint.per-file-ignores]
+# LLM prompt prose lives in long template strings; wrapping it would change
+# the prompts themselves.
+"src/alex/lib/process_doc_assets.py" = ["E501"]
+"src/alex/lib/asset_folders.py" = ["E501"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+files = ["src", "tests"]
+
+[[tool.mypy.overrides]]
+module = [
+    "pymupdf4llm",
+    "marker.*",
+    "litellm",
+]
+ignore_missing_imports = true

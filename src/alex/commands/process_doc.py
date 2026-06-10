@@ -14,8 +14,7 @@ from alex.lib.process_doc_assets import (
 
 
 class ProcessDocAssetProcessor(Protocol):
-    def __call__(self, config: ProcessDocAssetConfig) -> ProcessDocAssetOutput:
-        ...
+    def __call__(self, config: ProcessDocAssetConfig) -> ProcessDocAssetOutput: ...
 
 
 def build_process_doc_command(

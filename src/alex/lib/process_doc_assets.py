@@ -19,7 +19,6 @@ from alex.lib.document_sources import (
     metadata_from_markdown,
 )
 
-
 CHUNK_LINE_LIMIT = 10_000
 DEFAULT_FAST_SUMMARY_MODEL = "claude-haiku-4-5"
 DEFAULT_FINAL_SUMMARY_MODEL = "claude-opus-4-8"
@@ -118,8 +117,7 @@ class ProcessDocSummarizer(Protocol):
         prompts: tuple[str, ...],
         model: str,
         max_tokens: int,
-    ) -> tuple[str, ...]:
-        ...
+    ) -> tuple[str, ...]: ...
 
     def complete(
         self,
@@ -127,8 +125,7 @@ class ProcessDocSummarizer(Protocol):
         prompt: str,
         model: str,
         max_tokens: int,
-    ) -> str:
-        ...
+    ) -> str: ...
 
 
 def process_doc_asset(
@@ -202,9 +199,8 @@ def process_doc_asset(
             markdown_path=markdown_path,
             headers_path=headers_path,
             chunk_paths=chunk_paths,
-            summarizer=summarizer or AnthropicMessagesSummarizer(
-                max_workers=config.summary_max_workers
-            ),
+            summarizer=summarizer
+            or AnthropicMessagesSummarizer(max_workers=config.summary_max_workers),
         )
 
     return ProcessDocAssetOutput(
@@ -406,7 +402,7 @@ def write_individual_chunk_summaries(
     chunk_paths: tuple[Path, ...],
     chunk_summaries: tuple[str, ...],
 ) -> None:
-    for chunk_path, summary in zip(chunk_paths, chunk_summaries):
+    for chunk_path, summary in zip(chunk_paths, chunk_summaries, strict=True):
         summary_path = chunk_summaries_dir / f"{chunk_path.stem}_summary.md"
         summary_path.write_text(
             f"""# Summary: {chunk_path.name}
@@ -850,7 +846,9 @@ def infer_chapter_level(*, headers: str, markdown: str) -> int:
     if not levels:
         levels = tuple(header.level for header in parse_markdown_headers(markdown))
     if not levels:
-        raise ProcessDocAssetError("Cannot infer chapter level without markdown headers.")
+        raise ProcessDocAssetError(
+            "Cannot infer chapter level without markdown headers."
+        )
 
     counts = Counter(levels)
     top_level = min(counts)

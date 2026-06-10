@@ -2,6 +2,7 @@ import subprocess
 import sys
 import textwrap
 
+import pytest
 from click.testing import CliRunner
 
 from alex.commands.main import main
@@ -71,30 +72,16 @@ def test_cli_help_does_not_import_pdf_converter_dependencies() -> None:
     assert "to-markdown" not in result.stdout
 
 
-def test_cli_import_loads_source_dotenv() -> None:
-    code = textwrap.dedent(
-        """
-        import alex.lib.env
-
-        calls = []
-
-        def fake_load_source_dotenv():
-            calls.append("loaded")
-
-        alex.lib.env.load_source_dotenv = fake_load_source_dotenv
-
-        import alex.commands.main
-
-        if calls != ["loaded"]:
-            raise SystemExit(f"dotenv loader calls: {calls!r}")
-        """
+def test_running_a_command_loads_the_source_dotenv(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[str] = []
+    monkeypatch.setattr(
+        "alex.commands.main.load_source_dotenv",
+        lambda: calls.append("loaded"),
     )
 
-    result = subprocess.run(
-        [sys.executable, "-c", code],
-        capture_output=True,
-        check=False,
-        text=True,
-    )
+    result = CliRunner().invoke(main, ["version"])
 
-    assert result.returncode == 0, result.stderr
+    assert result.exit_code == 0
+    assert calls == ["loaded"]

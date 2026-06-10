@@ -22,8 +22,7 @@ SUMMARY_SOURCE_EXTENSIONS = frozenset({".epub", ".markdown", ".md", ".pdf", ".tx
 
 
 class PdfMarkdowner(Protocol):
-    def __call__(self, config: ToMarkdownConfig) -> MarkdownOutput:
-        ...
+    def __call__(self, config: ToMarkdownConfig) -> MarkdownOutput: ...
 
 
 class UnsupportedSummarySourceError(ValueError):

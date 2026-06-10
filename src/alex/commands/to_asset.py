@@ -6,8 +6,8 @@ from typing import TYPE_CHECKING, Protocol
 import click
 
 from alex.lib.asset_folders import (
-    AssetNamer,
     DEFAULT_VAULT_ASSET_ROOT,
+    AssetNamer,
     EpubMarkdowner,
     PdfMarkdowner,
     ToAssetConfig,
@@ -35,8 +35,7 @@ class AssetBuilder(Protocol):
         pdf_markdowner: PdfMarkdowner,
         epub_markdowner: EpubMarkdowner,
         asset_namer: AssetNamer,
-    ) -> ToAssetOutput:
-        ...
+    ) -> ToAssetOutput: ...
 
 
 def validate_supported_source(source: Path) -> None:

@@ -2,6 +2,8 @@ import os
 import sys
 import zipfile
 from base64 import b64encode
+from collections.abc import Iterator
+from email.message import Message
 from io import BytesIO
 from pathlib import Path
 from types import ModuleType
@@ -17,10 +19,10 @@ from alex.lib.converters.to_markdown import (
     build_datalab_submit_request,
     datalab_pdf_markdowner,
     epub_markdowner,
-    read_datalab_json,
     marker_pdf_markdowner,
     poll_datalab_result,
     pymupdf4llm_markdowner,
+    read_datalab_json,
 )
 
 
@@ -35,7 +37,7 @@ def test_pymupdf4llm_markdowner_writes_markdown_asset(
         calls.append((source_path, kwargs))
         return "# Paper\n"
 
-    monkeypatch.setattr(converter_module.pymupdf4llm, "to_markdown", fake_to_markdown)
+    monkeypatch.setattr(converter_module, "pymupdf_to_markdown", fake_to_markdown)
 
     config = ToMarkdownConfig(source=source, output_dir=tmp_path / "out", name="paper")
 
@@ -68,7 +70,7 @@ def test_pymupdf4llm_markdowner_rejects_non_string_markdown(
     def fake_to_markdown(source_path: str, **kwargs: Any) -> list[str]:
         return ["# Paper\n"]
 
-    monkeypatch.setattr(converter_module.pymupdf4llm, "to_markdown", fake_to_markdown)
+    monkeypatch.setattr(converter_module, "pymupdf_to_markdown", fake_to_markdown)
 
     config = ToMarkdownConfig(source=source, output_dir=tmp_path / "out", name="paper")
 
@@ -87,7 +89,7 @@ def test_pymupdf4llm_markdowner_suppresses_library_stdout(
         os.write(1, b"=== noisy fd parser output ===\n")
         return "# Paper\n"
 
-    monkeypatch.setattr(converter_module.pymupdf4llm, "to_markdown", fake_to_markdown)
+    monkeypatch.setattr(converter_module, "pymupdf_to_markdown", fake_to_markdown)
 
     config = ToMarkdownConfig(source=source, output_dir=tmp_path / "out", name="paper")
 
@@ -106,7 +108,7 @@ def test_pymupdf4llm_markdowner_removes_bold_wrapping_from_headers(
     def fake_to_markdown(source_path: str, **kwargs: Any) -> str:
         return "## **Paper Title**\n\nBody with **bold** text.\n"
 
-    monkeypatch.setattr(converter_module.pymupdf4llm, "to_markdown", fake_to_markdown)
+    monkeypatch.setattr(converter_module, "pymupdf_to_markdown", fake_to_markdown)
 
     config = ToMarkdownConfig(source=source, output_dir=tmp_path / "out", name="paper")
 
@@ -141,7 +143,7 @@ def test_marker_pdf_markdowner_writes_markdown_asset_and_images(
 ) -> None:
     source = tmp_path / "paper.pdf"
     source.write_bytes(b"%PDF-1.7\n")
-    calls: list[tuple[str, Any]] = []
+    calls: list[tuple[Any, ...]] = []
     rendered = object()
 
     class FakeImage:
@@ -161,7 +163,9 @@ def test_marker_pdf_markdowner_writes_markdown_asset_and_images(
         calls.append(("create_models", None))
         return {"layout_model": "fake"}
 
-    def fake_text_from_rendered(rendered: object) -> tuple[str, str, dict[str, FakeImage]]:
+    def fake_text_from_rendered(
+        rendered: object,
+    ) -> tuple[str, str, dict[str, FakeImage]]:
         calls.append(("render_text", rendered))
         return (
             "![Figure](figure.jpeg)\n\n## **Paper**\n",
@@ -245,7 +249,10 @@ def test_build_datalab_submit_request_uses_convert_api_multipart_form(
     assert request.get_header("X-api-key") == "test-datalab-key"
     assert request.get_header("User-agent") == "alex-cli/0.1.0"
     assert request.get_header("Accept") == "application/json"
-    assert request.get_header("Content-type") == "multipart/form-data; boundary=test-boundary"
+    assert (
+        request.get_header("Content-type")
+        == "multipart/form-data; boundary=test-boundary"
+    )
     assert isinstance(body, bytes)
     assert b'name="output_format"\r\n\r\nmarkdown' in body
     assert b'name="mode"\r\n\r\nbalanced' in body
@@ -296,7 +303,7 @@ def test_read_datalab_json_raises_readable_error_for_http_failures(
             url=request.full_url,
             code=403,
             msg="Forbidden",
-            hdrs=None,
+            hdrs=Message(),
             fp=BytesIO(b"error code: 1010"),
         )
 
@@ -315,7 +322,7 @@ def test_read_datalab_json_raises_readable_error_for_http_failures(
 def test_poll_datalab_result_polls_until_complete(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    responses = iter(
+    responses: Iterator[dict[str, object]] = iter(
         [
             {"status": "processing"},
             {"status": "complete", "success": True, "markdown": "# Paper\n"},
@@ -374,7 +381,7 @@ def test_datalab_pdf_markdowner_writes_markdown_asset_and_images(
 ) -> None:
     source = tmp_path / "paper.pdf"
     source.write_bytes(b"%PDF-1.7\n")
-    calls: list[tuple[str, Any]] = []
+    calls: list[tuple[Any, ...]] = []
 
     def fake_submit_datalab_pdf(
         pdf_path: Path,
@@ -450,9 +457,9 @@ def install_fake_marker_modules(
 ) -> None:
     marker_module = ModuleType("marker")
     converters_module = ModuleType("marker.converters")
-    pdf_module = ModuleType("marker.converters.pdf")
-    models_module = ModuleType("marker.models")
-    output_module = ModuleType("marker.output")
+    pdf_module: Any = ModuleType("marker.converters.pdf")
+    models_module: Any = ModuleType("marker.models")
+    output_module: Any = ModuleType("marker.output")
 
     pdf_module.PdfConverter = pdf_converter
     models_module.create_model_dict = create_model_dict

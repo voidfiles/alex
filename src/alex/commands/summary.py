@@ -25,8 +25,7 @@ class SummaryAssetProcessor(Protocol):
         config: SummaryAssetConfig,
         *,
         pdf_markdowner: PdfMarkdowner,
-    ) -> SummaryAssetOutput:
-        ...
+    ) -> SummaryAssetOutput: ...
 
 
 def build_summary_command(

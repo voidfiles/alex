@@ -1,6 +1,5 @@
 from importlib.metadata import version
 
-
 PACKAGE_NAME = "alex"
 
 

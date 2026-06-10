@@ -2,7 +2,6 @@ import os
 from collections.abc import MutableMapping
 from pathlib import Path
 
-
 SOURCE_ROOT = Path(__file__).resolve().parents[3]
 SOURCE_DOTENV_PATH = SOURCE_ROOT / ".env"
 

@@ -9,7 +9,6 @@ from pathlib import Path
 
 from alex.lib.asset_folders import DEFAULT_VAULT_ASSET_ROOT
 
-
 DEFAULT_SAMPLE_FILE = Path("pdf_test/sample.txt")
 DEFAULT_ASSET_ROOT = DEFAULT_VAULT_ASSET_ROOT
 DEFAULT_OUTPUT_ROOT = Path("pdf_test")
@@ -120,7 +119,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         "--sample-file",
         type=Path,
         default=DEFAULT_SAMPLE_FILE,
-        help=f"File containing sample names, one per line. Defaults to {DEFAULT_SAMPLE_FILE}.",
+        help="File containing sample names, one per line. "
+        f"Defaults to {DEFAULT_SAMPLE_FILE}.",
     )
     parser.add_argument(
         "--asset-root",
@@ -132,7 +132,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         "--output-root",
         type=Path,
         default=DEFAULT_OUTPUT_ROOT,
-        help=f"Directory where sample test folders are written. Defaults to {DEFAULT_OUTPUT_ROOT}.",
+        help="Directory where sample test folders are written. "
+        f"Defaults to {DEFAULT_OUTPUT_ROOT}.",
     )
     parser.add_argument(
         "--alex",

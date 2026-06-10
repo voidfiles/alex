@@ -4,7 +4,7 @@ from alex.lib.env import SOURCE_DOTENV_PATH, load_source_dotenv
 
 
 def test_source_dotenv_path_points_to_repository_root() -> None:
-    assert SOURCE_DOTENV_PATH == Path(__file__).resolve().parents[1] / ".env"
+    assert Path(__file__).resolve().parents[1] / ".env" == SOURCE_DOTENV_PATH
 
 
 def test_load_source_dotenv_sets_missing_values_from_dotenv(tmp_path: Path) -> None:

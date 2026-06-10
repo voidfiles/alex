@@ -1,20 +1,17 @@
 import click
 
-from alex.lib.env import load_source_dotenv
-
-
-load_source_dotenv()
-
 from alex.commands.dump_env import dump_env
 from alex.commands.process_doc import process_doc
 from alex.commands.summary import summary
 from alex.commands.to_asset import to_asset
 from alex.commands.version import version
+from alex.lib.env import load_source_dotenv
 
 
 @click.group(context_settings={"help_option_names": ["-h", "--help"]})
 def main() -> None:
     """Alex command line tools."""
+    load_source_dotenv()
 
 
 main.add_command(to_asset)
