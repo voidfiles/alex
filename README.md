@@ -1,6 +1,8 @@
 # alex
 
-Python command line tools managed with `uv`.
+Personal command line tools for turning PDFs, EPUBs, and Markdown into
+Obsidian vault assets with LLM-generated names and summaries. Python,
+managed with `uv`.
 
 ## Install
 
@@ -10,41 +12,116 @@ Install the CLI globally in editable mode:
 uv tool install --editable /Users/alex/Documents/codes/alex --force
 ```
 
-This makes `alex` available from any directory while continuing to use the code in this checkout.
+This makes `alex` available from any directory while continuing to use the
+code in this checkout.
 
-## Usage
+## Setup
+
+Copy `.env.example` to `.env` and fill in the keys you use. The CLI loads
+`.env` from this checkout on every run and never overrides variables that
+are already exported.
+
+- `ANTHROPIC_API_KEY` — required for `to-asset` naming and `process-doc`
+  summaries with the default models.
+- `DATALAB_API_KEY` — required only for `--datalab` PDF conversion.
+- Other provider keys (`OPENAI_API_KEY`, `GEMINI_API_KEY`, ...) — only if
+  you point a model override at that provider.
+
+## Commands
+
+### to-asset
 
 ```bash
-uv run alex --help
-uv run alex dump-env
-uv run alex version
-uv run alex to-asset paper.pdf
-uv run alex to-asset book.epub
-uv run alex to-asset paper.pdf --asset-root /Users/alex/Dropbox/obsidian/Alex3/assets
-uv run alex to-asset paper.pdf --miner
-uv run alex to-asset paper.pdf --datalab
-uv run alex summary paper.pdf assets
-uv run alex summary book.md assets
-uv run alex process-doc assets/book_asset
-alex --help
-alex dump-env
-alex version
 alex to-asset paper.pdf
 alex to-asset book.epub
 alex to-asset paper.pdf --asset-root /Users/alex/Dropbox/obsidian/Alex3/assets
-alex to-asset paper.pdf --miner
-alex to-asset paper.pdf --datalab
-alex summary paper.pdf assets
-alex summary book.md assets
+alex to-asset paper.pdf --miner     # local marker-pdf instead of PyMuPDF4LLM
+alex to-asset paper.pdf --datalab   # Datalab Convert API
+```
+
+Converts a PDF or EPUB into a vault asset folder. Extracts Markdown in a
+temporary workspace, asks an LLM for canonical title/author metadata, then
+finalizes the asset as `ASSET_ROOT/CANONICAL_NAME` (default asset root is
+the Obsidian vault above). The folder ends up with `CANONICAL_NAME.md`,
+`headers.md`, `metadata.json`, `canonical_name.txt`, extracted images, and
+the original source file renamed to `CANONICAL_NAME.ext`. The converter
+flags only apply to PDFs.
+
+### process-doc
+
+```bash
 alex process-doc assets/book_asset
 ```
 
-`dump-env` prints the selected `/Users/alex/Documents/codes/alex/.env` file to stdout. `to-asset` accepts PDF or EPUB input, extracts Markdown in a temporary workspace, asks an LLM for canonical title/author metadata, and finalizes the asset as `ASSET_ROOT/CANONICAL_NAME`, defaulting to `/Users/alex/Dropbox/obsidian/Alex3/assets`. It writes `CANONICAL_NAME.md`, `headers.md`, `metadata.json`, and `canonical_name.txt`, keeps extracted PDF images beside the Markdown, and moves the original source file into the asset folder as `CANONICAL_NAME.ext` after conversion succeeds. For PDFs, it uses PyMuPDF4LLM by default. Pass `--miner` to use local marker-pdf, or pass `--datalab` to use the Datalab Convert API; those converter options only apply to PDFs. `summary` accepts PDF, Markdown, TXT, or EPUB input and creates `OUTPUT_PATH/INPUT_STEM`, keeping the source copy, extracted Markdown, images, and metadata together. `process-doc` accepts an existing asset directory only. The directory must already contain the original file, one Markdown extract, and `headers.md`; the command writes `chapter_level.txt`, `metadata.json`, `canonical_name.txt`, regenerates `chunks/*.md` in place, and generates `chunk_summary.md` plus `summary.md` when `summary.md` is not already present. Use `summary` for the stem-based one-command workflow, or use `to-asset` first and then pass the prepared asset directory to `process-doc`. On startup, the CLI loads `/Users/alex/Documents/codes/alex/.env` and leaves already-exported environment variables in place. The Datalab converter requires `DATALAB_API_KEY` from that file or the environment. To-asset naming and process-doc summarization require `ANTHROPIC_API_KEY`; override the to-asset naming model with `PROCESS_DOC_ASSET_NAMING_MODEL`, and override process-doc summary models with `PROCESS_DOC_FAST_SUMMARY_MODEL` and `PROCESS_DOC_FINAL_SUMMARY_MODEL`.
+Processes an existing asset directory (it must contain the original file,
+one Markdown extract, and `headers.md`). Infers the chapter level, writes
+`chapter_level.txt`, `metadata.json`, and `canonical_name.txt`, regenerates
+`chunks/*.md`, and generates `chunk_summary.md` plus `summary.md` unless
+`summary.md` already exists.
+
+### summary
+
+```bash
+alex summary paper.pdf assets
+alex summary book.md assets
+```
+
+Creates a summary workspace at `OUTPUT_PATH/INPUT_STEM` from a PDF,
+Markdown, TXT, or EPUB input: source copy, extracted Markdown, images, and
+metadata together. Use `summary` for the stem-named one-command workflow,
+or `to-asset` followed by `process-doc` for the canonical-named pipeline.
+
+### pdf-samples
+
+```bash
+alex pdf-samples --limit 5
+```
+
+Dev tool: re-runs `to-asset` over known sample PDFs with both the default
+and marker converters so their Markdown output can be compared.
+
+### dump-env / version
+
+`dump-env` prints the selected `.env` file. `version` prints the installed
+version.
+
+## Models
+
+LLM calls go through [LiteLLM](https://docs.litellm.ai), so any provider's
+model string works. Each role has an env override (see `src/alex/lib/llm.py`):
+
+| Role | Env var | Default |
+| --- | --- | --- |
+| Chunk summaries + compression | `ALEX_FAST_SUMMARY_MODEL` | `anthropic/claude-haiku-4-5` |
+| Final synthesis | `ALEX_FINAL_SUMMARY_MODEL` | `anthropic/claude-opus-4-8` |
+| Asset naming | `ALEX_NAMING_MODEL` | `anthropic/claude-sonnet-4-6` |
+
+Example: `ALEX_FINAL_SUMMARY_MODEL=openai/gpt-5 alex process-doc assets/book_asset`.
+
+## Development
+
+```bash
+just            # lint + typecheck + tests (same as CI)
+just test       # pytest
+just lint       # ruff check + format check
+just typecheck  # mypy --strict
+just fmt        # autoformat + autofix
+```
+
+CI runs the same four steps on every push (`.github/workflows/ci.yml`).
 
 ## Project Layout
 
 ```text
 src/alex/commands/  # Click command modules
 src/alex/lib/       # Reusable library code
+  llm.py                 # LiteLLM completer + model roles
+  markdown_structure.py  # header parsing, chapters, chunking, TOC
+  summarize.py           # map-reduce summary pipeline + prompts
+  asset_metadata.py      # the metadata.json contract
+  asset_folders.py       # to-asset flow
+  summary_assets.py      # summary workspace flow
+  process_doc_assets.py  # asset validation + process-doc orchestration
+  converters/            # PDF/EPUB -> Markdown backends
 tests/              # Focused CLI tests
 ```
