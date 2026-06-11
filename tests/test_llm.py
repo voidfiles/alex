@@ -6,7 +6,7 @@ from typing import Any
 
 import pytest
 
-from alex.lib.process_doc_assets import (
+from alex.lib.llm import (
     DEFAULT_FAST_SUMMARY_MODEL,
     DEFAULT_FINAL_SUMMARY_MODEL,
     FAST_SUMMARY_MODEL_ENV,

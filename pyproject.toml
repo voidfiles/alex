@@ -37,7 +37,7 @@ select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
 [tool.ruff.lint.per-file-ignores]
 # LLM prompt prose lives in long template strings; wrapping it would change
 # the prompts themselves.
-"src/alex/lib/process_doc_assets.py" = ["E501"]
+"src/alex/lib/summarize.py" = ["E501"]
 "src/alex/lib/asset_folders.py" = ["E501"]
 
 [tool.mypy]

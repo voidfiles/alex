@@ -7,7 +7,6 @@ import click
 
 from alex.lib.process_doc_assets import (
     ProcessDocAssetConfig,
-    ProcessDocAssetError,
     ProcessDocAssetOutput,
     process_doc_asset,
 )
@@ -35,7 +34,7 @@ def build_process_doc_command(
         """Process an existing document asset directory."""
         try:
             result = processor(ProcessDocAssetConfig(asset_path=asset_path))
-        except (OSError, ProcessDocAssetError) as error:
+        except (OSError, RuntimeError, ValueError) as error:
             raise click.ClickException(str(error)) from error
 
         click.echo(f"Processed {result.asset_dir}")

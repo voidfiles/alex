@@ -1,41 +1,30 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import TYPE_CHECKING, Protocol
 
 import click
 
 from alex.lib.asset_folders import (
     DEFAULT_VAULT_ASSET_ROOT,
     AssetNamer,
-    EpubMarkdowner,
-    PdfMarkdowner,
     ToAssetConfig,
-    ToAssetOutput,
     build_asset,
     llm_asset_namer,
 )
-
-if TYPE_CHECKING:
-    from alex.lib.converters.to_markdown import MarkdownOutput, ToMarkdownConfig
-
+from alex.lib.converters.to_markdown import (
+    Markdowner,
+    datalab_pdf_markdowner,
+    epub_markdowner,
+    marker_pdf_markdowner,
+    pymupdf4llm_markdowner,
+    select_markdowner,
+)
 
 SUPPORTED_SOURCE_EXTENSIONS = frozenset({".epub", ".pdf"})
 
 
 class UnsupportedAssetSourceError(ValueError):
     pass
-
-
-class AssetBuilder(Protocol):
-    def __call__(
-        self,
-        config: ToAssetConfig,
-        *,
-        pdf_markdowner: PdfMarkdowner,
-        epub_markdowner: EpubMarkdowner,
-        asset_namer: AssetNamer,
-    ) -> ToAssetOutput: ...
 
 
 def validate_supported_source(source: Path) -> None:
@@ -50,37 +39,12 @@ def validate_supported_source(source: Path) -> None:
     )
 
 
-def lazy_pymupdf4llm_markdowner(config: ToMarkdownConfig) -> MarkdownOutput:
-    from alex.lib.converters.to_markdown import pymupdf4llm_markdowner
-
-    return pymupdf4llm_markdowner(config)
-
-
-def lazy_marker_pdf_markdowner(config: ToMarkdownConfig) -> MarkdownOutput:
-    from alex.lib.converters.to_markdown import marker_pdf_markdowner
-
-    return marker_pdf_markdowner(config)
-
-
-def lazy_datalab_pdf_markdowner(config: ToMarkdownConfig) -> MarkdownOutput:
-    from alex.lib.converters.to_markdown import datalab_pdf_markdowner
-
-    return datalab_pdf_markdowner(config)
-
-
-def lazy_epub_markdowner(config: ToMarkdownConfig) -> MarkdownOutput:
-    from alex.lib.converters.to_markdown import epub_markdowner
-
-    return epub_markdowner(config)
-
-
 def build_to_asset_command(
-    markdowner: PdfMarkdowner = lazy_pymupdf4llm_markdowner,
-    epub_markdowner: EpubMarkdowner = lazy_epub_markdowner,
+    markdowner: Markdowner = pymupdf4llm_markdowner,
+    epub_markdowner: Markdowner = epub_markdowner,
     asset_namer: AssetNamer = llm_asset_namer,
-    miner_markdowner: PdfMarkdowner = lazy_marker_pdf_markdowner,
-    datalab_markdowner: PdfMarkdowner = lazy_datalab_pdf_markdowner,
-    asset_builder: AssetBuilder = build_asset,
+    miner_markdowner: Markdowner = marker_pdf_markdowner,
+    datalab_markdowner: Markdowner = datalab_pdf_markdowner,
 ) -> click.Command:
     @click.command("to-asset")
     @click.argument(
@@ -134,15 +98,15 @@ def build_to_asset_command(
             raise click.UsageError("PDF converter options only apply to PDF inputs.")
 
         selected_markdowner = select_markdowner(
-            default_markdowner=markdowner,
-            miner_markdowner=miner_markdowner,
-            datalab_markdowner=datalab_markdowner,
+            markdowner,
+            miner_markdowner,
+            datalab_markdowner,
             use_miner=miner,
             use_datalab=datalab,
         )
         config = ToAssetConfig(source=source, asset_root=asset_root, force=force)
         try:
-            result = asset_builder(
+            result = build_asset(
                 config,
                 pdf_markdowner=selected_markdowner,
                 epub_markdowner=epub_markdowner,
@@ -154,21 +118,6 @@ def build_to_asset_command(
         click.echo(f"Wrote {result.asset_dir}")
 
     return command
-
-
-def select_markdowner(
-    default_markdowner: PdfMarkdowner,
-    miner_markdowner: PdfMarkdowner,
-    datalab_markdowner: PdfMarkdowner,
-    *,
-    use_miner: bool,
-    use_datalab: bool,
-) -> PdfMarkdowner:
-    if use_datalab:
-        return datalab_markdowner
-    if use_miner:
-        return miner_markdowner
-    return default_markdowner
 
 
 to_asset = build_to_asset_command()

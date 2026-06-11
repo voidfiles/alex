@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import argparse
 import shutil
 import subprocess
 from collections.abc import Callable, Sequence
@@ -109,54 +108,3 @@ def read_samples(*, sample_file: Path, limit: int) -> list[str]:
             break
 
     return samples
-
-
-def main(argv: Sequence[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(
-        description="Copy PDF markdown test samples and run alex to-asset.",
-    )
-    parser.add_argument(
-        "--sample-file",
-        type=Path,
-        default=DEFAULT_SAMPLE_FILE,
-        help="File containing sample names, one per line. "
-        f"Defaults to {DEFAULT_SAMPLE_FILE}.",
-    )
-    parser.add_argument(
-        "--asset-root",
-        type=Path,
-        default=DEFAULT_ASSET_ROOT,
-        help=f"Root Obsidian asset directory. Defaults to {DEFAULT_ASSET_ROOT}.",
-    )
-    parser.add_argument(
-        "--output-root",
-        type=Path,
-        default=DEFAULT_OUTPUT_ROOT,
-        help="Directory where sample test folders are written. "
-        f"Defaults to {DEFAULT_OUTPUT_ROOT}.",
-    )
-    parser.add_argument(
-        "--alex",
-        default="alex",
-        help="Command used to invoke the alex CLI. Defaults to alex.",
-    )
-    parser.add_argument(
-        "--limit",
-        type=int,
-        default=DEFAULT_LIMIT,
-        help=f"Maximum number of samples to process. Defaults to {DEFAULT_LIMIT}.",
-    )
-    args = parser.parse_args(argv)
-
-    results = run_pdf_markdown_samples(
-        sample_file=args.sample_file,
-        asset_root=args.asset_root,
-        output_root=args.output_root,
-        alex_command=args.alex,
-        limit=args.limit,
-    )
-
-    for result in results:
-        print(f"Wrote {result.default_markdown} and {result.miner_markdown}")
-
-    return 0

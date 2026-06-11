@@ -1,6 +1,7 @@
 import click
 
 from alex.commands.dump_env import dump_env
+from alex.commands.pdf_samples import pdf_samples
 from alex.commands.process_doc import process_doc
 from alex.commands.summary import summary
 from alex.commands.to_asset import to_asset
@@ -17,5 +18,6 @@ def main() -> None:
 main.add_command(to_asset)
 main.add_command(process_doc)
 main.add_command(summary)
+main.add_command(pdf_samples)
 main.add_command(dump_env)
 main.add_command(version)

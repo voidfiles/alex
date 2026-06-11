@@ -11,6 +11,8 @@ from html.parser import HTMLParser
 from pathlib import Path
 from xml.etree import ElementTree
 
+from alex.lib.markdown_structure import strip_inline_markdown
+
 
 class UnsupportedDocumentSourceError(ValueError):
     pass
@@ -79,10 +81,6 @@ def first_markdown_byline(markdown: str) -> str | None:
         if stripped.lower().startswith("by "):
             return stripped[3:].strip()
     return None
-
-
-def strip_inline_markdown(text: str) -> str:
-    return re.sub(r"\*\*|__|\*|_|`", "", text)
 
 
 def split_authors(authors: str) -> tuple[str, ...]:

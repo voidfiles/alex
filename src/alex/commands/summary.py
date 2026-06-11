@@ -5,14 +5,14 @@ from typing import Protocol
 
 import click
 
-from alex.commands.to_asset import (
-    lazy_datalab_pdf_markdowner,
-    lazy_marker_pdf_markdowner,
-    lazy_pymupdf4llm_markdowner,
+from alex.lib.converters.to_markdown import (
+    Markdowner,
+    datalab_pdf_markdowner,
+    marker_pdf_markdowner,
+    pymupdf4llm_markdowner,
     select_markdowner,
 )
 from alex.lib.summary_assets import (
-    PdfMarkdowner,
     SummaryAssetConfig,
     SummaryAssetOutput,
     process_summary_asset,
@@ -24,15 +24,15 @@ class SummaryAssetProcessor(Protocol):
         self,
         config: SummaryAssetConfig,
         *,
-        pdf_markdowner: PdfMarkdowner,
+        pdf_markdowner: Markdowner,
     ) -> SummaryAssetOutput: ...
 
 
 def build_summary_command(
     processor: SummaryAssetProcessor = process_summary_asset,
-    default_pdf_markdowner: PdfMarkdowner = lazy_pymupdf4llm_markdowner,
-    miner_pdf_markdowner: PdfMarkdowner = lazy_marker_pdf_markdowner,
-    datalab_pdf_markdowner: PdfMarkdowner = lazy_datalab_pdf_markdowner,
+    default_pdf_markdowner: Markdowner = pymupdf4llm_markdowner,
+    miner_pdf_markdowner: Markdowner = marker_pdf_markdowner,
+    datalab_pdf_markdowner: Markdowner = datalab_pdf_markdowner,
 ) -> click.Command:
     @click.command("summary")
     @click.argument(
@@ -77,9 +77,9 @@ def build_summary_command(
             raise click.UsageError("Choose only one converter option.")
 
         pdf_markdowner = select_markdowner(
-            default_markdowner=default_pdf_markdowner,
-            miner_markdowner=miner_pdf_markdowner,
-            datalab_markdowner=datalab_pdf_markdowner,
+            default_pdf_markdowner,
+            miner_pdf_markdowner,
+            datalab_pdf_markdowner,
             use_miner=miner,
             use_datalab=datalab,
         )

@@ -49,6 +49,21 @@ class DatalabApiError(RuntimeError):
 Markdowner = Callable[[ToMarkdownConfig], MarkdownOutput]
 
 
+def select_markdowner(
+    default_markdowner: Markdowner,
+    miner_markdowner: Markdowner,
+    datalab_markdowner: Markdowner,
+    *,
+    use_miner: bool,
+    use_datalab: bool,
+) -> Markdowner:
+    if use_datalab:
+        return datalab_markdowner
+    if use_miner:
+        return miner_markdowner
+    return default_markdowner
+
+
 BOLD_HEADER_PATTERN = re.compile(
     r"^(?P<marker>[ \t]{0,3}#{1,6}[ \t]+)\*\*(?P<text>.*?)\*\*"
     r"(?P<trailing>[ \t]*#*[ \t]*)$",

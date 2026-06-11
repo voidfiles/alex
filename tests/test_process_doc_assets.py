@@ -9,6 +9,7 @@ from alex.lib.process_doc_assets import (
     ProcessDocAssetError,
     process_doc_asset,
 )
+from alex.lib.summarize import SummarySettings
 
 
 class CompletionCall(NamedTuple):
@@ -104,7 +105,10 @@ def test_process_doc_asset_chunks_an_existing_asset_folder(tmp_path: Path) -> No
     )
 
     result = process_doc_asset(
-        ProcessDocAssetConfig(asset_path=asset_dir, summary_max_workers=1),
+        ProcessDocAssetConfig(
+            asset_path=asset_dir,
+            summary=SummarySettings(max_workers=1),
+        ),
         completer=completer,
     )
 
@@ -204,8 +208,7 @@ def test_process_doc_asset_recursively_compresses_large_chunk_summaries(
     result = process_doc_asset(
         ProcessDocAssetConfig(
             asset_path=asset_dir,
-            max_summary_context_tokens=50,
-            summary_max_workers=1,
+            summary=SummarySettings(max_context_tokens=50, max_workers=1),
         ),
         completer=completer,
     )
@@ -244,13 +247,19 @@ def test_process_doc_asset_can_rerun_after_generated_files_exist(
     completer = RecordingCompleter()
 
     first = process_doc_asset(
-        ProcessDocAssetConfig(asset_path=asset_dir, summary_max_workers=1),
+        ProcessDocAssetConfig(
+            asset_path=asset_dir,
+            summary=SummarySettings(max_workers=1),
+        ),
         completer=completer,
     )
     (first.chunks_dir / "stale.md").write_text("stale", encoding="utf-8")
 
     second = process_doc_asset(
-        ProcessDocAssetConfig(asset_path=asset_dir, summary_max_workers=1),
+        ProcessDocAssetConfig(
+            asset_path=asset_dir,
+            summary=SummarySettings(max_workers=1),
+        ),
         completer=completer,
     )
 

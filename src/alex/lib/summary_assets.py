@@ -1,11 +1,15 @@
 from __future__ import annotations
 
-import json
 import shutil
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Protocol
 
+from alex.lib.asset_metadata import AssetMetadata
+from alex.lib.converters.to_markdown import (
+    Markdowner,
+    ToMarkdownConfig,
+    pymupdf4llm_markdowner,
+)
 from alex.lib.document_sources import (
     DocumentMetadata,
     copy_file,
@@ -14,15 +18,7 @@ from alex.lib.document_sources import (
     title_from_stem,
 )
 
-if TYPE_CHECKING:
-    from alex.lib.converters.to_markdown import MarkdownOutput, ToMarkdownConfig
-
-
 SUMMARY_SOURCE_EXTENSIONS = frozenset({".epub", ".markdown", ".md", ".pdf", ".txt"})
-
-
-class PdfMarkdowner(Protocol):
-    def __call__(self, config: ToMarkdownConfig) -> MarkdownOutput: ...
 
 
 class UnsupportedSummarySourceError(ValueError):
@@ -57,16 +53,10 @@ class SummarySourceContent:
     full_markdown: Path
 
 
-def lazy_pymupdf4llm_markdowner(config: ToMarkdownConfig) -> MarkdownOutput:
-    from alex.lib.converters.to_markdown import pymupdf4llm_markdowner
-
-    return pymupdf4llm_markdowner(config)
-
-
 def process_summary_asset(
     config: SummaryAssetConfig,
     *,
-    pdf_markdowner: PdfMarkdowner = lazy_pymupdf4llm_markdowner,
+    pdf_markdowner: Markdowner = pymupdf4llm_markdowner,
 ) -> SummaryAssetOutput:
     source_format = summary_source_format_for(config.source)
     asset_dir = config.output_path / config.source.stem
@@ -125,7 +115,7 @@ def write_summary_source_content(
     source_format: str,
     asset_dir: Path,
     asset_name: str,
-    pdf_markdowner: PdfMarkdowner,
+    pdf_markdowner: Markdowner,
 ) -> SummarySourceContent:
     if source_format == "pdf":
         return write_pdf_summary_source_content(
@@ -168,10 +158,8 @@ def write_pdf_summary_source_content(
     source: Path,
     asset_dir: Path,
     asset_name: str,
-    pdf_markdowner: PdfMarkdowner,
+    pdf_markdowner: Markdowner,
 ) -> SummarySourceContent:
-    from alex.lib.converters.to_markdown import ToMarkdownConfig
-
     source_copy = asset_dir / source.name
     full_markdown = asset_dir / f"{asset_name}.md"
     copy_file(source, source_copy)
@@ -218,14 +206,10 @@ def write_summary_metadata(
     output: SummaryAssetOutput,
     content: SummarySourceContent,
 ) -> None:
-    payload = {
-        "title": content.metadata.title,
-        "authors": list(content.metadata.authors),
-        "source_format": content.source_format,
-        "source_file": output.source_copy.name,
-        "full_markdown": output.full_markdown.name,
-    }
-    output.metadata_path.write_text(
-        json.dumps(payload, indent=2, sort_keys=False) + "\n",
-        encoding="utf-8",
-    )
+    AssetMetadata(
+        title=content.metadata.title,
+        authors=content.metadata.authors,
+        source_format=content.source_format,
+        source_file=output.source_copy.name,
+        full_markdown=output.full_markdown.name,
+    ).write(output.metadata_path)
