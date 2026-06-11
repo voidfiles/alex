@@ -4,12 +4,10 @@ import json
 import os
 import re
 import shutil
-import time
-import urllib.error
-import urllib.request
 from collections import Counter
+from collections.abc import Sequence
 from concurrent.futures import ThreadPoolExecutor
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Protocol
 
@@ -20,17 +18,17 @@ from alex.lib.document_sources import (
 )
 
 CHUNK_LINE_LIMIT = 10_000
-DEFAULT_FAST_SUMMARY_MODEL = "claude-haiku-4-5"
-DEFAULT_FINAL_SUMMARY_MODEL = "claude-opus-4-8"
+DEFAULT_FAST_SUMMARY_MODEL = "anthropic/claude-haiku-4-5"
+DEFAULT_FINAL_SUMMARY_MODEL = "anthropic/claude-opus-4-8"
+FAST_SUMMARY_MODEL_ENV = "ALEX_FAST_SUMMARY_MODEL"
+FINAL_SUMMARY_MODEL_ENV = "ALEX_FINAL_SUMMARY_MODEL"
 DEFAULT_CHUNK_SUMMARY_MAX_TOKENS = 20_000
 DEFAULT_FINAL_SUMMARY_MAX_TOKENS = 8_192
 DEFAULT_MAX_SUMMARY_CONTEXT_TOKENS = 180_000
 DEFAULT_SUMMARY_MAX_WORKERS = 4
-DEFAULT_ANTHROPIC_MESSAGES_URL = "https://api.anthropic.com/v1/messages"
-DEFAULT_ANTHROPIC_VERSION = "2023-06-01"
 DEFAULT_LLM_TIMEOUT_SECONDS = 900.0
+DEFAULT_LLM_RETRIES = 6
 MAX_SUMMARY_COMPRESSION_ITERATIONS = 8
-TRANSIENT_ANTHROPIC_STATUS_CODES = frozenset({408, 409, 429, 500, 502, 503, 504})
 MARKDOWN_EXTENSIONS = frozenset({".md", ".markdown"})
 SOURCE_EXTENSIONS = frozenset({".epub", ".pdf", ".txt", *MARKDOWN_EXTENSIONS})
 GENERATED_MARKDOWN_FILES = frozenset(
@@ -55,14 +53,22 @@ class ProcessDocAssetError(ValueError):
     pass
 
 
+def resolve_fast_summary_model() -> str:
+    return os.getenv(FAST_SUMMARY_MODEL_ENV) or DEFAULT_FAST_SUMMARY_MODEL
+
+
+def resolve_final_summary_model() -> str:
+    return os.getenv(FINAL_SUMMARY_MODEL_ENV) or DEFAULT_FINAL_SUMMARY_MODEL
+
+
 @dataclass(frozen=True)
 class ProcessDocAssetConfig:
     asset_path: Path
     summarize: bool = True
     force_summary: bool = False
     max_summary_context_tokens: int = DEFAULT_MAX_SUMMARY_CONTEXT_TOKENS
-    fast_summary_model: str = DEFAULT_FAST_SUMMARY_MODEL
-    final_summary_model: str = DEFAULT_FINAL_SUMMARY_MODEL
+    fast_summary_model: str = field(default_factory=resolve_fast_summary_model)
+    final_summary_model: str = field(default_factory=resolve_final_summary_model)
     chunk_summary_max_tokens: int = DEFAULT_CHUNK_SUMMARY_MAX_TOKENS
     final_summary_max_tokens: int = DEFAULT_FINAL_SUMMARY_MAX_TOKENS
     summary_max_workers: int = DEFAULT_SUMMARY_MAX_WORKERS
@@ -110,15 +116,7 @@ class SummaryChunkReference:
     path: str
 
 
-class ProcessDocSummarizer(Protocol):
-    def complete_batch(
-        self,
-        *,
-        prompts: tuple[str, ...],
-        model: str,
-        max_tokens: int,
-    ) -> tuple[str, ...]: ...
-
+class Completer(Protocol):
     def complete(
         self,
         *,
@@ -131,7 +129,7 @@ class ProcessDocSummarizer(Protocol):
 def process_doc_asset(
     config: ProcessDocAssetConfig,
     *,
-    summarizer: ProcessDocSummarizer | None = None,
+    completer: Completer | None = None,
 ) -> ProcessDocAssetOutput:
     asset_dir = config.asset_path
     if not asset_dir.is_dir():
@@ -199,8 +197,7 @@ def process_doc_asset(
             markdown_path=markdown_path,
             headers_path=headers_path,
             chunk_paths=chunk_paths,
-            summarizer=summarizer
-            or AnthropicMessagesSummarizer(max_workers=config.summary_max_workers),
+            completer=completer or LiteLlmCompleter(),
         )
 
     return ProcessDocAssetOutput(
@@ -225,7 +222,7 @@ def summarize_doc_asset(
     markdown_path: Path,
     headers_path: Path,
     chunk_paths: tuple[Path, ...],
-    summarizer: ProcessDocSummarizer,
+    completer: Completer,
 ) -> ProcessDocSummaryOutput:
     asset_dir = config.asset_path
     summary_path = asset_dir / "summary.md"
@@ -256,16 +253,13 @@ def summarize_doc_asset(
         )
         for chunk_path in chunk_paths
     )
-    chunk_summaries = summarizer.complete_batch(
+    chunk_summaries = complete_all(
+        completer=completer,
         prompts=prompts,
-        model=summary_fast_model(config),
+        model=config.fast_summary_model,
         max_tokens=config.chunk_summary_max_tokens,
+        max_workers=config.summary_max_workers,
     )
-    if len(chunk_summaries) != len(chunk_paths):
-        raise ProcessDocAssetError(
-            "Summarizer returned "
-            f"{len(chunk_summaries)} chunk summaries for {len(chunk_paths)} chunks."
-        )
 
     references = tuple(
         SummaryChunkReference(
@@ -286,9 +280,10 @@ def summarize_doc_asset(
         title=metadata.title,
         authors=authors,
         max_context_tokens=config.max_summary_context_tokens,
-        summarizer=summarizer,
-        model=summary_fast_model(config),
+        completer=completer,
+        model=config.fast_summary_model,
         max_tokens=config.chunk_summary_max_tokens,
+        max_workers=config.summary_max_workers,
     )
 
     chunk_summary_path.write_text(
@@ -303,14 +298,14 @@ def summarize_doc_asset(
     )
     shutil.rmtree(chunk_summaries_dir)
 
-    final_summary = summarizer.complete(
+    final_summary = completer.complete(
         prompt=final_summary_prompt(
             title=metadata.title,
             authors=authors,
             section_summaries=consolidated,
             references=references,
         ),
-        model=summary_final_model(config),
+        model=config.final_summary_model,
         max_tokens=config.final_summary_max_tokens,
     )
     summary_path.write_text(
@@ -333,22 +328,6 @@ def authors_for_display(metadata: DocumentMetadata) -> str:
     if metadata.authors:
         return ", ".join(metadata.authors)
     return "Unknown"
-
-
-def summary_fast_model(config: ProcessDocAssetConfig) -> str:
-    return (
-        os.getenv("PROCESS_DOC_FAST_SUMMARY_MODEL")
-        or os.getenv("ANTHROPIC_SMALL_FAST_MODEL")
-        or config.fast_summary_model
-    )
-
-
-def summary_final_model(config: ProcessDocAssetConfig) -> str:
-    return (
-        os.getenv("PROCESS_DOC_FINAL_SUMMARY_MODEL")
-        or os.getenv("ANTHROPIC_MODEL")
-        or config.final_summary_model
-    )
 
 
 def chunk_summary_prompt(
@@ -427,9 +406,10 @@ def compress_summary_until_within_context(
     title: str,
     authors: str,
     max_context_tokens: int,
-    summarizer: ProcessDocSummarizer,
+    completer: Completer,
     model: str,
     max_tokens: int,
+    max_workers: int,
 ) -> str:
     if max_context_tokens <= 0:
         raise ProcessDocAssetError("max_summary_context_tokens must be positive.")
@@ -451,16 +431,13 @@ def compress_summary_until_within_context(
             compression_summary_prompt(title=title, authors=authors, content=chunk)
             for chunk in chunks
         )
-        compressed_chunks = summarizer.complete_batch(
+        compressed_chunks = complete_all(
+            completer=completer,
             prompts=prompts,
             model=model,
             max_tokens=max_tokens,
+            max_workers=max_workers,
         )
-        if len(compressed_chunks) != len(chunks):
-            raise ProcessDocAssetError(
-                "Summarizer returned "
-                f"{len(compressed_chunks)} compressed summaries for {len(chunks)} chunks."
-            )
         compressed = "\n\n---\n\n".join(compressed_chunks)
         if len(compressed) >= len(current):
             raise ProcessDocAssetError(
@@ -476,6 +453,9 @@ def split_content_for_summary_compression(
     content: str,
     max_context_tokens: int,
 ) -> tuple[str, ...]:
+    # count_tokens_estimate assumes ~4 chars per token; splitting at 3 chars
+    # per token leaves headroom for the compression prompt wrapped around
+    # each chunk.
     chunk_size = max(1, max_context_tokens * 3)
     chunks: list[str] = []
     current_chunk: list[str] = []
@@ -632,152 +612,58 @@ def count_tokens_estimate(text: str) -> int:
     return len(text) // 4
 
 
-class AnthropicMessagesSummarizer:
-    def __init__(
-        self,
-        *,
-        max_workers: int = DEFAULT_SUMMARY_MAX_WORKERS,
-        timeout_seconds: float = DEFAULT_LLM_TIMEOUT_SECONDS,
-        max_retries: int = 6,
-        initial_retry_delay_seconds: float = 5.0,
-    ) -> None:
-        self.max_workers = max(1, max_workers)
-        self.timeout_seconds = timeout_seconds
-        self.max_retries = max_retries
-        self.initial_retry_delay_seconds = initial_retry_delay_seconds
+class LlmError(RuntimeError):
+    pass
 
-    def complete_batch(
-        self,
-        *,
-        prompts: tuple[str, ...],
-        model: str,
-        max_tokens: int,
-    ) -> tuple[str, ...]:
-        if not prompts:
-            return ()
-        if self.max_workers == 1 or len(prompts) == 1:
-            return tuple(
-                self.complete(prompt=prompt, model=model, max_tokens=max_tokens)
-                for prompt in prompts
+
+@dataclass(frozen=True)
+class LiteLlmCompleter:
+    timeout_seconds: float = DEFAULT_LLM_TIMEOUT_SECONDS
+    num_retries: int = DEFAULT_LLM_RETRIES
+
+    def complete(self, *, prompt: str, model: str, max_tokens: int) -> str:
+        # Imported lazily: litellm drags in a large dependency tree and the
+        # CLI only needs it once a command actually calls a model.
+        import litellm
+
+        litellm.suppress_debug_info = True
+        try:
+            response = litellm.completion(
+                model=model,
+                messages=[{"role": "user", "content": prompt}],
+                max_tokens=max_tokens,
+                timeout=self.timeout_seconds,
+                num_retries=self.num_retries,
             )
+        except Exception as error:
+            raise LlmError(f"LLM request failed for model {model}: {error}") from error
 
-        worker_count = min(self.max_workers, len(prompts))
-
-        def complete_prompt(prompt: str) -> str:
-            return self.complete(prompt=prompt, model=model, max_tokens=max_tokens)
-
-        with ThreadPoolExecutor(max_workers=worker_count) as executor:
-            return tuple(executor.map(complete_prompt, prompts))
-
-    def complete(
-        self,
-        *,
-        prompt: str,
-        model: str,
-        max_tokens: int,
-    ) -> str:
-        payload = {
-            "model": model,
-            "max_tokens": max_tokens,
-            "messages": [{"role": "user", "content": prompt}],
-        }
-        body = json.dumps(payload).encode("utf-8")
-        request = urllib.request.Request(
-            anthropic_messages_url(),
-            data=body,
-            headers={
-                "content-type": "application/json",
-                "accept": "application/json",
-                "anthropic-version": DEFAULT_ANTHROPIC_VERSION,
-                "x-api-key": anthropic_api_key(),
-            },
-            method="POST",
-        )
-        retry_delay = self.initial_retry_delay_seconds
-
-        for attempt in range(self.max_retries + 1):
-            try:
-                with urllib.request.urlopen(
-                    request,
-                    timeout=self.timeout_seconds,
-                ) as response:
-                    response_body = response.read().decode("utf-8")
-                return extract_anthropic_text(response_body)
-            except urllib.error.HTTPError as error:
-                error_body = error.read().decode("utf-8", errors="replace")
-                if (
-                    error.code in TRANSIENT_ANTHROPIC_STATUS_CODES
-                    and attempt < self.max_retries
-                ):
-                    time.sleep(retry_delay)
-                    retry_delay = min(retry_delay * 2, 60.0)
-                    continue
-                raise ProcessDocAssetError(
-                    "Anthropic Messages API request failed "
-                    f"with HTTP {error.code}: {anthropic_error_message(error_body)}"
-                ) from error
-            except (TimeoutError, urllib.error.URLError) as error:
-                if attempt < self.max_retries:
-                    time.sleep(retry_delay)
-                    retry_delay = min(retry_delay * 2, 60.0)
-                    continue
-                raise ProcessDocAssetError(
-                    f"Anthropic Messages API request failed: {error}"
-                ) from error
-
-        raise ProcessDocAssetError("Anthropic Messages API request failed.")
+        content = response.choices[0].message.content
+        if not isinstance(content, str) or not content.strip():
+            raise LlmError(f"Model {model} returned an empty completion.")
+        return content
 
 
-def anthropic_api_key() -> str:
-    api_key = os.getenv("ANTHROPIC_API_KEY")
-    if not api_key:
-        raise ProcessDocAssetError(
-            "ANTHROPIC_API_KEY is required to generate process-doc summaries."
-        )
-    return api_key
+def complete_all(
+    *,
+    completer: Completer,
+    prompts: Sequence[str],
+    model: str,
+    max_tokens: int,
+    max_workers: int,
+) -> tuple[str, ...]:
+    if not prompts:
+        return ()
 
+    def run(prompt: str) -> str:
+        return completer.complete(prompt=prompt, model=model, max_tokens=max_tokens)
 
-def anthropic_messages_url() -> str:
-    explicit_url = os.getenv("ANTHROPIC_MESSAGES_URL")
-    if explicit_url:
-        return explicit_url
-    base_url = os.getenv("ANTHROPIC_BASE_URL")
-    if base_url:
-        return f"{base_url.rstrip('/')}/v1/messages"
-    return DEFAULT_ANTHROPIC_MESSAGES_URL
+    worker_count = min(max(1, max_workers), len(prompts))
+    if worker_count == 1:
+        return tuple(run(prompt) for prompt in prompts)
 
-
-def extract_anthropic_text(response_body: str) -> str:
-    payload = json.loads(response_body)
-    if not isinstance(payload, dict):
-        raise ProcessDocAssetError("Anthropic Messages API returned invalid JSON.")
-    content = payload.get("content")
-    if not isinstance(content, list):
-        raise ProcessDocAssetError("Anthropic Messages API response has no content.")
-
-    text_parts: list[str] = []
-    for block in content:
-        if not isinstance(block, dict):
-            continue
-        text = block.get("text")
-        if isinstance(text, str):
-            text_parts.append(text)
-    return "".join(text_parts)
-
-
-def anthropic_error_message(response_body: str) -> str:
-    try:
-        payload = json.loads(response_body)
-    except json.JSONDecodeError:
-        return response_body.strip() or "unknown error"
-    if not isinstance(payload, dict):
-        return response_body.strip() or "unknown error"
-    error = payload.get("error")
-    if isinstance(error, dict):
-        message = error.get("message")
-        if isinstance(message, str):
-            return message
-    return response_body.strip() or "unknown error"
+    with ThreadPoolExecutor(max_workers=worker_count) as executor:
+        return tuple(executor.map(run, prompts))
 
 
 def find_headers_extract(asset_dir: Path) -> Path:

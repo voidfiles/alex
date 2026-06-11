@@ -11,54 +11,48 @@ from alex.lib.process_doc_assets import (
 )
 
 
-class BatchSummaryCall(NamedTuple):
-    prompts: tuple[str, ...]
-    model: str
-    max_tokens: int
-
-
-class FinalSummaryCall(NamedTuple):
+class CompletionCall(NamedTuple):
     prompt: str
     model: str
     max_tokens: int
 
 
-class RecordingSummarizer:
+class RecordingCompleter:
+    """Routes canned responses by prompt shape, mirroring the real pipeline.
+
+    Tests pin summary_max_workers=1 so chunk responses pop in chunk order.
+    """
+
     def __init__(
         self,
         *,
-        batch_responses: list[tuple[str, ...] | str] | None = None,
+        chunk_responses: list[str] | None = None,
+        compression_response: str = "Compressed summary.",
         final_response: str = "Final synthesis.",
     ) -> None:
-        self.batch_responses = batch_responses or []
+        self.chunk_responses = chunk_responses
+        self.compression_response = compression_response
         self.final_response = final_response
-        self.batch_calls: list[BatchSummaryCall] = []
-        self.final_calls: list[FinalSummaryCall] = []
+        self.calls: list[CompletionCall] = []
 
-    def complete_batch(
-        self,
-        *,
-        prompts: tuple[str, ...],
-        model: str,
-        max_tokens: int,
-    ) -> tuple[str, ...]:
-        self.batch_calls.append(BatchSummaryCall(prompts, model, max_tokens))
-        if self.batch_responses:
-            response = self.batch_responses.pop(0)
-            if isinstance(response, str):
-                return tuple(response for _ in prompts)
-            return response
-        return tuple(f"Summary for chunk {index + 1}." for index in range(len(prompts)))
+    def complete(self, *, prompt: str, model: str, max_tokens: int) -> str:
+        self.calls.append(CompletionCall(prompt, model, max_tokens))
+        if "<section_content>" in prompt:
+            if self.chunk_responses is None:
+                return f"Summary for chunk {len(self.calls)}."
+            return self.chunk_responses.pop(0)
+        if "<section_summaries>" in prompt:
+            return self.final_response
+        return self.compression_response
 
-    def complete(
-        self,
-        *,
-        prompt: str,
-        model: str,
-        max_tokens: int,
-    ) -> str:
-        self.final_calls.append(FinalSummaryCall(prompt, model, max_tokens))
-        return self.final_response
+    def chunk_calls(self) -> list[CompletionCall]:
+        return [call for call in self.calls if "<section_content>" in call.prompt]
+
+    def compression_calls(self) -> list[CompletionCall]:
+        return [call for call in self.calls if "Consolidated summary:" in call.prompt]
+
+    def final_calls(self) -> list[CompletionCall]:
+        return [call for call in self.calls if "<section_summaries>" in call.prompt]
 
 
 def test_process_doc_asset_chunks_an_existing_asset_folder(tmp_path: Path) -> None:
@@ -104,14 +98,14 @@ def test_process_doc_asset_chunks_an_existing_asset_folder(tmp_path: Path) -> No
         ),
         encoding="utf-8",
     )
-    summarizer = RecordingSummarizer(
-        batch_responses=[("Foundations summary.", "Practice summary.")],
+    completer = RecordingCompleter(
+        chunk_responses=["Foundations summary.", "Practice summary."],
         final_response="Systems synthesis.",
     )
 
     result = process_doc_asset(
-        ProcessDocAssetConfig(asset_path=asset_dir),
-        summarizer=summarizer,
+        ProcessDocAssetConfig(asset_path=asset_dir, summary_max_workers=1),
+        completer=completer,
     )
 
     assert result.asset_dir == asset_dir
@@ -150,16 +144,16 @@ def test_process_doc_asset_chunks_an_existing_asset_folder(tmp_path: Path) -> No
     assert result.summary_path == asset_dir / "summary.md"
     assert not (asset_dir / "chunk_summaries").exists()
 
-    assert len(summarizer.batch_calls) == 1
-    batch_call = summarizer.batch_calls[0]
-    assert batch_call.model == "claude-haiku-4-5"
-    assert batch_call.max_tokens == 20_000
-    assert len(batch_call.prompts) == 2
-    assert "<document_metadata>" in batch_call.prompts[0]
-    assert "Title: Systems Book" in batch_call.prompts[0]
-    assert "Authors: Dana Example" in batch_call.prompts[0]
-    assert "<document_structure>" in batch_call.prompts[0]
-    assert "Foundations body." in batch_call.prompts[0]
+    chunk_calls = completer.chunk_calls()
+    assert len(chunk_calls) == 2
+    assert {call.model for call in chunk_calls} == {"anthropic/claude-haiku-4-5"}
+    assert {call.max_tokens for call in chunk_calls} == {20_000}
+    assert "<document_metadata>" in chunk_calls[0].prompt
+    assert "Title: Systems Book" in chunk_calls[0].prompt
+    assert "Authors: Dana Example" in chunk_calls[0].prompt
+    assert "<document_structure>" in chunk_calls[0].prompt
+    assert "Foundations body." in chunk_calls[0].prompt
+    assert completer.compression_calls() == []
 
     chunk_summary = result.chunk_summary_path.read_text(encoding="utf-8")
     assert chunk_summary.startswith("# Chunk Summary: Systems Book\n")
@@ -170,11 +164,11 @@ def test_process_doc_asset_chunks_an_existing_asset_folder(tmp_path: Path) -> No
     assert "Foundations summary." in chunk_summary
     assert "Practice summary." in chunk_summary
 
-    assert len(summarizer.final_calls) == 1
-    final_call = summarizer.final_calls[0]
-    assert final_call.model == "claude-opus-4-8"
+    final_calls = completer.final_calls()
+    assert len(final_calls) == 1
+    final_call = final_calls[0]
+    assert final_call.model == "anthropic/claude-opus-4-8"
     assert final_call.max_tokens == 8_192
-    assert "<section_summaries>" in final_call.prompt
     assert "Foundations summary." in final_call.prompt
     assert "chunks/001_foundations.md" in final_call.prompt
 
@@ -201,11 +195,9 @@ def test_process_doc_asset_recursively_compresses_large_chunk_summaries(
         "- Large Summary (H1, line 1, 7 lines)\n  - First (H2, line 5, 3 lines)\n",
         encoding="utf-8",
     )
-    summarizer = RecordingSummarizer(
-        batch_responses=[
-            ("Long summary. " * 20,),
-            "Compressed summary.",
-        ],
+    completer = RecordingCompleter(
+        chunk_responses=["Long summary. " * 20],
+        compression_response="Compressed summary.",
         final_response="Final from compressed summaries.",
     )
 
@@ -213,23 +205,26 @@ def test_process_doc_asset_recursively_compresses_large_chunk_summaries(
         ProcessDocAssetConfig(
             asset_path=asset_dir,
             max_summary_context_tokens=50,
+            summary_max_workers=1,
         ),
-        summarizer=summarizer,
+        completer=completer,
     )
 
-    assert len(summarizer.batch_calls) == 2
-    compression_call = summarizer.batch_calls[1]
-    assert compression_call.model == "claude-haiku-4-5"
-    assert (
-        "Consolidate them into a comprehensive summary" in compression_call.prompts[0]
+    assert len(completer.chunk_calls()) == 1
+    compression_calls = completer.compression_calls()
+    assert len(compression_calls) == 2
+    assert {call.model for call in compression_calls} == {"anthropic/claude-haiku-4-5"}
+    assert all(
+        "Consolidate them into a comprehensive summary" in call.prompt
+        for call in compression_calls
     )
-    assert any("Long summary." in prompt for prompt in compression_call.prompts)
+    assert any("Long summary." in call.prompt for call in compression_calls)
 
     assert result.chunk_summary_path is not None
     chunk_summary = result.chunk_summary_path.read_text(encoding="utf-8")
     assert "Compressed summary." in chunk_summary
     assert "Long summary. Long summary." not in chunk_summary
-    assert "Compressed summary." in summarizer.final_calls[0].prompt
+    assert "Compressed summary." in completer.final_calls()[0].prompt
 
 
 def test_process_doc_asset_can_rerun_after_generated_files_exist(
@@ -246,23 +241,23 @@ def test_process_doc_asset_can_rerun_after_generated_files_exist(
         "- Rerunnable (H1, line 1, 5 lines)\n  - First (H2, line 3, 2 lines)\n",
         encoding="utf-8",
     )
-    summarizer = RecordingSummarizer()
+    completer = RecordingCompleter()
 
     first = process_doc_asset(
-        ProcessDocAssetConfig(asset_path=asset_dir),
-        summarizer=summarizer,
+        ProcessDocAssetConfig(asset_path=asset_dir, summary_max_workers=1),
+        completer=completer,
     )
     (first.chunks_dir / "stale.md").write_text("stale", encoding="utf-8")
 
     second = process_doc_asset(
-        ProcessDocAssetConfig(asset_path=asset_dir),
-        summarizer=summarizer,
+        ProcessDocAssetConfig(asset_path=asset_dir, summary_max_workers=1),
+        completer=completer,
     )
 
     assert second.original_file == asset_dir / "rerunnable.pdf"
     assert tuple(path.name for path in second.chunk_paths) == ("001_first.md",)
     assert not (second.chunks_dir / "stale.md").exists()
-    assert len(summarizer.batch_calls) == 1
+    assert len(completer.chunk_calls()) == 1
 
 
 def test_process_doc_asset_requires_headers_markdown_and_original(

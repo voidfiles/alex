@@ -10,15 +10,19 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Protocol
 
 from alex.lib.document_sources import canonicalize_name, copy_file, split_authors
-from alex.lib.process_doc_assets import MarkdownHeader, parse_markdown_headers
+from alex.lib.process_doc_assets import (
+    Completer,
+    MarkdownHeader,
+    parse_markdown_headers,
+)
 
 if TYPE_CHECKING:
     from alex.lib.converters.to_markdown import MarkdownOutput, ToMarkdownConfig
 
 
 DEFAULT_VAULT_ASSET_ROOT = Path("/Users/alex/Dropbox/obsidian/Alex3/assets")
-DEFAULT_ASSET_NAMING_MODEL = "claude-sonnet-4-6"
-ASSET_NAMING_MODEL_ENV = "PROCESS_DOC_ASSET_NAMING_MODEL"
+DEFAULT_ASSET_NAMING_MODEL = "anthropic/claude-sonnet-4-6"
+ASSET_NAMING_MODEL_ENV = "ALEX_NAMING_MODEL"
 
 
 class PdfMarkdowner(Protocol):
@@ -27,10 +31,6 @@ class PdfMarkdowner(Protocol):
 
 class EpubMarkdowner(Protocol):
     def __call__(self, config: ToMarkdownConfig) -> MarkdownOutput: ...
-
-
-class TextCompleter(Protocol):
-    def complete(self, *, prompt: str, model: str, max_tokens: int) -> str: ...
 
 
 class AssetNamer(Protocol):
@@ -78,7 +78,7 @@ class AssetName:
 
 @dataclass(frozen=True)
 class LlmAssetNamer:
-    completer: TextCompleter
+    completer: Completer
     model: str = DEFAULT_ASSET_NAMING_MODEL
     max_tokens: int = 200
 
@@ -201,21 +201,16 @@ def build_asset(
 
 
 def llm_asset_namer(asset_input: AssetNameInput) -> AssetName:
-    from alex.lib.process_doc_assets import AnthropicMessagesSummarizer
+    from alex.lib.process_doc_assets import LiteLlmCompleter
 
     return LlmAssetNamer(
-        completer=AnthropicMessagesSummarizer(max_workers=1),
+        completer=LiteLlmCompleter(),
         model=asset_naming_model(),
     )(asset_input)
 
 
 def asset_naming_model() -> str:
-    return (
-        os.getenv(ASSET_NAMING_MODEL_ENV)
-        or os.getenv("LLM_MODEL")
-        or os.getenv("ANTHROPIC_MODEL")
-        or DEFAULT_ASSET_NAMING_MODEL
-    )
+    return os.getenv(ASSET_NAMING_MODEL_ENV) or DEFAULT_ASSET_NAMING_MODEL
 
 
 def asset_name_prompt(asset_input: AssetNameInput) -> str:
