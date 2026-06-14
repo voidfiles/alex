@@ -7,7 +7,11 @@ from pathlib import Path
 
 from alex.lib.asset_metadata import AssetMetadata
 from alex.lib.chunking import ChunkSettings, chunk_markdown_document
-from alex.lib.document_sources import canonical_name_for, metadata_from_markdown
+from alex.lib.document_sources import (
+    canonical_name_for,
+    metadata_from_markdown,
+    source_content_hash,
+)
 from alex.lib.llm import Completer, Embedder, LiteLlmCompleter, LiteLlmEmbedder
 from alex.lib.summarize import (
     SummaryOutput,
@@ -111,6 +115,7 @@ def process_doc_asset(
         headers_file=headers_path.name,
         chapter_level=chunking_result.chapter_level,
         chunks_dir=chunks_dir.name,
+        source_sha256=source_content_hash(original_file),
     ).write(metadata_path)
 
     canonical_name_path = asset_dir / "canonical_name.txt"

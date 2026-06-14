@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import posixpath
 import re
 import shutil
@@ -22,6 +23,10 @@ class UnsupportedDocumentSourceError(ValueError):
 class DocumentMetadata:
     title: str
     authors: tuple[str, ...] = ()
+
+
+def source_content_hash(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
 def copy_file(source: Path, destination: Path) -> None:

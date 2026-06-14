@@ -78,6 +78,24 @@ oversized chapters (or documents with no usable structure) are split
 semantically with embeddings at topic boundaries. Small documents never
 call the embedding model.
 
+### transcribe
+
+```bash
+alex transcribe meeting.wav transcripts
+alex transcribe meeting.m4a transcripts --model whisper-1
+alex transcribe meeting.wav transcripts --force
+```
+
+Transcribes an audio file through LiteLLM and writes a stem-named output
+folder at `OUTPUT_PATH/INPUT_STEM` with `transcript.txt` and
+`transcript.json`. The default model is OpenAI `whisper-1`; override it
+with `ALEX_TRANSCRIPTION_MODEL` or `--model`.
+
+`transcript.txt` is speaker-labelled when the transcription response
+includes speaker metadata. OpenAI `whisper-1` does not do real speaker
+diarization, so Whisper output is labelled as `Speaker 1` until you switch
+to a model that returns speaker-aware segments.
+
 ### eval-summary
 
 ```bash
@@ -136,6 +154,7 @@ model string works. Each role has an env override (see `src/alex/lib/llm.py`):
 | Eval judging | `ALEX_EVAL_JUDGE_MODEL` | `anthropic/claude-haiku-4-5` |
 | Eval fact extraction | `ALEX_FACT_EXTRACTOR_MODEL` | `anthropic/claude-sonnet-4-6` |
 | Prompt critic | `ALEX_PROMPT_CRITIC_MODEL` | `anthropic/claude-opus-4-8` |
+| Audio transcription | `ALEX_TRANSCRIPTION_MODEL` | `whisper-1` |
 
 Example: `ALEX_FINAL_SUMMARY_MODEL=openai/gpt-5 alex process-doc assets/book_asset`.
 

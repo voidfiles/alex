@@ -1,3 +1,5 @@
+import hashlib
+import json
 import shutil
 from pathlib import Path
 
@@ -35,7 +37,7 @@ def make_doc_output(asset_dir: Path) -> ProcessDocAssetOutput:
 def fake_builder_for(
     asset_root: Path, *, call_log: list[ToAssetConfig] | None = None
 ) -> AssetBuilder:
-    """Fake asset builder that moves the source, mirroring build_asset's behavior."""
+    """Fake builder: respects move_source, mirrors build_asset behavior."""
 
     def builder(config: ToAssetConfig) -> ToAssetOutput:
         if call_log is not None:
@@ -44,7 +46,10 @@ def fake_builder_for(
         asset_dir = config.asset_root / stem
         asset_dir.mkdir(parents=True, exist_ok=True)
         dest = asset_dir / config.source.name
-        shutil.move(str(config.source), str(dest))
+        if config.move_source:
+            shutil.move(str(config.source), str(dest))
+        else:
+            shutil.copy2(str(config.source), str(dest))
         md = asset_dir / f"{stem}.md"
         md.write_text("# Content\n", encoding="utf-8")
         headers = asset_dir / "headers.md"
@@ -97,7 +102,7 @@ def test_process_vault_processes_all_sources(tmp_path: Path) -> None:
     assert result.exit_code == 0
     assert "Ingested a.epub" in result.output
     assert "Ingested b.pdf" in result.output
-    assert "Done: 2 ingested, 0 failed" in result.output
+    assert "Done: 2 ingested, 0 skipped, 0 failed (total 2)." in result.output
 
 
 def test_process_vault_empty_vault_exits_zero(tmp_path: Path) -> None:
@@ -142,7 +147,7 @@ def test_process_vault_partial_failure_exits_zero(tmp_path: Path) -> None:
         asset_dir = config.asset_root / stem
         asset_dir.mkdir(parents=True, exist_ok=True)
         dest = asset_dir / config.source.name
-        shutil.move(str(config.source), str(dest))
+        shutil.copy2(str(config.source), str(dest))
         md = asset_dir / f"{stem}.md"
         md.write_text("# Content\n", encoding="utf-8")
         headers = asset_dir / "headers.md"
@@ -173,7 +178,7 @@ def test_process_vault_partial_failure_exits_zero(tmp_path: Path) -> None:
     assert "FAILED bad.pdf" in result.output
     assert "converter exploded" in result.output
     assert "Ingested good.epub" in result.output
-    assert "1 ingested, 1 failed" in result.output
+    assert "1 ingested, 0 skipped, 1 failed" in result.output
 
 
 def test_process_vault_lock_held_skips_without_calling_fakes(tmp_path: Path) -> None:
@@ -314,3 +319,82 @@ def test_process_vault_process_doc_failure_reports_asset_dir(tmp_path: Path) -> 
     assert "FAILED book.pdf" in result.output
     assert "chunking failed" in result.output
     assert "alex process-doc" in result.output  # tells the user how to finish it
+
+
+def test_process_vault_skipped_asset_shows_in_summary(tmp_path: Path) -> None:
+    vault = tmp_path / "vault"
+    vault.mkdir()
+    asset_root = vault / "assets"
+    asset_root.mkdir()
+    lock_path = tmp_path / "test.lock"
+
+    # Seed a processed asset matching the source content.
+    content = b"%PDF-already-done"
+    sha = hashlib.sha256(content).hexdigest()
+    source = vault / "book.pdf"
+    source.write_bytes(content)
+    existing_dir = asset_root / "existing_book"
+    existing_dir.mkdir()
+    (existing_dir / "metadata.json").write_text(
+        json.dumps({"title": "Book", "source_sha256": sha}),
+        encoding="utf-8",
+    )
+    chunks_dir = existing_dir / "chunks"
+    chunks_dir.mkdir()
+    (chunks_dir / "001.md").write_text("chunk", encoding="utf-8")
+
+    builder_calls: list[ToAssetConfig] = []
+    processor_calls: list[ProcessDocAssetConfig] = []
+
+    result = CliRunner().invoke(
+        build_process_vault_command(
+            asset_builder=fake_builder_for(asset_root, call_log=builder_calls),
+            doc_processor=fake_processor_for(call_log=processor_calls),
+        ),
+        [
+            "--vault-root",
+            str(vault),
+            "--asset-root",
+            str(asset_root),
+            "--lock-path",
+            str(lock_path),
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "Skipped book.pdf (already processed)" in result.output
+    assert "Done: 0 ingested, 1 skipped, 0 failed (total 1)." in result.output
+    # Original removed even on skip.
+    assert not source.exists()
+    # Neither builder nor processor called.
+    assert builder_calls == []
+    assert processor_calls == []
+
+
+def test_process_vault_original_removed_after_successful_ingestion(
+    tmp_path: Path,
+) -> None:
+    vault = tmp_path / "vault"
+    vault.mkdir()
+    asset_root = vault / "assets"
+    asset_root.mkdir()
+    source = vault / "book.pdf"
+    source.write_bytes(b"%PDF")
+    lock_path = tmp_path / "test.lock"
+
+    CliRunner().invoke(
+        build_process_vault_command(
+            asset_builder=fake_builder_for(asset_root),
+            doc_processor=fake_processor_for(),
+        ),
+        [
+            "--vault-root",
+            str(vault),
+            "--asset-root",
+            str(asset_root),
+            "--lock-path",
+            str(lock_path),
+        ],
+    )
+
+    assert not source.exists()

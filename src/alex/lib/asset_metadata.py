@@ -17,6 +17,7 @@ class AssetMetadata(BaseModel):
     headers_file: str | None = None
     chapter_level: int | None = None
     chunks_dir: str | None = None
+    source_sha256: str | None = None
 
     def write(self, path: Path) -> None:
         payload = self.model_dump(mode="json", exclude_none=True)

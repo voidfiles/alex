@@ -12,7 +12,12 @@ from typing import Protocol
 
 from alex.lib.asset_metadata import AssetMetadata
 from alex.lib.converters.to_markdown import Markdowner, ToMarkdownConfig
-from alex.lib.document_sources import canonicalize_name, copy_file, split_authors
+from alex.lib.document_sources import (
+    canonicalize_name,
+    copy_file,
+    source_content_hash,
+    split_authors,
+)
 from alex.lib.llm import Completer, LiteLlmCompleter, resolve_asset_naming_model
 from alex.lib.markdown_structure import table_of_contents_markdown
 
@@ -53,6 +58,7 @@ class ToAssetConfig:
     source: Path
     asset_root: Path = DEFAULT_VAULT_ASSET_ROOT
     force: bool = False
+    move_source: bool = True
 
 
 @dataclass(frozen=True)
@@ -149,7 +155,11 @@ def build_markdown_asset(
         work_dir=work_dir,
         force=config.force,
     )
-    write_asset_name_cache(work_dir=work_dir, asset_name=asset_name)
+    write_asset_name_cache(
+        work_dir=work_dir,
+        asset_name=asset_name,
+        source=config.source,
+    )
     final_markdown = rename_markdown_to_canonical_name(
         markdown_path=markdown_path,
         canonical_name=asset_name.canonical_name,
@@ -158,6 +168,7 @@ def build_markdown_asset(
         source=config.source,
         asset_dir=work_dir,
         canonical_name=asset_name.canonical_name,
+        move=config.move_source,
     )
     shutil.move(str(work_dir), str(final_dir))
     cleanup_tmp_parent(work_dir)
@@ -242,10 +253,13 @@ def authors_from_response(value: object) -> tuple[str, ...]:
     return ()
 
 
-def write_asset_name_cache(*, work_dir: Path, asset_name: AssetName) -> None:
+def write_asset_name_cache(
+    *, work_dir: Path, asset_name: AssetName, source: Path
+) -> None:
     AssetMetadata(
         title=asset_name.title,
         authors=asset_name.authors,
+        source_sha256=source_content_hash(source),
     ).write(work_dir / "metadata.json")
     (work_dir / "canonical_name.txt").write_text(
         f"{asset_name.canonical_name}\n",
@@ -305,14 +319,17 @@ def move_source_to_canonical_asset_path(
     source: Path,
     asset_dir: Path,
     canonical_name: str,
+    move: bool = True,
 ) -> Path:
     destination = asset_dir / f"{canonical_name}{source.suffix}"
     if source.resolve() == destination.resolve():
         return destination
     if destination.exists():
         raise FileExistsError(f"Asset source already exists: {destination}")
-
-    shutil.move(str(source), str(destination))
+    if move:
+        shutil.move(str(source), str(destination))
+    else:
+        copy_file(source, destination)
     return destination
 
 

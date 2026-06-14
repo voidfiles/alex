@@ -1,6 +1,7 @@
 import sys
 import time
 from collections.abc import Callable
+from pathlib import Path
 from types import ModuleType, SimpleNamespace
 from typing import Any
 
@@ -10,16 +11,22 @@ from alex.lib.llm import (
     DEFAULT_EMBEDDING_MODEL,
     DEFAULT_FAST_SUMMARY_MODEL,
     DEFAULT_FINAL_SUMMARY_MODEL,
+    DEFAULT_TRANSCRIPTION_MODEL,
     EMBEDDING_MODEL_ENV,
     FAST_SUMMARY_MODEL_ENV,
     FINAL_SUMMARY_MODEL_ENV,
+    TRANSCRIPTION_MODEL_ENV,
+    AudioTranscript,
     LiteLlmCompleter,
     LiteLlmEmbedder,
+    LiteLlmTranscriber,
     LlmError,
+    TranscriptSegment,
     complete_all,
     resolve_embedding_model,
     resolve_fast_summary_model,
     resolve_final_summary_model,
+    resolve_transcription_model,
 )
 
 
@@ -142,6 +149,16 @@ def install_fake_litellm_embedding(
     monkeypatch.setitem(sys.modules, "litellm", litellm_module)
 
 
+def install_fake_litellm_transcription(
+    monkeypatch: pytest.MonkeyPatch,
+    transcription: Callable[..., Any],
+) -> None:
+    litellm_module: Any = ModuleType("litellm")
+    litellm_module.transcription = transcription
+    litellm_module.suppress_debug_info = False
+    monkeypatch.setitem(sys.modules, "litellm", litellm_module)
+
+
 def embedding_response(vectors: list[list[float]]) -> SimpleNamespace:
     # Reversed on purpose: the embedder must reorder by each item's index.
     data = [
@@ -257,3 +274,82 @@ def test_summary_models_can_be_swapped_via_environment(
 
     assert resolve_fast_summary_model() == "gemini/gemini-2.5-flash"
     assert resolve_final_summary_model() == "openai/gpt-5"
+
+
+def test_transcription_model_defaults_to_openai_whisper(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv(TRANSCRIPTION_MODEL_ENV, raising=False)
+    assert resolve_transcription_model() == DEFAULT_TRANSCRIPTION_MODEL
+    assert resolve_transcription_model() == "whisper-1"
+
+    monkeypatch.setenv(TRANSCRIPTION_MODEL_ENV, "groq/whisper-large-v3")
+    assert resolve_transcription_model() == "groq/whisper-large-v3"
+
+
+def test_litellm_transcriber_requests_verbose_json_segments_and_parses_response(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    audio_path = tmp_path / "meeting.wav"
+    audio_path.write_bytes(b"audio bytes")
+    captured_kwargs: list[dict[str, Any]] = []
+
+    def fake_transcription(**kwargs: Any) -> SimpleNamespace:
+        captured_kwargs.append(kwargs)
+        assert kwargs["file"].read() == b"audio bytes"
+        return SimpleNamespace(
+            text="Hello there.",
+            language="en",
+            duration=1.2,
+            segments=[
+                {
+                    "speaker": "Speaker A",
+                    "start": 0.0,
+                    "end": 1.2,
+                    "text": "Hello there.",
+                }
+            ],
+        )
+
+    install_fake_litellm_transcription(monkeypatch, fake_transcription)
+
+    result = LiteLlmTranscriber(timeout_seconds=12.5, num_retries=3).transcribe(
+        audio_path=audio_path,
+        model="whisper-1",
+    )
+
+    assert result == AudioTranscript(
+        text="Hello there.",
+        language="en",
+        duration_seconds=1.2,
+        segments=(
+            TranscriptSegment(
+                text="Hello there.",
+                speaker="Speaker A",
+                start_seconds=0.0,
+                end_seconds=1.2,
+            ),
+        ),
+    )
+    assert captured_kwargs[0]["model"] == "whisper-1"
+    assert captured_kwargs[0]["response_format"] == "verbose_json"
+    assert captured_kwargs[0]["timestamp_granularities"] == ["segment"]
+    assert captured_kwargs[0]["timeout"] == 12.5
+    assert captured_kwargs[0]["num_retries"] == 3
+
+
+def test_litellm_transcriber_wraps_provider_errors(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    audio_path = tmp_path / "meeting.wav"
+    audio_path.write_bytes(b"audio bytes")
+
+    def failing_transcription(**kwargs: Any) -> SimpleNamespace:
+        raise RuntimeError("bad audio")
+
+    install_fake_litellm_transcription(monkeypatch, failing_transcription)
+
+    with pytest.raises(LlmError, match=r"whisper-1.*bad audio"):
+        LiteLlmTranscriber().transcribe(audio_path=audio_path, model="whisper-1")

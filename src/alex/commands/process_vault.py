@@ -16,6 +16,7 @@ from alex.lib.process_vault import (
     DocProcessor,
     ProcessVaultConfig,
     ProcessVaultOutput,
+    VaultSourceResult,
     default_asset_builder,
     process_vault_root,
 )
@@ -107,17 +108,27 @@ def _echo_summary(output: ProcessVaultOutput) -> None:
         click.echo("No PDF or EPUB files found at the vault root.")
         return
     for result in output.results:
-        if result.ok:
-            click.echo(f"Ingested {result.source.name} -> {result.asset_dir}")
-        else:
-            msg = f"FAILED {result.source.name}: {result.error}"
-            if result.asset_dir is not None:
-                msg += f" (run `alex process-doc {result.asset_dir}` to finish)"
-            click.echo(msg)
+        _echo_result(result)
     total = len(output.results)
-    n_ok = len(output.processed)
+    n_ingested = len(output.processed)
+    n_skipped = len(output.skipped)
     n_fail = len(output.failed)
-    click.echo(f"Done: {n_ok} ingested, {n_fail} failed (total {total}).")
+    click.echo(
+        f"Done: {n_ingested} ingested, {n_skipped} skipped,"
+        f" {n_fail} failed (total {total})."
+    )
+
+
+def _echo_result(result: VaultSourceResult) -> None:
+    if result.status == "ingested":
+        click.echo(f"Ingested {result.source.name} -> {result.asset_dir}")
+    elif result.status == "skipped":
+        click.echo(f"Skipped {result.source.name} (already processed)")
+    else:
+        msg = f"FAILED {result.source.name}: {result.error}"
+        if result.asset_dir is not None:
+            msg += f" (run `alex process-doc {result.asset_dir}` to finish)"
+        click.echo(msg)
 
 
 process_vault = build_process_vault_command()

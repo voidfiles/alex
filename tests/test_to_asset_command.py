@@ -1,3 +1,5 @@
+import hashlib
+import json
 import zipfile
 from pathlib import Path
 
@@ -92,9 +94,11 @@ def test_to_asset_moves_pdf_original_markdown_and_headers_to_asset_folder(
             ),
         )
     ]
-    assert (asset_dir / "metadata.json").read_text(encoding="utf-8") == (
-        '{\n  "title": "Deep Work",\n  "authors": [\n    "Cal Newport"\n  ]\n}\n'
-    )
+    source_sha256 = hashlib.sha256(b"%PDF-1.7\n").hexdigest()
+    metadata = json.loads((asset_dir / "metadata.json").read_text(encoding="utf-8"))
+    assert metadata["title"] == "Deep Work"
+    assert metadata["authors"] == ["Cal Newport"]
+    assert metadata["source_sha256"] == source_sha256
     assert (asset_dir / "canonical_name.txt").read_text(encoding="utf-8") == (
         "deep_work_cal_newport\n"
     )

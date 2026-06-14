@@ -8,6 +8,7 @@ from alex.commands.process_doc import process_doc
 from alex.commands.process_vault import process_vault
 from alex.commands.summary import summary
 from alex.commands.to_asset import to_asset
+from alex.commands.transcribe import transcribe
 from alex.commands.version import version
 from alex.lib.env import load_source_dotenv
 
@@ -22,6 +23,7 @@ main.add_command(to_asset)
 main.add_command(process_doc)
 main.add_command(process_vault)
 main.add_command(summary)
+main.add_command(transcribe)
 main.add_command(eval_summary)
 main.add_command(improve_prompt_command)
 main.add_command(pdf_samples)

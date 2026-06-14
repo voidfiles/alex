@@ -1,3 +1,4 @@
+import hashlib
 import json
 from pathlib import Path
 
@@ -85,6 +86,7 @@ def test_process_doc_asset_chunks_an_existing_asset_folder(tmp_path: Path) -> No
         "headers_file": "headers.md",
         "chapter_level": 2,
         "chunks_dir": "chunks",
+        "source_sha256": hashlib.sha256(b"epub").hexdigest(),
     }
     assert result.canonical_name_path.read_text(encoding="utf-8") == (
         "systems_book_dana_example\n"

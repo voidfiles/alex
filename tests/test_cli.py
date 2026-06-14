@@ -21,6 +21,7 @@ def test_cli_help_lists_available_commands() -> None:
     assert "summary" in result.output
     assert "to-asset" in result.output
     assert "to-markdown" not in result.output
+    assert "transcribe" in result.output
     assert "version" in result.output
 
 
@@ -41,7 +42,7 @@ def test_cli_help_does_not_import_pdf_converter_dependencies() -> None:
         original_import = builtins.__import__
 
         def rejecting_import(name, *args, **kwargs):
-            blocked_prefixes = ("pymupdf4llm", "marker")
+            blocked_prefixes = ("pymupdf4llm", "marker", "litellm")
             if name.startswith(blocked_prefixes):
                 raise RuntimeError(f"{name} should not be imported for help")
             return original_import(name, *args, **kwargs)
@@ -71,6 +72,7 @@ def test_cli_help_does_not_import_pdf_converter_dependencies() -> None:
     assert "summary" in result.stdout
     assert "to-asset" in result.stdout
     assert "to-markdown" not in result.stdout
+    assert "transcribe" in result.stdout
 
 
 def test_running_a_command_loads_the_source_dotenv(
