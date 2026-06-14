@@ -8,8 +8,10 @@ from alex.lib.asset_folders import (
     DEFAULT_VAULT_ASSET_ROOT,
     AssetNamer,
     ToAssetConfig,
+    UnsupportedAssetSourceError,
     build_asset,
     llm_asset_namer,
+    validate_supported_source,
 )
 from alex.lib.converters.to_markdown import (
     Markdowner,
@@ -19,24 +21,6 @@ from alex.lib.converters.to_markdown import (
     pymupdf4llm_markdowner,
     select_markdowner,
 )
-
-SUPPORTED_SOURCE_EXTENSIONS = frozenset({".epub", ".pdf"})
-
-
-class UnsupportedAssetSourceError(ValueError):
-    pass
-
-
-def validate_supported_source(source: Path) -> None:
-    source_extension = source.suffix.lower()
-    if source_extension in SUPPORTED_SOURCE_EXTENSIONS:
-        return
-
-    supported_extensions = ", ".join(sorted(SUPPORTED_SOURCE_EXTENSIONS))
-    raise UnsupportedAssetSourceError(
-        f"Unsupported file type '{source_extension}'. "
-        f"Supported file types: {supported_extensions}"
-    )
 
 
 def build_to_asset_command(

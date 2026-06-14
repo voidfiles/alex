@@ -30,6 +30,11 @@ def test_summary_command_writes_stem_named_workspace(tmp_path: Path) -> None:
             source_copy=source_copy,
             full_markdown=full_markdown,
             metadata_path=metadata,
+            headers_path=asset_dir / "headers.md",
+            chunks_dir=asset_dir / "chunks",
+            chunk_paths=(asset_dir / "chunks" / "001_paper.md",),
+            chunk_summary_path=asset_dir / "chunk_summary.md",
+            summary_path=asset_dir / "summary.md",
         )
 
     result = CliRunner().invoke(
@@ -42,7 +47,10 @@ def test_summary_command_writes_stem_named_workspace(tmp_path: Path) -> None:
     )
 
     assert result.exit_code == 0
-    assert result.output == f"Wrote {tmp_path / 'summaries' / 'paper'}\n"
+    asset_dir = tmp_path / "summaries" / "paper"
+    assert result.output == (
+        f"Wrote {asset_dir}\nChunks: 1\nSummary: {asset_dir / 'summary.md'}\n"
+    )
     assert captured_configs == [
         SummaryAssetConfig(
             source=source,
@@ -83,6 +91,11 @@ def test_summary_command_miner_option_selects_miner_pdf_markdowner(
             source_copy=source_copy,
             full_markdown=full_markdown,
             metadata_path=metadata,
+            headers_path=asset_dir / "headers.md",
+            chunks_dir=asset_dir / "chunks",
+            chunk_paths=(),
+            chunk_summary_path=None,
+            summary_path=None,
         )
 
     result = CliRunner().invoke(

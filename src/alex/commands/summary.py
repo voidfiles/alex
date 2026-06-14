@@ -72,7 +72,7 @@ def build_summary_command(
         datalab: bool,
         force: bool,
     ) -> None:
-        """Create a summary workspace for an input file."""
+        """Summarize an input file end-to-end into a workspace."""
         if miner and datalab:
             raise click.UsageError("Choose only one converter option.")
 
@@ -83,17 +83,20 @@ def build_summary_command(
             use_miner=miner,
             use_datalab=datalab,
         )
-        config = SummaryAssetConfig(
-            source=source,
-            output_path=output_path,
-            force=force,
-        )
         try:
+            config = SummaryAssetConfig(
+                source=source,
+                output_path=output_path,
+                force=force,
+            )
             result = processor(config, pdf_markdowner=pdf_markdowner)
         except (OSError, RuntimeError, ValueError) as error:
             raise click.ClickException(str(error)) from error
 
         click.echo(f"Wrote {result.asset_dir}")
+        click.echo(f"Chunks: {len(result.chunk_paths)}")
+        if result.summary_path is not None:
+            click.echo(f"Summary: {result.summary_path}")
 
     return command
 

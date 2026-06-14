@@ -3,9 +3,12 @@
 from __future__ import annotations
 
 import shutil
+from collections.abc import Mapping
 from dataclasses import dataclass, field
+from importlib.resources.abc import Traversable
 from pathlib import Path
 
+from alex.lib.chunking import count_tokens_estimate
 from alex.lib.document_sources import DocumentMetadata
 from alex.lib.llm import (
     Completer,
@@ -13,6 +16,7 @@ from alex.lib.llm import (
     resolve_fast_summary_model,
     resolve_final_summary_model,
 )
+from alex.lib.prompt_templates import PromptTemplate, load_prompt
 
 DEFAULT_CHUNK_SUMMARY_MAX_TOKENS = 20_000
 DEFAULT_FINAL_SUMMARY_MAX_TOKENS = 8_192
@@ -25,10 +29,48 @@ class SummarizationError(ValueError):
     pass
 
 
+SUMMARY_PROMPT_NAMES = ("chunk_summary", "compression_summary", "final_summary")
+
+
+@dataclass(frozen=True)
+class SummaryPrompts:
+    chunk_summary: PromptTemplate
+    compression_summary: PromptTemplate
+    final_summary: PromptTemplate
+
+    @classmethod
+    def load(
+        cls,
+        overrides: Mapping[str, str] | None = None,
+        *,
+        root: Traversable | None = None,
+    ) -> SummaryPrompts:
+        versions = dict(overrides or {})
+        unknown = sorted(set(versions) - set(SUMMARY_PROMPT_NAMES))
+        if unknown:
+            raise SummarizationError(
+                f"Unknown summary prompts in overrides: {', '.join(unknown)}"
+            )
+        return cls(
+            chunk_summary=load_prompt(
+                "chunk_summary", version=versions.get("chunk_summary"), root=root
+            ),
+            compression_summary=load_prompt(
+                "compression_summary",
+                version=versions.get("compression_summary"),
+                root=root,
+            ),
+            final_summary=load_prompt(
+                "final_summary", version=versions.get("final_summary"), root=root
+            ),
+        )
+
+
 @dataclass(frozen=True)
 class SummarySettings:
     fast_model: str = field(default_factory=resolve_fast_summary_model)
     final_model: str = field(default_factory=resolve_final_summary_model)
+    prompts: SummaryPrompts = field(default_factory=SummaryPrompts.load)
     chunk_summary_max_tokens: int = DEFAULT_CHUNK_SUMMARY_MAX_TOKENS
     final_summary_max_tokens: int = DEFAULT_FINAL_SUMMARY_MAX_TOKENS
     max_context_tokens: int = DEFAULT_MAX_SUMMARY_CONTEXT_TOKENS
@@ -79,7 +121,7 @@ def summarize_doc_asset(
     chunk_summaries_dir.mkdir()
 
     prompts = tuple(
-        chunk_summary_prompt(
+        settings.prompts.chunk_summary.render(
             title=metadata.title,
             authors=authors,
             headers=headers,
@@ -113,6 +155,7 @@ def summarize_doc_asset(
         content=concatenated,
         title=metadata.title,
         authors=authors,
+        template=settings.prompts.compression_summary,
         max_context_tokens=settings.max_context_tokens,
         completer=completer,
         model=settings.fast_model,
@@ -133,11 +176,11 @@ def summarize_doc_asset(
     shutil.rmtree(chunk_summaries_dir)
 
     final_summary = completer.complete(
-        prompt=final_summary_prompt(
+        prompt=settings.prompts.final_summary.render(
             title=metadata.title,
             authors=authors,
             section_summaries=consolidated,
-            references=references,
+            chunk_reference_list=chunk_reference_list(references),
         ),
         model=settings.final_model,
         max_tokens=settings.final_summary_max_tokens,
@@ -162,51 +205,6 @@ def authors_for_display(metadata: DocumentMetadata) -> str:
     if metadata.authors:
         return ", ".join(metadata.authors)
     return "Unknown"
-
-
-def chunk_summary_prompt(
-    *,
-    title: str,
-    authors: str,
-    headers: str,
-    chunk: str,
-) -> str:
-    return f"""You are a PhD-level domain expert with deep knowledge of academic literature. Your task is to create a rigorous, comprehensive summary of a section from an academic document.
-
-<document_metadata>
-Title: {title}
-Authors: {authors}
-</document_metadata>
-
-<document_structure>
-{headers}
-</document_structure>
-
-<section_content>
-{chunk}
-</section_content>
-
-Before writing your summary, think through:
-- What are the core arguments and evidence presented?
-- How does this section fit within the broader document structure?
-- What theoretical frameworks or methodologies are employed?
-- What are the key technical terms, definitions, or concepts introduced?
-- What assumptions or limitations should be noted?
-- What key passages explain core ideas or are particularly well-articulated and should be kept in the final summary?
-
-Now create a PhD-level summary that:
-
-1. Captures core arguments: Identify the central thesis and supporting claims with precision
-2. Analyzes evidence and methodology: Explain how the authors support their arguments
-3. Maintains academic rigor: Use appropriate technical terminology and preserve nuance
-4. Contextualizes within the work: Show how this section relates to the document's overall structure and argument
-5. Identifies key insights: Highlight novel contributions, significant findings, or important implications
-6. Notes critical details: Include specific examples, data points, or concepts that are essential for deep understanding
-7. Highlights key passages: Include passages that should be retained for later synthesis
-
-Your summary should demonstrate the analytical depth expected in graduate-level academic discourse. Write as if summarizing for fellow researchers who need to understand not just what was said, but how and why.
-
-Summary:"""
 
 
 def write_individual_chunk_summaries(
@@ -239,6 +237,7 @@ def compress_summary_until_within_context(
     content: str,
     title: str,
     authors: str,
+    template: PromptTemplate,
     max_context_tokens: int,
     completer: Completer,
     model: str,
@@ -262,7 +261,7 @@ def compress_summary_until_within_context(
             max_context_tokens=max_context_tokens,
         )
         prompts = tuple(
-            compression_summary_prompt(title=title, authors=authors, content=chunk)
+            template.render(title=title, authors=authors, content=chunk)
             for chunk in chunks
         )
         compressed_chunks = complete_all(
@@ -310,23 +309,6 @@ def split_content_for_summary_compression(
     return tuple(chunks)
 
 
-def compression_summary_prompt(*, title: str, authors: str, content: str) -> str:
-    return f"""Summarize the following collection of section summaries from "{title}" by {authors}.
-
-These are summaries of different sections. Consolidate them into a comprehensive summary that:
-1. Captures all key ideas and main points
-2. Maintains logical flow and connections between ideas
-3. Preserves important details and examples
-4. Is thorough but more concise than the input
-
-CONTENT:
----
-{content}
----
-
-Consolidated summary:"""
-
-
 def chunk_summary_content(
     *,
     title: str,
@@ -356,59 +338,12 @@ This document contains consolidated summaries of all chunks from the source mate
 """
 
 
-def final_summary_prompt(
-    *,
-    title: str,
-    authors: str,
-    section_summaries: str,
-    references: tuple[SummaryChunkReference, ...],
-) -> str:
-    chunk_reference_list = "\n".join(
-        f"{reference.index}. {reference.filename} -> Link as: `[text]({reference.path})`"
+def chunk_reference_list(references: tuple[SummaryChunkReference, ...]) -> str:
+    return "\n".join(
+        f"{reference.index}. {reference.filename} "
+        f"-> Link as: `[text]({reference.path})`"
         for reference in references
     )
-    return f"""You are a senior academic researcher preparing a comprehensive analytical overview for fellow scholars. Your task is to synthesize multiple detailed section summaries into a cohesive, high-level summary of the entire work.
-
-<document_metadata>
-Title: {title}
-Authors: {authors}
-</document_metadata>
-
-<section_summaries>
-{section_summaries}
-</section_summaries>
-
-<chunk_reference_guide>
-The source material is divided into chunks. When discussing specific sections or topics, link to the relevant chunk for deeper reading. Available chunks:
-
-{chunk_reference_list}
-
-Use standard Markdown links. Link when referencing specific chapters, sections, major topics, or details that benefit from deeper exploration. Use links strategically so they improve readability.
-</chunk_reference_guide>
-
-Before writing your synthesis, analyze:
-- What is the overarching thesis or research question?
-- How do the sections build upon each other to form a coherent argument?
-- What are the major theoretical contributions or empirical findings?
-- What methodological approaches or frameworks are central to the work?
-- How does this work position itself within existing scholarship?
-- What are the key limitations or areas for future research?
-- How do the key passages included in the section summaries illuminate core ideas?
-
-Now create a comprehensive synthesis that:
-
-1. Provides a clear executive overview of the work's central purpose, scope, and contribution
-2. Articulates the core thesis and arguments with precision and nuance
-3. Identifies the theoretical and methodological framework
-4. Explains the structure and progression, with inline links to relevant chunks where appropriate
-5. Highlights key findings and insights, linking to specific chunks where useful
-6. Notes strengths, limitations, assumptions, and areas of particular significance
-7. Contextualizes the work's contribution to ongoing scholarly conversations
-8. Integrates key passages from the section summaries to enrich the synthesis
-
-Write this summary for researchers deciding whether this work is relevant, graduate students using it in literature reviews, and scholars who need a sophisticated refresher.
-
-High-level summary:"""
 
 
 def summary_content(
@@ -440,7 +375,3 @@ For detailed exploration of specific sections, see the individual chunks:
 
 {chunk_index}
 """
-
-
-def count_tokens_estimate(text: str) -> int:
-    return len(text) // 4

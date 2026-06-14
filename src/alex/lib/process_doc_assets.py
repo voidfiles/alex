@@ -6,9 +6,9 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from alex.lib.asset_metadata import AssetMetadata
+from alex.lib.chunking import ChunkSettings, chunk_markdown_document
 from alex.lib.document_sources import canonical_name_for, metadata_from_markdown
-from alex.lib.llm import Completer, LiteLlmCompleter
-from alex.lib.markdown_structure import infer_chapter_level, write_chunks
+from alex.lib.llm import Completer, Embedder, LiteLlmCompleter, LiteLlmEmbedder
 from alex.lib.summarize import (
     SummaryOutput,
     SummarySettings,
@@ -44,6 +44,7 @@ class ProcessDocAssetConfig:
     asset_path: Path
     summarize: bool = True
     summary: SummarySettings = field(default_factory=SummarySettings)
+    chunking: ChunkSettings = field(default_factory=ChunkSettings)
 
 
 @dataclass(frozen=True)
@@ -52,7 +53,7 @@ class ProcessDocAssetOutput:
     original_file: Path
     markdown_path: Path
     headers_path: Path
-    chapter_level_path: Path
+    chapter_level_path: Path | None
     metadata_path: Path
     canonical_name_path: Path
     chunks_dir: Path
@@ -65,6 +66,7 @@ def process_doc_asset(
     config: ProcessDocAssetConfig,
     *,
     completer: Completer | None = None,
+    embedder: Embedder | None = None,
 ) -> ProcessDocAssetOutput:
     asset_dir = config.asset_path
     if not asset_dir.is_dir():
@@ -76,18 +78,27 @@ def process_doc_asset(
 
     markdown = markdown_path.read_text(encoding="utf-8")
     headers = headers_path.read_text(encoding="utf-8")
-    chapter_level = infer_chapter_level(headers=headers, markdown=markdown)
-
-    chapter_level_path = asset_dir / "chapter_level.txt"
-    chapter_level_path.write_text(f"{chapter_level}\n", encoding="utf-8")
 
     chunks_dir = asset_dir / "chunks"
-    chunk_paths = write_chunks(
+    chunking_result = chunk_markdown_document(
         chunks_dir=chunks_dir,
         markdown=markdown,
         markdown_filename=markdown_path.name,
-        chapter_level=chapter_level,
+        headers=headers,
+        settings=config.chunking,
+        embedder=embedder or LiteLlmEmbedder(),
     )
+    chunk_paths = chunking_result.chunk_paths
+
+    chapter_level_file = asset_dir / "chapter_level.txt"
+    chapter_level_path: Path | None = None
+    if chunking_result.chapter_level is None:
+        chapter_level_file.unlink(missing_ok=True)
+    else:
+        chapter_level_file.write_text(
+            f"{chunking_result.chapter_level}\n", encoding="utf-8"
+        )
+        chapter_level_path = chapter_level_file
 
     metadata = metadata_from_markdown(markdown, markdown_path)
     metadata_path = asset_dir / "metadata.json"
@@ -98,7 +109,7 @@ def process_doc_asset(
         source_file=original_file.name,
         full_markdown=markdown_path.name,
         headers_file=headers_path.name,
-        chapter_level=chapter_level,
+        chapter_level=chunking_result.chapter_level,
         chunks_dir=chunks_dir.name,
     ).write(metadata_path)
 

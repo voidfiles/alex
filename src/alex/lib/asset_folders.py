@@ -18,6 +18,23 @@ from alex.lib.markdown_structure import table_of_contents_markdown
 
 DEFAULT_VAULT_ASSET_ROOT = Path("/Users/alex/Dropbox/obsidian/Alex3/assets")
 
+SUPPORTED_SOURCE_EXTENSIONS = frozenset({".epub", ".pdf"})
+
+
+class UnsupportedAssetSourceError(ValueError):
+    pass
+
+
+def validate_supported_source(source: Path) -> None:
+    source_extension = source.suffix.lower()
+    if source_extension in SUPPORTED_SOURCE_EXTENSIONS:
+        return
+    supported_extensions = ", ".join(sorted(SUPPORTED_SOURCE_EXTENSIONS))
+    raise UnsupportedAssetSourceError(
+        f"Unsupported file type '{source_extension}'. "
+        f"Supported file types: {supported_extensions}"
+    )
+
 
 class AssetNamer(Protocol):
     def __call__(self, asset_input: AssetNameInput) -> AssetName: ...

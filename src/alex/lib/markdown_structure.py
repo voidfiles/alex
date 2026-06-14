@@ -5,10 +5,9 @@ from __future__ import annotations
 import re
 import shutil
 from collections import Counter
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-
-CHUNK_LINE_LIMIT = 10_000
 
 
 class MarkdownStructureError(ValueError):
@@ -87,6 +86,7 @@ def write_chunks(
     markdown: str,
     markdown_filename: str,
     chapter_level: int,
+    splitter: Callable[[str], tuple[str, ...]],
 ) -> tuple[Path, ...]:
     if chunks_dir.exists():
         shutil.rmtree(chunks_dir)
@@ -108,8 +108,8 @@ def write_chunks(
             chapter_start_index=chapter.start_index,
             chapter_level=chapter_level,
         )
-        parts = split_chapter_lines(chapter.lines)
-        for part_index, part_lines in enumerate(parts, 1):
+        parts = splitter("\n".join(chapter.lines))
+        for part_index, part in enumerate(parts, 1):
             suffix = ""
             if len(parts) > 1:
                 suffix = f"_part_{part_index}"
@@ -120,7 +120,7 @@ def write_chunks(
                 chunk_content(
                     markdown_filename=markdown_filename,
                     parent_headers=parent_headers,
-                    chapter_lines=part_lines,
+                    body=part,
                 ),
                 encoding="utf-8",
             )
@@ -195,26 +195,16 @@ def parents_for_chapter(
     )
 
 
-def split_chapter_lines(chapter_lines: tuple[str, ...]) -> tuple[tuple[str, ...], ...]:
-    if len(chapter_lines) <= CHUNK_LINE_LIMIT:
-        return (chapter_lines,)
-
-    return tuple(
-        chapter_lines[index : index + CHUNK_LINE_LIMIT]
-        for index in range(0, len(chapter_lines), CHUNK_LINE_LIMIT)
-    )
-
-
 def chunk_content(
     *,
     markdown_filename: str,
     parent_headers: tuple[str, ...],
-    chapter_lines: tuple[str, ...],
+    body: str,
 ) -> str:
     parts = [f"[Back to full document](../{markdown_filename})"]
     if parent_headers:
         parts.append("\n".join(parent_headers))
-    parts.append("\n".join(chapter_lines))
+    parts.append(body)
     return fix_image_paths_for_chunks("\n\n".join(parts).rstrip() + "\n")
 
 

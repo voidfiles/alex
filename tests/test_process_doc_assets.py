@@ -1,6 +1,5 @@
 import json
 from pathlib import Path
-from typing import NamedTuple
 
 import pytest
 
@@ -10,50 +9,7 @@ from alex.lib.process_doc_assets import (
     process_doc_asset,
 )
 from alex.lib.summarize import SummarySettings
-
-
-class CompletionCall(NamedTuple):
-    prompt: str
-    model: str
-    max_tokens: int
-
-
-class RecordingCompleter:
-    """Routes canned responses by prompt shape, mirroring the real pipeline.
-
-    Tests pin summary_max_workers=1 so chunk responses pop in chunk order.
-    """
-
-    def __init__(
-        self,
-        *,
-        chunk_responses: list[str] | None = None,
-        compression_response: str = "Compressed summary.",
-        final_response: str = "Final synthesis.",
-    ) -> None:
-        self.chunk_responses = chunk_responses
-        self.compression_response = compression_response
-        self.final_response = final_response
-        self.calls: list[CompletionCall] = []
-
-    def complete(self, *, prompt: str, model: str, max_tokens: int) -> str:
-        self.calls.append(CompletionCall(prompt, model, max_tokens))
-        if "<section_content>" in prompt:
-            if self.chunk_responses is None:
-                return f"Summary for chunk {len(self.calls)}."
-            return self.chunk_responses.pop(0)
-        if "<section_summaries>" in prompt:
-            return self.final_response
-        return self.compression_response
-
-    def chunk_calls(self) -> list[CompletionCall]:
-        return [call for call in self.calls if "<section_content>" in call.prompt]
-
-    def compression_calls(self) -> list[CompletionCall]:
-        return [call for call in self.calls if "Consolidated summary:" in call.prompt]
-
-    def final_calls(self) -> list[CompletionCall]:
-        return [call for call in self.calls if "<section_summaries>" in call.prompt]
+from helpers import RecordingCompleter
 
 
 def test_process_doc_asset_chunks_an_existing_asset_folder(tmp_path: Path) -> None:
@@ -116,6 +72,7 @@ def test_process_doc_asset_chunks_an_existing_asset_folder(tmp_path: Path) -> No
     assert result.original_file == original
     assert result.markdown_path == markdown
     assert result.headers_path == headers
+    assert result.chapter_level_path is not None
     assert result.chapter_level_path.read_text(encoding="utf-8") == "2\n"
 
     metadata = json.loads(result.metadata_path.read_text(encoding="utf-8"))
@@ -156,6 +113,7 @@ def test_process_doc_asset_chunks_an_existing_asset_folder(tmp_path: Path) -> No
     assert "Title: Systems Book" in chunk_calls[0].prompt
     assert "Authors: Dana Example" in chunk_calls[0].prompt
     assert "<document_structure>" in chunk_calls[0].prompt
+    assert "- Systems Book (H1, line 1, 14 lines)" in chunk_calls[0].prompt
     assert "Foundations body." in chunk_calls[0].prompt
     assert completer.compression_calls() == []
 
@@ -267,6 +225,43 @@ def test_process_doc_asset_can_rerun_after_generated_files_exist(
     assert tuple(path.name for path in second.chunk_paths) == ("001_first.md",)
     assert not (second.chunks_dir / "stale.md").exists()
     assert len(completer.chunk_calls()) == 1
+
+
+def test_process_doc_asset_handles_structureless_markdown(tmp_path: Path) -> None:
+    asset_dir = tmp_path / "structureless"
+    asset_dir.mkdir()
+    (asset_dir / "notes.pdf").write_bytes(b"%PDF")
+    (asset_dir / "notes.md").write_text(
+        "Plain notes without any headings.\n\nJust prose paragraphs.\n",
+        encoding="utf-8",
+    )
+    (asset_dir / "headers.md").write_text(
+        "# Document Structure\n\nTable of Contents:\n",
+        encoding="utf-8",
+    )
+    # A stale marker from a previous structured run must not survive.
+    (asset_dir / "chapter_level.txt").write_text("2\n", encoding="utf-8")
+    completer = RecordingCompleter()
+
+    result = process_doc_asset(
+        ProcessDocAssetConfig(
+            asset_path=asset_dir,
+            summary=SummarySettings(max_workers=1),
+        ),
+        completer=completer,
+    )
+
+    assert result.chapter_level_path is None
+    assert not (asset_dir / "chapter_level.txt").exists()
+    metadata = json.loads(result.metadata_path.read_text(encoding="utf-8"))
+    assert "chapter_level" not in metadata
+    assert tuple(path.name for path in result.chunk_paths) == (
+        "001_plain_notes_without_any_headings.md",
+    )
+    chunk = result.chunk_paths[0].read_text(encoding="utf-8")
+    assert chunk.startswith("[Back to full document](../notes.md)\n\n")
+    assert "Just prose paragraphs." in chunk
+    assert result.summary_path == asset_dir / "summary.md"
 
 
 def test_process_doc_asset_requires_headers_markdown_and_original(

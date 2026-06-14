@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 import shutil
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from alex.lib.asset_metadata import AssetMetadata
+from alex.lib.chunking import ChunkSettings, chunk_markdown_document
 from alex.lib.converters.to_markdown import (
     Markdowner,
     ToMarkdownConfig,
@@ -17,6 +18,9 @@ from alex.lib.document_sources import (
     read_epub_source,
     title_from_stem,
 )
+from alex.lib.llm import Completer, Embedder, LiteLlmCompleter, LiteLlmEmbedder
+from alex.lib.markdown_structure import table_of_contents_markdown
+from alex.lib.summarize import SummarySettings, summarize_doc_asset
 
 SUMMARY_SOURCE_EXTENSIONS = frozenset({".epub", ".markdown", ".md", ".pdf", ".txt"})
 
@@ -34,6 +38,8 @@ class SummaryAssetConfig:
     source: Path
     output_path: Path
     force: bool = False
+    summary: SummarySettings = field(default_factory=SummarySettings)
+    chunking: ChunkSettings = field(default_factory=ChunkSettings)
 
 
 @dataclass(frozen=True)
@@ -42,6 +48,11 @@ class SummaryAssetOutput:
     source_copy: Path
     full_markdown: Path
     metadata_path: Path
+    headers_path: Path
+    chunks_dir: Path
+    chunk_paths: tuple[Path, ...]
+    chunk_summary_path: Path | None
+    summary_path: Path | None
 
 
 @dataclass(frozen=True)
@@ -57,6 +68,8 @@ def process_summary_asset(
     config: SummaryAssetConfig,
     *,
     pdf_markdowner: Markdowner = pymupdf4llm_markdowner,
+    completer: Completer | None = None,
+    embedder: Embedder | None = None,
 ) -> SummaryAssetOutput:
     source_format = summary_source_format_for(config.source)
     asset_dir = config.output_path / config.source.stem
@@ -70,15 +83,50 @@ def process_summary_asset(
         pdf_markdowner=pdf_markdowner,
     )
 
-    output = SummaryAssetOutput(
+    headers = table_of_contents_markdown(content.markdown)
+    headers_path = asset_dir / "headers.md"
+    headers_path.write_text(headers, encoding="utf-8")
+
+    chunks_dir = asset_dir / "chunks"
+    chunking_result = chunk_markdown_document(
+        chunks_dir=chunks_dir,
+        markdown=content.markdown,
+        markdown_filename=content.full_markdown.name,
+        headers=headers,
+        settings=config.chunking,
+        embedder=embedder or LiteLlmEmbedder(),
+    )
+
+    metadata_path = asset_dir / "metadata.json"
+    write_summary_metadata(
+        metadata_path=metadata_path,
+        content=content,
+        headers_filename=headers_path.name,
+        chapter_level=chunking_result.chapter_level,
+        chunks_dirname=chunks_dir.name,
+    )
+
+    summary_output = summarize_doc_asset(
+        settings=config.summary,
+        asset_dir=asset_dir,
+        metadata=content.metadata,
+        markdown_path=content.full_markdown,
+        headers_path=headers_path,
+        chunk_paths=chunking_result.chunk_paths,
+        completer=completer or LiteLlmCompleter(),
+    )
+
+    return SummaryAssetOutput(
         asset_dir=asset_dir,
         source_copy=content.source_copy,
         full_markdown=content.full_markdown,
-        metadata_path=asset_dir / "metadata.json",
+        metadata_path=metadata_path,
+        headers_path=headers_path,
+        chunks_dir=chunks_dir,
+        chunk_paths=chunking_result.chunk_paths,
+        chunk_summary_path=summary_output.chunk_summary_path,
+        summary_path=summary_output.summary_path,
     )
-    write_summary_metadata(output=output, content=content)
-
-    return output
 
 
 def summary_source_format_for(source: Path) -> str:
@@ -203,13 +251,19 @@ def write_text_summary_source_content(
 
 def write_summary_metadata(
     *,
-    output: SummaryAssetOutput,
+    metadata_path: Path,
     content: SummarySourceContent,
+    headers_filename: str,
+    chapter_level: int | None,
+    chunks_dirname: str,
 ) -> None:
     AssetMetadata(
         title=content.metadata.title,
         authors=content.metadata.authors,
         source_format=content.source_format,
-        source_file=output.source_copy.name,
-        full_markdown=output.full_markdown.name,
-    ).write(output.metadata_path)
+        source_file=content.source_copy.name,
+        full_markdown=content.full_markdown.name,
+        headers_file=headers_filename,
+        chapter_level=chapter_level,
+        chunks_dir=chunks_dirname,
+    ).write(metadata_path)

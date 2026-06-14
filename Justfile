@@ -16,3 +16,8 @@ typecheck:
 fmt:
     uv run ruff format
     uv run ruff check --fix
+
+# Summary-quality evals; makes real LLM calls, never runs in CI.
+# Cheaper iteration: ALEX_FINAL_SUMMARY_MODEL=anthropic/claude-sonnet-4-6 just eval
+eval *ARGS:
+    uv run alex eval-summary {{ARGS}}

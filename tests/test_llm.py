@@ -7,13 +7,17 @@ from typing import Any
 import pytest
 
 from alex.lib.llm import (
+    DEFAULT_EMBEDDING_MODEL,
     DEFAULT_FAST_SUMMARY_MODEL,
     DEFAULT_FINAL_SUMMARY_MODEL,
+    EMBEDDING_MODEL_ENV,
     FAST_SUMMARY_MODEL_ENV,
     FINAL_SUMMARY_MODEL_ENV,
     LiteLlmCompleter,
+    LiteLlmEmbedder,
     LlmError,
     complete_all,
+    resolve_embedding_model,
     resolve_fast_summary_model,
     resolve_final_summary_model,
 )
@@ -126,6 +130,113 @@ def test_complete_all_returns_empty_for_no_prompts() -> None:
     )
 
     assert results == ()
+
+
+def install_fake_litellm_embedding(
+    monkeypatch: pytest.MonkeyPatch,
+    embedding: Callable[..., Any],
+) -> None:
+    litellm_module: Any = ModuleType("litellm")
+    litellm_module.embedding = embedding
+    litellm_module.suppress_debug_info = False
+    monkeypatch.setitem(sys.modules, "litellm", litellm_module)
+
+
+def embedding_response(vectors: list[list[float]]) -> SimpleNamespace:
+    # Reversed on purpose: the embedder must reorder by each item's index.
+    data = [
+        {"index": index, "embedding": vector}
+        for index, vector in reversed(list(enumerate(vectors)))
+    ]
+    return SimpleNamespace(data=data)
+
+
+def test_litellm_embedder_batches_inputs_and_preserves_order(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured_kwargs: list[dict[str, Any]] = []
+
+    def fake_embedding(**kwargs: Any) -> SimpleNamespace:
+        captured_kwargs.append(kwargs)
+        batch_number = float(len(captured_kwargs))
+        return embedding_response(
+            [[batch_number, float(index)] for index in range(len(kwargs["input"]))]
+        )
+
+    install_fake_litellm_embedding(monkeypatch, fake_embedding)
+    texts = [f"text {index}" for index in range(100)]
+
+    result = LiteLlmEmbedder(timeout_seconds=5.0, num_retries=2).embed(
+        texts=texts,
+        model="openai/text-embedding-3-small",
+    )
+
+    assert [len(call["input"]) for call in captured_kwargs] == [96, 4]
+    assert captured_kwargs[0]["model"] == "openai/text-embedding-3-small"
+    assert captured_kwargs[0]["timeout"] == 5.0
+    assert captured_kwargs[0]["num_retries"] == 2
+    assert len(result) == 100
+    assert result[0] == (1.0, 0.0)
+    assert result[95] == (1.0, 95.0)
+    assert result[96] == (2.0, 0.0)
+    assert result[99] == (2.0, 3.0)
+
+
+def test_litellm_embedder_makes_no_calls_for_empty_input(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def fail_embedding(**kwargs: Any) -> SimpleNamespace:
+        raise AssertionError("embedding should not be called")
+
+    install_fake_litellm_embedding(monkeypatch, fail_embedding)
+
+    assert LiteLlmEmbedder().embed(texts=[], model="openai/x") == ()
+
+
+def test_litellm_embedder_wraps_provider_errors(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def failing_embedding(**kwargs: Any) -> SimpleNamespace:
+        raise RuntimeError("quota exceeded")
+
+    install_fake_litellm_embedding(monkeypatch, failing_embedding)
+
+    with pytest.raises(LlmError, match=r"openai/x.*quota exceeded"):
+        LiteLlmEmbedder().embed(texts=["one"], model="openai/x")
+
+
+def test_litellm_embedder_rejects_vector_count_mismatch(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    install_fake_litellm_embedding(
+        monkeypatch,
+        lambda **kwargs: embedding_response([[1.0, 0.0]]),
+    )
+
+    with pytest.raises(LlmError, match="1 embeddings for 2 inputs"):
+        LiteLlmEmbedder().embed(texts=["one", "two"], model="openai/x")
+
+
+def test_litellm_embedder_rejects_malformed_response(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    install_fake_litellm_embedding(
+        monkeypatch,
+        lambda **kwargs: SimpleNamespace(data=[{"index": 0}]),
+    )
+
+    with pytest.raises(LlmError, match="malformed embedding response"):
+        LiteLlmEmbedder().embed(texts=["one"], model="openai/x")
+
+
+def test_embedding_model_defaults_and_env_override(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv(EMBEDDING_MODEL_ENV, raising=False)
+    assert resolve_embedding_model() == DEFAULT_EMBEDDING_MODEL
+
+    monkeypatch.setenv(EMBEDDING_MODEL_ENV, "voyage/voyage-3.5-lite")
+    assert resolve_embedding_model() == "voyage/voyage-3.5-lite"
 
 
 def test_summary_models_default_to_anthropic(

@@ -17,6 +17,7 @@ def test_cli_help_lists_available_commands() -> None:
     assert "Alex command line tools." in result.output
     assert "dump-env" in result.output
     assert "process-doc" in result.output
+    assert "process-vault" in result.output
     assert "summary" in result.output
     assert "to-asset" in result.output
     assert "to-markdown" not in result.output
