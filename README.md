@@ -60,8 +60,9 @@ Processes an existing asset directory (it must contain the original file,
 one Markdown extract, and `headers.md`). Infers the chapter level, writes
 `chapter_level.txt`, `metadata.json`, and `canonical_name.txt`, regenerates
 `chunks/*.md`, and generates `chunk_summary.md` plus graph-enhanced
-`summary.md` unless `summary.md` already exists. The graph pass writes
-debug artifacts under `summary_graph/`.
+`summary.md` unless `summary.md` already exists. The graph pass extracts
+claim/evidence graphs from raw chunks before chunk summarization, merges them
+into a document graph, and writes debug artifacts under `summary_graph/`.
 
 ### summary
 
@@ -74,9 +75,10 @@ Summarizes a PDF, Markdown, TXT, or EPUB input end-to-end into a workspace
 at `OUTPUT_PATH/INPUT_STEM`: source copy, extracted Markdown, images,
 `headers.md`, `metadata.json`, semantic chunks under `chunks/`, and the
 generated `chunk_summary.md`, graph-enhanced `summary.md`, and debug
-artifacts under `summary_graph/`. Use `summary` for the stem-named
-one-command workflow, or `to-asset` followed by `process-doc` for the
-canonical-named pipeline.
+artifacts under `summary_graph/`, including per-chunk graphs under
+`summary_graph/chunks/` and merged document graph artifacts. Use `summary` for
+the stem-named one-command workflow, or `to-asset` followed by `process-doc`
+for the canonical-named pipeline.
 
 Chunking is structure-first: documents split along their headers, and only
 oversized chapters (or documents with no usable structure) are split

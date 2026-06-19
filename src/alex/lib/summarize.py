@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import shutil
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from importlib.resources.abc import Traversable
 from pathlib import Path
@@ -23,6 +23,7 @@ from alex.lib.llm import (
 from alex.lib.prompt_templates import PromptTemplate, load_prompt
 
 if TYPE_CHECKING:
+    from alex.lib.claim_graph import ClaimGraph
     from alex.lib.summary_eval import ClaimVerdict
 
 DEFAULT_CHUNK_SUMMARY_MAX_TOKENS = 20_000
@@ -36,12 +37,18 @@ class SummarizationError(ValueError):
     pass
 
 
-SUMMARY_PROMPT_NAMES = ("chunk_summary", "compression_summary", "final_summary")
+SUMMARY_PROMPT_NAMES = (
+    "chunk_summary",
+    "chunk_summary_with_graph",
+    "compression_summary",
+    "final_summary",
+)
 
 
 @dataclass(frozen=True)
 class SummaryPrompts:
     chunk_summary: PromptTemplate
+    chunk_summary_with_graph: PromptTemplate
     compression_summary: PromptTemplate
     final_summary: PromptTemplate
 
@@ -61,6 +68,11 @@ class SummaryPrompts:
         return cls(
             chunk_summary=load_prompt(
                 "chunk_summary", version=versions.get("chunk_summary"), root=root
+            ),
+            chunk_summary_with_graph=load_prompt(
+                "chunk_summary_with_graph",
+                version=versions.get("chunk_summary_with_graph"),
+                root=root,
             ),
             compression_summary=load_prompt(
                 "compression_summary",
@@ -85,6 +97,8 @@ class SummarySettings:
     judge_max_tokens: int = 8_192
     extractor_max_tokens: int = 8_192
     graph_enhanced: bool = True
+    chunk_graph_enhanced: bool = True
+    chunk_graph_max_claims: int = 12
     graph_max_claims: int = 48
     graph_artifacts: bool = True
     max_context_tokens: int = DEFAULT_MAX_SUMMARY_CONTEXT_TOKENS
@@ -110,6 +124,14 @@ class SummaryChunkReference:
 class GraphEnhancedSummary:
     final_summary: str
     artifact_dir: Path | None
+
+
+@dataclass(frozen=True)
+class ChunkGraphBundle:
+    chunk_path: Path
+    graph: ClaimGraph
+    selected: ClaimGraph
+    selected_markdown: str
 
 
 def summarize_doc_asset(
@@ -145,12 +167,29 @@ def summarize_doc_asset(
         shutil.rmtree(chunk_summaries_dir)
     chunk_summaries_dir.mkdir()
 
+    chunk_graph_bundles: tuple[ChunkGraphBundle, ...] = ()
+    selected_graph_by_chunk: dict[Path, str] = {}
+    if settings.graph_enhanced:
+        chunk_graph_bundles = build_chunk_graph_bundles(
+            settings=settings,
+            doc_name=markdown_path.name,
+            chunk_paths=chunk_paths,
+            completer=completer,
+        )
+        if settings.chunk_graph_enhanced:
+            selected_graph_by_chunk = {
+                bundle.chunk_path: bundle.selected_markdown
+                for bundle in chunk_graph_bundles
+            }
+
     prompts = tuple(
-        settings.prompts.chunk_summary.render(
+        chunk_summary_prompt(
+            settings=settings,
             title=metadata.title,
             authors=authors,
             headers=headers,
-            chunk=chunk_path.read_text(encoding="utf-8"),
+            chunk_path=chunk_path,
+            selected_graph_by_chunk=selected_graph_by_chunk,
         )
         for chunk_path in chunk_paths
     )
@@ -214,12 +253,18 @@ def summarize_doc_asset(
     final_graph_artifact_dir: Path | None = None
     if settings.graph_enhanced:
         source_markdown = markdown_path.read_text(encoding="utf-8")
+        document_graph = merged_document_graph(
+            doc_name=markdown_path.name,
+            chunk_graph_bundles=chunk_graph_bundles,
+        )
         graph_summary = graph_enhanced_summary(
             settings=settings,
             asset_dir=asset_dir,
             doc_name=markdown_path.name,
             doc_text=source_markdown,
             standard_summary=standard_final_summary,
+            document_graph=document_graph,
+            chunk_graph_bundles=chunk_graph_bundles,
             completer=completer,
         )
         final_summary = graph_summary.final_summary
@@ -241,6 +286,99 @@ def summarize_doc_asset(
     )
 
 
+def chunk_summary_prompt(
+    *,
+    settings: SummarySettings,
+    title: str,
+    authors: str,
+    headers: str,
+    chunk_path: Path,
+    selected_graph_by_chunk: Mapping[Path, str],
+) -> str:
+    chunk = chunk_path.read_text(encoding="utf-8")
+    selected_chunk_graph = selected_graph_by_chunk.get(chunk_path)
+    if selected_chunk_graph is None:
+        return settings.prompts.chunk_summary.render(
+            title=title,
+            authors=authors,
+            headers=headers,
+            chunk=chunk,
+        )
+    return settings.prompts.chunk_summary_with_graph.render(
+        title=title,
+        authors=authors,
+        headers=headers,
+        chunk=chunk,
+        selected_chunk_graph=selected_chunk_graph,
+    )
+
+
+def build_chunk_graph_bundles(
+    *,
+    settings: SummarySettings,
+    doc_name: str,
+    chunk_paths: Sequence[Path],
+    completer: Completer,
+) -> tuple[ChunkGraphBundle, ...]:
+    from alex.lib.claim_graph import (
+        GraphPrompts,
+        GraphSettings,
+        build_claim_graph,
+        chunk_graph_source,
+        render_selected_subgraph,
+        select_claim_subgraph,
+    )
+    from alex.lib.summary_eval import EvalSettings
+
+    eval_settings = EvalSettings(
+        judge_model=settings.judge_model,
+        fact_extractor_model=settings.fact_extractor_model,
+        judge_max_tokens=settings.judge_max_tokens,
+        extractor_max_tokens=settings.extractor_max_tokens,
+    )
+    graph_prompts = GraphPrompts.load()
+    graph_settings = GraphSettings(max_claims=settings.chunk_graph_max_claims)
+    bundles: list[ChunkGraphBundle] = []
+    for chunk_index, chunk_path in enumerate(chunk_paths, 1):
+        chunk_text = chunk_path.read_text(encoding="utf-8")
+        graph = build_claim_graph(
+            source=chunk_graph_source(
+                doc_name=doc_name,
+                chunk_index=chunk_index,
+                chunk_path=chunk_path,
+                chunk_text=chunk_text,
+            ),
+            prompts=graph_prompts,
+            completer=completer,
+            eval_settings=eval_settings,
+            settings=graph_settings,
+        )
+        selected = select_claim_subgraph(graph, settings=graph_settings)
+        bundles.append(
+            ChunkGraphBundle(
+                chunk_path=chunk_path,
+                graph=graph,
+                selected=selected,
+                selected_markdown=render_selected_subgraph(selected),
+            )
+        )
+    return tuple(bundles)
+
+
+def merged_document_graph(
+    *,
+    doc_name: str,
+    chunk_graph_bundles: Sequence[ChunkGraphBundle],
+) -> ClaimGraph:
+    from alex.lib.claim_graph import merge_chunk_graphs
+
+    return merge_chunk_graphs(
+        doc_name=doc_name,
+        source_path=doc_name,
+        chunk_graphs=tuple(bundle.graph for bundle in chunk_graph_bundles),
+    )
+
+
 def graph_enhanced_summary(
     *,
     settings: SummarySettings,
@@ -248,12 +386,13 @@ def graph_enhanced_summary(
     doc_name: str,
     doc_text: str,
     standard_summary: str,
+    document_graph: ClaimGraph,
+    chunk_graph_bundles: Sequence[ChunkGraphBundle],
     completer: Completer,
 ) -> GraphEnhancedSummary:
     from alex.lib.claim_graph import (
         GraphPrompts,
         GraphSettings,
-        build_claim_graph,
         graph_summary_prompt,
         render_selected_subgraph,
         select_claim_subgraph,
@@ -277,15 +416,8 @@ def graph_enhanced_summary(
     merge_template = load_prompt("merged_summary")
     filter_template = load_prompt("merged_summary_faithfulness_filter")
 
-    graph = build_claim_graph(
-        doc_name=doc_name,
-        doc_text=doc_text,
-        prompts=graph_prompts,
-        completer=completer,
-        eval_settings=eval_settings,
-    )
     selected = select_claim_subgraph(
-        graph,
+        document_graph,
         settings=GraphSettings(max_claims=settings.graph_max_claims),
     )
     selected_markdown = render_selected_subgraph(selected)
@@ -353,7 +485,18 @@ def graph_enhanced_summary(
             filtered_summary,
             encoding="utf-8",
         )
-        write_graph_json(artifact_dir / "graph.json", graph)
+        write_chunk_graph_artifacts(
+            artifact_dir=artifact_dir,
+            chunk_graph_bundles=chunk_graph_bundles,
+            write_graph_json=write_graph_json,
+        )
+        write_graph_json(artifact_dir / "document_graph.json", document_graph)
+        write_graph_json(artifact_dir / "selected_document_subgraph.json", selected)
+        (artifact_dir / "selected_document_subgraph.md").write_text(
+            selected_markdown,
+            encoding="utf-8",
+        )
+        write_graph_json(artifact_dir / "graph.json", document_graph)
         write_graph_json(artifact_dir / "selected_subgraph.json", selected)
         (artifact_dir / "selected_subgraph.md").write_text(
             selected_markdown,
@@ -368,6 +511,25 @@ def graph_enhanced_summary(
         final_summary=filtered_summary,
         artifact_dir=artifact_dir,
     )
+
+
+def write_chunk_graph_artifacts(
+    *,
+    artifact_dir: Path,
+    chunk_graph_bundles: Sequence[ChunkGraphBundle],
+    write_graph_json: Callable[[Path, ClaimGraph], None],
+) -> None:
+    chunks_dir = artifact_dir / "chunks"
+    chunks_dir.mkdir()
+    for bundle in chunk_graph_bundles:
+        chunk_dir = chunks_dir / bundle.chunk_path.stem
+        chunk_dir.mkdir()
+        write_graph_json(chunk_dir / "graph.json", bundle.graph)
+        write_graph_json(chunk_dir / "selected_subgraph.json", bundle.selected)
+        (chunk_dir / "selected_subgraph.md").write_text(
+            bundle.selected_markdown,
+            encoding="utf-8",
+        )
 
 
 def render_supported_claims(verdicts: Sequence[ClaimVerdict]) -> str:

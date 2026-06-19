@@ -84,13 +84,62 @@ def test_process_markdown_summary_runs_the_full_pipeline(
     assert (result.graph_artifact_dir / "graph.json").is_file()
     assert (result.graph_artifact_dir / "selected_subgraph.json").is_file()
     assert (result.graph_artifact_dir / "selected_subgraph.md").is_file()
+    assert (result.graph_artifact_dir / "document_graph.json").is_file()
+    assert (result.graph_artifact_dir / "selected_document_subgraph.json").is_file()
+    assert (result.graph_artifact_dir / "selected_document_subgraph.md").is_file()
+    assert (result.graph_artifact_dir / "chunks" / "001_deep_work").is_dir()
+    assert (
+        result.graph_artifact_dir / "chunks" / "001_deep_work" / "graph.json"
+    ).is_file()
+    assert (
+        result.graph_artifact_dir
+        / "chunks"
+        / "001_deep_work"
+        / "selected_subgraph.json"
+    ).is_file()
+    assert (
+        result.graph_artifact_dir / "chunks" / "001_deep_work" / "selected_subgraph.md"
+    ).is_file()
     assert (result.graph_artifact_dir / "pre_filter_claim_verdicts.json").is_file()
 
     chunk_calls = completer.chunk_calls()
     assert len(chunk_calls) == 1
     assert "Title: Deep Work" in chunk_calls[0].prompt
     assert "Body text." in chunk_calls[0].prompt
+    assert "<selected_chunk_graph>" in chunk_calls[0].prompt
+    assert "The document preserves important claims." in chunk_calls[0].prompt
+    source_claim_calls = [
+        call for call in completer.calls if "source-grounded claims" in call.prompt
+    ]
+    assert source_claim_calls
+    assert completer.calls.index(source_claim_calls[0]) < completer.calls.index(
+        chunk_calls[0]
+    )
     assert len(completer.final_calls()) == 1
+
+
+def test_process_markdown_summary_skips_chunk_graph_when_graph_disabled(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "deep-work.md"
+    source.write_text("# Deep Work\n\nBy Cal Newport\n\nBody text.\n", encoding="utf-8")
+    completer = RecordingCompleter(
+        chunk_responses=["Deep work chunk summary."],
+        final_response="Deep work synthesis.",
+    )
+
+    result = process_summary_asset(
+        SummaryAssetConfig(
+            source=source,
+            output_path=tmp_path / "summaries",
+            summary=SummarySettings(max_workers=1, graph_enhanced=False),
+        ),
+        completer=completer,
+    )
+
+    assert result.graph_artifact_dir is None
+    assert not any("source-grounded claims" in call.prompt for call in completer.calls)
+    assert "<selected_chunk_graph>" not in completer.chunk_calls()[0].prompt
 
 
 def test_process_pdf_summary_converts_inside_stem_named_workspace(

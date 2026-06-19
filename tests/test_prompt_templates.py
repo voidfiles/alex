@@ -154,6 +154,9 @@ def test_summary_prompts_load_uses_active_versions() -> None:
     assert prompts.chunk_summary.placeholders() == frozenset(
         {"title", "authors", "headers", "chunk"}
     )
+    assert prompts.chunk_summary_with_graph.placeholders() == frozenset(
+        {"title", "authors", "headers", "chunk", "selected_chunk_graph"}
+    )
     assert prompts.compression_summary.placeholders() == frozenset(
         {"title", "authors", "content"}
     )

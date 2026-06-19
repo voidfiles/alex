@@ -6,8 +6,11 @@ import pytest
 from alex.lib.claim_graph import (
     GraphPrompts,
     GraphSettings,
+    GraphSource,
     build_claim_graph,
     claim_evidence_items,
+    document_graph_source,
+    merge_chunk_graphs,
     render_selected_subgraph,
     select_claim_subgraph,
 )
@@ -86,8 +89,7 @@ def test_claim_evidence_items_validates_shape() -> None:
 
 def test_build_claim_graph_creates_claim_and_support_edges() -> None:
     graph = build_claim_graph(
-        doc_name="note.md",
-        doc_text=DOC,
+        source=document_graph_source(doc_name="note.md", doc_text=DOC),
         prompts=GraphPrompts.load(),
         completer=ClaimCompleter(),
         eval_settings=EvalSettings(
@@ -107,10 +109,94 @@ def test_build_claim_graph_creates_claim_and_support_edges() -> None:
     assert any(edge.type == "similar_to" for edge in graph.edges)
 
 
+def test_build_claim_graph_supports_chunk_source() -> None:
+    graph = build_claim_graph(
+        source=GraphSource(
+            id="chunk:note:1",
+            type="chunk",
+            label="001_note.md",
+            text=DOC,
+            source_path="chunks/001_note.md",
+            chunk_index=1,
+            chunk_filename="001_note.md",
+        ),
+        prompts=GraphPrompts.load(),
+        completer=ClaimCompleter(),
+        eval_settings=EvalSettings(
+            judge_model="judge/test",
+            fact_extractor_model="extractor/test",
+        ),
+    )
+
+    root = graph.nodes[0]
+    assert root.id == "chunk:note:1"
+    assert root.type == "chunk"
+    assert root.label == "001_note.md"
+    assert root.source == "chunks/001_note.md"
+    assert root.metadata["chunk_index"] == "1"
+    assert root.metadata["chunk_filename"] == "001_note.md"
+    assert any(node.id.startswith("section:note:1:") for node in graph.nodes)
+    assert any(node.id.startswith("evidence:note:1:") for node in graph.nodes)
+    assert any(node.id.startswith("claim:note:1:") for node in graph.nodes)
+    assert any(edge.type == "supports" for edge in graph.edges)
+
+
+def test_merge_chunk_graphs_creates_document_graph_with_chunk_edges() -> None:
+    prompts = GraphPrompts.load()
+    eval_settings = EvalSettings(
+        judge_model="judge/test",
+        fact_extractor_model="extractor/test",
+    )
+    first = build_claim_graph(
+        source=GraphSource(
+            id="chunk:note:1",
+            type="chunk",
+            label="001_note.md",
+            text=DOC,
+            source_path="chunks/001_note.md",
+            chunk_index=1,
+            chunk_filename="001_note.md",
+        ),
+        prompts=prompts,
+        completer=ClaimCompleter(),
+        eval_settings=eval_settings,
+    )
+    second = build_claim_graph(
+        source=GraphSource(
+            id="chunk:note:2",
+            type="chunk",
+            label="002_note.md",
+            text=DOC,
+            source_path="chunks/002_note.md",
+            chunk_index=2,
+            chunk_filename="002_note.md",
+        ),
+        prompts=prompts,
+        completer=ClaimCompleter(),
+        eval_settings=eval_settings,
+    )
+
+    merged = merge_chunk_graphs(
+        doc_name="note.md",
+        source_path="note.md",
+        chunk_graphs=(first, second),
+    )
+
+    assert merged.nodes[0].id == "doc:note-md"
+    assert merged.nodes[0].type == "document"
+    assert sum(node.type == "chunk" for node in merged.nodes) == 2
+    assert any(
+        edge.source == "doc:note-md"
+        and edge.target == "chunk:note:1"
+        and edge.type == "contains"
+        for edge in merged.edges
+    )
+    assert any(edge.type == "similar_to" for edge in merged.edges)
+
+
 def test_select_claim_subgraph_keeps_section_coverage() -> None:
     graph = build_claim_graph(
-        doc_name="note.md",
-        doc_text=DOC,
+        source=document_graph_source(doc_name="note.md", doc_text=DOC),
         prompts=GraphPrompts.load(),
         completer=ClaimCompleter(),
         eval_settings=EvalSettings(

@@ -13,6 +13,7 @@ from alex.lib.claim_graph import (
     GraphPrompts,
     GraphSettings,
     build_claim_graph,
+    document_graph_source,
     graph_summary_prompt,
     render_selected_subgraph,
     select_claim_subgraph,
@@ -208,8 +209,7 @@ def evaluate_claim_graph_doc(
 ) -> GraphDocResult:
     doc_text = doc_path.read_text(encoding="utf-8")
     graph = build_claim_graph(
-        doc_name=doc_path.name,
-        doc_text=doc_text,
+        source=document_graph_source(doc_name=doc_path.name, doc_text=doc_text),
         prompts=graph_prompts,
         completer=completer,
         eval_settings=config.settings,

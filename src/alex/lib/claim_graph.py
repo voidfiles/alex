@@ -9,7 +9,7 @@ from collections import Counter, defaultdict
 from collections.abc import Sequence
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 from alex.lib.llm import Completer
 from alex.lib.prompt_templates import PromptTemplate, load_prompt
@@ -30,6 +30,17 @@ DEFAULT_MAX_GRAPH_CLAIMS = 24
 class ClaimEvidenceItem:
     claim: str
     evidence: str
+
+
+@dataclass(frozen=True)
+class GraphSource:
+    id: str
+    type: Literal["document", "chunk"]
+    label: str
+    text: str
+    source_path: str
+    chunk_index: int | None = None
+    chunk_filename: str | None = None
 
 
 @dataclass(frozen=True)
@@ -84,38 +95,42 @@ class GraphSettings:
 
 def build_claim_graph(
     *,
-    doc_name: str,
-    doc_text: str,
+    source: GraphSource,
     prompts: GraphPrompts,
     completer: Completer,
     eval_settings: EvalSettings,
+    settings: GraphSettings | None = None,
 ) -> ClaimGraph:
-    sections = fact_sections(doc_text)
+    graph_settings = settings or GraphSettings()
+    source_key = graph_source_key(source)
+    source_metadata = graph_source_metadata(source)
+    sections = fact_sections(source.text)
     nodes: list[GraphNode] = [
         GraphNode(
-            id=f"doc:{slugify(doc_name)}",
-            type="document",
-            label=doc_name,
-            source=doc_name,
+            id=source.id,
+            type=source.type,
+            label=source.label,
+            source=source.source_path,
             text="",
+            metadata=source_metadata,
         )
     ]
     edges: list[GraphEdge] = []
-    document_id = nodes[0].id
     claim_counts: Counter[str] = Counter()
 
     for section_index, section in enumerate(sections, 1):
-        section_id = f"section:{slugify(doc_name)}:{section_index}"
+        section_id = f"section:{source_key}:{section_index}"
         section_node = GraphNode(
             id=section_id,
             type="section",
             label=section.title,
-            source=doc_name,
+            source=source.source_path,
             text=trim_text(section.text),
             section_index=section_index,
+            metadata=source_metadata,
         )
         nodes.append(section_node)
-        edges.append(GraphEdge(source=document_id, target=section_id, type="contains"))
+        edges.append(GraphEdge(source=source.id, target=section_id, type="contains"))
 
         for claim_index, item in enumerate(
             extract_source_claims(
@@ -129,19 +144,20 @@ def build_claim_graph(
             normalized = slugify(item.claim, limit=72)
             claim_counts[normalized] += 1
             suffix = claim_counts[normalized]
-            claim_id = f"claim:{normalized}:{suffix}"
-            evidence_id = f"evidence:{slugify(doc_name)}:{section_index}:{claim_index}"
+            claim_id = f"claim:{source_key}:{normalized}:{suffix}"
+            evidence_id = f"evidence:{source_key}:{section_index}:{claim_index}"
             score = claim_score(item.claim, item.evidence)
+            metadata = {**source_metadata, "section": section.title}
             nodes.append(
                 GraphNode(
                     id=evidence_id,
                     type="evidence",
                     label=f"{section.title} evidence {claim_index}",
-                    source=doc_name,
+                    source=source.source_path,
                     text=item.evidence,
                     section_index=section_index,
                     score=score,
-                    metadata={"section": section.title},
+                    metadata=metadata,
                 )
             )
             nodes.append(
@@ -149,11 +165,11 @@ def build_claim_graph(
                     id=claim_id,
                     type="claim",
                     label=trim_text(item.claim, limit=120),
-                    source=doc_name,
+                    source=source.source_path,
                     text=item.claim,
                     section_index=section_index,
                     score=score,
-                    metadata={"section": section.title, "evidence_id": evidence_id},
+                    metadata={**metadata, "evidence_id": evidence_id},
                 )
             )
             edges.append(
@@ -168,7 +184,96 @@ def build_claim_graph(
                 )
             )
 
-    edges.extend(similar_claim_edges(nodes))
+    edges.extend(
+        similar_claim_edges(nodes, threshold=graph_settings.similarity_threshold)
+    )
+    return ClaimGraph(doc_name=source.label, nodes=tuple(nodes), edges=tuple(edges))
+
+
+def document_graph_source(*, doc_name: str, doc_text: str) -> GraphSource:
+    return GraphSource(
+        id=f"doc:{slugify(doc_name)}",
+        type="document",
+        label=doc_name,
+        text=doc_text,
+        source_path=doc_name,
+    )
+
+
+def chunk_graph_source(
+    *,
+    doc_name: str,
+    chunk_index: int,
+    chunk_path: Path,
+    chunk_text: str,
+) -> GraphSource:
+    return GraphSource(
+        id=f"chunk:{slugify(doc_name)}:{chunk_index}",
+        type="chunk",
+        label=chunk_path.name,
+        text=chunk_text,
+        source_path=f"chunks/{chunk_path.name}",
+        chunk_index=chunk_index,
+        chunk_filename=chunk_path.name,
+    )
+
+
+def graph_source_key(source: GraphSource) -> str:
+    if source.type == "chunk" and source.chunk_index is not None:
+        return source.id.removeprefix("chunk:")
+    if source.type == "document":
+        return source.id.removeprefix("doc:")
+    return slugify(source.label)
+
+
+def graph_source_metadata(source: GraphSource) -> dict[str, str]:
+    metadata = {"source_path": source.source_path}
+    if source.chunk_index is not None:
+        metadata["chunk_index"] = str(source.chunk_index)
+    if source.chunk_filename is not None:
+        metadata["chunk_filename"] = source.chunk_filename
+    return metadata
+
+
+def merge_chunk_graphs(
+    *,
+    doc_name: str,
+    source_path: str,
+    chunk_graphs: Sequence[ClaimGraph],
+    settings: GraphSettings | None = None,
+) -> ClaimGraph:
+    graph_settings = settings or GraphSettings()
+    document_id = f"doc:{slugify(doc_name)}"
+    nodes: list[GraphNode] = [
+        GraphNode(
+            id=document_id,
+            type="document",
+            label=doc_name,
+            source=source_path,
+            metadata={"source_path": source_path},
+        )
+    ]
+    edges: list[GraphEdge] = []
+    seen_node_ids = {document_id}
+
+    for graph in chunk_graphs:
+        chunk_nodes = [node for node in graph.nodes if node.type == "chunk"]
+        if len(chunk_nodes) != 1:
+            raise ValueError(f"Expected exactly one chunk root in {graph.doc_name}.")
+        chunk_node = chunk_nodes[0]
+        edges.append(
+            GraphEdge(source=document_id, target=chunk_node.id, type="contains")
+        )
+        for node in graph.nodes:
+            if node.id in seen_node_ids:
+                raise ValueError(f"Duplicate graph node id while merging: {node.id}")
+            seen_node_ids.add(node.id)
+            nodes.append(node)
+        edges.extend(edge for edge in graph.edges if edge.type != "similar_to")
+
+    edges.extend(
+        similar_claim_edges(nodes, threshold=graph_settings.similarity_threshold)
+    )
     return ClaimGraph(doc_name=doc_name, nodes=tuple(nodes), edges=tuple(edges))
 
 
@@ -252,13 +357,16 @@ def select_claim_subgraph(
             selected_claim_ids.append(claim.id)
 
     selected_ids = set(selected_claim_ids)
-    for claim_id in selected_claim_ids:
-        for edge in incoming[claim_id]:
+
+    def add_ancestors(node_id: str) -> None:
+        for edge in incoming[node_id]:
+            if edge.source in selected_ids:
+                continue
             selected_ids.add(edge.source)
-            for parent_edge in incoming[edge.source]:
-                selected_ids.add(parent_edge.source)
-                for doc_edge in incoming[parent_edge.source]:
-                    selected_ids.add(doc_edge.source)
+            add_ancestors(edge.source)
+
+    for claim_id in selected_claim_ids:
+        add_ancestors(claim_id)
         for edge in outgoing[claim_id]:
             selected_ids.add(edge.target)
 
@@ -371,13 +479,17 @@ def supported_claims(evidence_id: str, edges: Sequence[GraphEdge]) -> str:
     return ", ".join(f"`{claim_id}`" for claim_id in claim_ids) or "none"
 
 
-def similar_claim_edges(nodes: Sequence[GraphNode]) -> tuple[GraphEdge, ...]:
+def similar_claim_edges(
+    nodes: Sequence[GraphNode],
+    *,
+    threshold: float = 0.28,
+) -> tuple[GraphEdge, ...]:
     claim_nodes = [node for node in nodes if node.type == "claim"]
     edges: list[GraphEdge] = []
     for index, left in enumerate(claim_nodes):
         for right in claim_nodes[index + 1 :]:
             score = similarity(left.text, right.text)
-            if score >= 0.28:
+            if score >= threshold:
                 edges.append(
                     GraphEdge(
                         source=left.id,
