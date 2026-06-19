@@ -44,6 +44,8 @@ def test_process_markdown_summary_runs_the_full_pipeline(
     assert tuple(path.name for path in result.chunk_paths) == ("001_deep_work.md",)
     assert result.chunk_summary_path == asset_dir / "chunk_summary.md"
     assert result.summary_path == asset_dir / "summary.md"
+    assert result.graph_artifact_dir == asset_dir / "summary_graph"
+    assert result.graph_artifact_dir.is_dir()
 
     assert result.full_markdown.read_text(encoding="utf-8") == source.read_text(
         encoding="utf-8"
@@ -65,8 +67,24 @@ def test_process_markdown_summary_runs_the_full_pipeline(
 
     assert result.summary_path is not None
     summary = result.summary_path.read_text(encoding="utf-8")
-    assert "Deep work synthesis." in summary
+    assert "Faithful Deep work synthesis." in summary
     assert "1. [001_deep_work.md](chunks/001_deep_work.md)" in summary
+    assert (result.graph_artifact_dir / "standard_summary.md").read_text(
+        encoding="utf-8"
+    ) == "Deep work synthesis."
+    assert (result.graph_artifact_dir / "graph_summary.md").read_text(
+        encoding="utf-8"
+    ) == "Graph-grounded summary."
+    assert (result.graph_artifact_dir / "merged_summary.md").read_text(
+        encoding="utf-8"
+    ) == "Merged summary from Deep work synthesis."
+    assert (result.graph_artifact_dir / "faithfulness_filtered_summary.md").read_text(
+        encoding="utf-8"
+    ) == "Faithful Deep work synthesis."
+    assert (result.graph_artifact_dir / "graph.json").is_file()
+    assert (result.graph_artifact_dir / "selected_subgraph.json").is_file()
+    assert (result.graph_artifact_dir / "selected_subgraph.md").is_file()
+    assert (result.graph_artifact_dir / "pre_filter_claim_verdicts.json").is_file()
 
     chunk_calls = completer.chunk_calls()
     assert len(chunk_calls) == 1

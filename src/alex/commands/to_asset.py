@@ -10,6 +10,7 @@ from alex.lib.asset_folders import (
     ToAssetConfig,
     UnsupportedAssetSourceError,
     build_asset,
+    default_vault_asset_root,
     llm_asset_namer,
     validate_supported_source,
 )
@@ -17,6 +18,7 @@ from alex.lib.converters.to_markdown import (
     Markdowner,
     datalab_pdf_markdowner,
     epub_markdowner,
+    existing_markdowner,
     marker_pdf_markdowner,
     pymupdf4llm_markdowner,
     select_markdowner,
@@ -26,6 +28,7 @@ from alex.lib.converters.to_markdown import (
 def build_to_asset_command(
     markdowner: Markdowner = pymupdf4llm_markdowner,
     epub_markdowner: Markdowner = epub_markdowner,
+    markdown_markdowner: Markdowner = existing_markdowner,
     asset_namer: AssetNamer = llm_asset_namer,
     miner_markdowner: Markdowner = marker_pdf_markdowner,
     datalab_markdowner: Markdowner = datalab_pdf_markdowner,
@@ -44,8 +47,8 @@ def build_to_asset_command(
     @click.option(
         "--asset-root",
         type=click.Path(file_okay=False, path_type=Path),
-        default=DEFAULT_VAULT_ASSET_ROOT,
-        show_default=True,
+        default=None,
+        show_default=f"{DEFAULT_VAULT_ASSET_ROOT} or $OBSIDIAN_ASSET_ROOT",
         help="Root vault asset folder.",
     )
     @click.option(
@@ -65,12 +68,12 @@ def build_to_asset_command(
     )
     def command(
         source: Path,
-        asset_root: Path,
+        asset_root: Path | None,
         force: bool,
         miner: bool,
         datalab: bool,
     ) -> None:
-        """Convert a PDF or EPUB into a vault asset folder."""
+        """Convert a PDF, EPUB, or Markdown file into a vault asset folder."""
         if miner and datalab:
             raise click.UsageError("Choose only one converter option.")
 
@@ -88,12 +91,17 @@ def build_to_asset_command(
             use_miner=miner,
             use_datalab=datalab,
         )
-        config = ToAssetConfig(source=source, asset_root=asset_root, force=force)
+        config = ToAssetConfig(
+            source=source,
+            asset_root=asset_root or default_vault_asset_root(),
+            force=force,
+        )
         try:
             result = build_asset(
                 config,
                 pdf_markdowner=selected_markdowner,
                 epub_markdowner=epub_markdowner,
+                markdown_markdowner=markdown_markdowner,
                 asset_namer=asset_namer,
             )
         except (OSError, RuntimeError, ValueError) as error:

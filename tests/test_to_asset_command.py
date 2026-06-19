@@ -166,6 +166,56 @@ def test_to_asset_moves_epub_original_markdown_and_headers_to_asset_folder(
     )
 
 
+def test_to_asset_moves_markdown_directly_to_asset_folder(tmp_path: Path) -> None:
+    source = tmp_path / "long-notes.md"
+    markdown = "# Long Notes\n\nBy Alex Example\n\n## Part One\n\nBody.\n"
+    source.write_text(markdown, encoding="utf-8")
+    source_bytes = source.read_bytes()
+    asset_root = tmp_path / "vault-assets"
+    captured_name_inputs: list[AssetNameInput] = []
+
+    result = CliRunner().invoke(
+        build_to_asset_command(
+            asset_namer=fixed_asset_namer(
+                "long_notes_alex_example",
+                title="Long Notes",
+                authors=("Alex Example",),
+                captured_inputs=captured_name_inputs,
+            ),
+        ),
+        [str(source), "--asset-root", str(asset_root)],
+    )
+
+    asset_dir = asset_root / "long_notes_alex_example"
+    assert result.exit_code == 0
+    assert result.output == f"Wrote {asset_dir}\n"
+    assert not source.exists()
+    assert (asset_dir / "long_notes_alex_example.md").read_text(
+        encoding="utf-8"
+    ) == markdown
+    assert not (asset_dir / "long_notes_alex_example.md.md").exists()
+    assert (asset_dir / "headers.md").read_text(encoding="utf-8") == (
+        "# Document Structure\n\n"
+        "Table of Contents:\n\n"
+        "- Long Notes (H1, line 1, 7 lines)\n"
+        "  - Part One (H2, line 5, 3 lines)\n"
+    )
+    assert captured_name_inputs == [
+        AssetNameInput(
+            source=source,
+            markdown=markdown,
+            headers=(
+                "# Document Structure\n\n"
+                "Table of Contents:\n\n"
+                "- Long Notes (H1, line 1, 7 lines)\n"
+                "  - Part One (H2, line 5, 3 lines)\n"
+            ),
+        )
+    ]
+    metadata = json.loads((asset_dir / "metadata.json").read_text(encoding="utf-8"))
+    assert metadata["source_sha256"] == hashlib.sha256(source_bytes).hexdigest()
+
+
 def test_to_asset_miner_option_uses_miner_markdowner(tmp_path: Path) -> None:
     source = tmp_path / "paper.pdf"
     source.write_bytes(b"%PDF-1.7\n")
@@ -352,7 +402,8 @@ def test_to_asset_rejects_unsupported_file_types(tmp_path: Path) -> None:
 
     assert result.exit_code == 1
     assert (
-        "Unsupported file type '.txt'. Supported file types: .epub, .pdf"
+        "Unsupported file type '.txt'. "
+        "Supported file types: .epub, .markdown, .md, .pdf"
         in result.output
     )
     assert converter_was_called is False

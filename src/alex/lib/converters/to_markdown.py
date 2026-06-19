@@ -15,7 +15,7 @@ from urllib.request import Request, urlopen
 
 from pydantic import BaseModel, Field
 
-from alex.lib.document_sources import read_epub_source
+from alex.lib.document_sources import copy_file, read_epub_source
 from alex.lib.metadata import package_version
 
 DATALAB_CONVERT_API_URL = "https://www.datalab.to/api/v1/convert"
@@ -111,6 +111,12 @@ def epub_markdowner(config: ToMarkdownConfig) -> MarkdownOutput:
     config.output_dir.mkdir(parents=True, exist_ok=True)
     config.asset_path.write_text(markdown, encoding="utf-8")
 
+    return MarkdownOutput(config=config, asset=config.asset_path)
+
+
+def existing_markdowner(config: ToMarkdownConfig) -> MarkdownOutput:
+    config.output_dir.mkdir(parents=True, exist_ok=True)
+    copy_file(config.source, config.asset_path)
     return MarkdownOutput(config=config, asset=config.asset_path)
 
 

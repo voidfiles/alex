@@ -105,6 +105,8 @@ def test_process_doc_asset_chunks_an_existing_asset_folder(tmp_path: Path) -> No
     assert "## Foundations" in foundations
     assert result.chunk_summary_path == asset_dir / "chunk_summary.md"
     assert result.summary_path == asset_dir / "summary.md"
+    assert result.graph_artifact_dir == asset_dir / "summary_graph"
+    assert result.graph_artifact_dir.is_dir()
     assert not (asset_dir / "chunk_summaries").exists()
 
     chunk_calls = completer.chunk_calls()
@@ -140,9 +142,15 @@ def test_process_doc_asset_chunks_an_existing_asset_folder(tmp_path: Path) -> No
     assert summary.startswith("# Summary: Systems Book\n")
     assert "[Back to full document](systems-book.md)" in summary
     assert "[View chunk summary](chunk_summary.md)" in summary
-    assert "Systems synthesis." in summary
+    assert "Faithful Systems synthesis." in summary
     assert "## Explore by Section" in summary
     assert "1. [001_foundations.md](chunks/001_foundations.md)" in summary
+    assert (result.graph_artifact_dir / "standard_summary.md").read_text(
+        encoding="utf-8"
+    ) == "Systems synthesis."
+    assert (result.graph_artifact_dir / "faithfulness_filtered_summary.md").read_text(
+        encoding="utf-8"
+    ) == "Faithful Systems synthesis."
 
 
 def test_process_doc_asset_recursively_compresses_large_chunk_summaries(

@@ -1,5 +1,6 @@
 """Shared test doubles for the summarize pipeline."""
 
+import json
 from typing import NamedTuple
 
 
@@ -35,6 +36,34 @@ class RecordingCompleter:
             return self.chunk_responses.pop(0)
         if "<section_summaries>" in prompt:
             return self.final_response
+        if "source-grounded claims" in prompt:
+            return json.dumps(
+                {
+                    "claims": [
+                        {
+                            "claim": "The document preserves important claims.",
+                            "evidence": "The document states important claims.",
+                        }
+                    ]
+                }
+            )
+        if "graph-guided abstractive summary" in prompt:
+            return "Graph-grounded summary."
+        if "merging two independently generated summaries" in prompt:
+            return f"Merged summary from {self.final_response}"
+        if "extracting factual claims from a summary" in prompt:
+            return json.dumps({"claims": ["Merged summary is supported."]})
+        if "verifying summary claims against the source document" in prompt:
+            return json.dumps(
+                {
+                    "verdicts": [
+                        {"supported": True, "evidence": "document support"}
+                        for _ in range(numbered_item_count(prompt))
+                    ]
+                }
+            )
+        if "filtering a merged summary for source faithfulness" in prompt:
+            return f"Faithful {self.final_response}"
         return self.compression_response
 
     def chunk_calls(self) -> list[CompletionCall]:
@@ -45,3 +74,9 @@ class RecordingCompleter:
 
     def final_calls(self) -> list[CompletionCall]:
         return [call for call in self.calls if "<section_summaries>" in call.prompt]
+
+
+def numbered_item_count(prompt: str) -> int:
+    return sum(
+        1 for line in prompt.splitlines() if line[:1].isdigit() and ". " in line[:5]
+    )

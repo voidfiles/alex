@@ -43,6 +43,8 @@ def build_process_doc_command(
             click.echo(f"Chunk summary: {result.chunk_summary_path.name}")
         if result.summary_path is not None:
             click.echo(f"Summary: {result.summary_path.name}")
+        if result.graph_artifact_dir is not None:
+            click.echo(f"Summary graph: {result.graph_artifact_dir.name}")
 
     return command
 

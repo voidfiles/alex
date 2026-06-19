@@ -97,6 +97,8 @@ def build_summary_command(
         click.echo(f"Chunks: {len(result.chunk_paths)}")
         if result.summary_path is not None:
             click.echo(f"Summary: {result.summary_path}")
+        if result.graph_artifact_dir is not None:
+            click.echo(f"Summary graph: {result.graph_artifact_dir}")
 
     return command
 

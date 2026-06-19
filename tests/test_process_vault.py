@@ -87,6 +87,7 @@ def test_find_vault_sources_returns_sorted_pdf_epub_only(tmp_path: Path) -> None
     (vault / "a.epub").write_bytes(b"epub")
     (vault / "c.txt").write_text("text", encoding="utf-8")
     (vault / "note.md").write_text("note", encoding="utf-8")
+    (vault / "draft.markdown").write_text("markdown note", encoding="utf-8")
     sub = vault / "subdir"
     sub.mkdir()
     (sub / "nested.pdf").write_bytes(b"%PDF")

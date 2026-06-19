@@ -9,3 +9,9 @@ build/
 dist/
 *.egg-info/
 evals/runs/
+evals/linage/
+
+evals/claim_graph/
+evals/facts/
+evals/merged_summary/
+evals/reports/

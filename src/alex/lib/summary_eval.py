@@ -19,7 +19,7 @@ import hashlib
 import json
 import re
 import tempfile
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any, Protocol
@@ -32,6 +32,13 @@ from alex.lib.llm import (
     resolve_eval_judge_model,
     resolve_fact_extractor_model,
 )
+from alex.lib.markdown_structure import (
+    MarkdownHeader,
+    MarkdownStructureError,
+    infer_chapter_level,
+    parse_markdown_headers,
+    split_chapters,
+)
 from alex.lib.prompt_templates import PromptTemplate, load_prompt
 from alex.lib.summarize import SummaryPrompts, SummarySettings
 from alex.lib.summary_assets import SummaryAssetConfig, process_summary_asset
@@ -43,6 +50,7 @@ EVAL_PROMPT_NAMES = (
     "claim_verification",
     "rubric_judge",
 )
+JUDGE_BATCH_SIZE = 10
 
 # A sink for human-readable progress lines. Scoring one document is a handful
 # of sequential LLM calls, so callers inject a reporter to watch the work
@@ -127,6 +135,28 @@ class RubricResult:
 
 
 @dataclass(frozen=True)
+class FactVerdict:
+    fact: str
+    covered: bool
+    evidence: str
+
+
+@dataclass(frozen=True)
+class ClaimVerdict:
+    claim: str
+    supported: bool
+    evidence: str
+
+
+@dataclass(frozen=True)
+class GeneratedSummary:
+    doc_name: str
+    doc_text: str
+    summary: str
+    error: str | None = None
+
+
+@dataclass(frozen=True)
 class DocScore:
     doc_name: str
     coverage: float
@@ -138,6 +168,8 @@ class DocScore:
     unsupported_claims: tuple[str, ...]
     rubric_notes: str
     summary: str
+    fact_verdicts: tuple[FactVerdict, ...] = ()
+    claim_verdicts: tuple[ClaimVerdict, ...] = ()
     error: str | None = None
 
 
@@ -161,11 +193,21 @@ class EvalRun:
     summary_final_model: str
     doc_scores: tuple[DocScore, ...]
     mean_blended: float
+    generated_summaries: tuple[GeneratedSummary, ...] = ()
 
 
 class SummaryEvaluator(Protocol):
     def evaluate(
         self, *, prompts: SummaryPrompts, run_id: str, progress: Progress = no_progress
+    ) -> EvalRun: ...
+
+    def rescore(
+        self,
+        *,
+        summaries: Sequence[GeneratedSummary],
+        prompt_versions: dict[str, str],
+        run_id: str,
+        progress: Progress = no_progress,
     ) -> EvalRun: ...
 
 
@@ -180,33 +222,86 @@ class PipelineSummaryEvaluator:
         self, *, prompts: SummaryPrompts, run_id: str, progress: Progress = no_progress
     ) -> EvalRun:
         docs = corpus_docs(self.config.corpus_dir, self.doc_names)
-        eval_prompts = EvalPrompts.load()
-        scores: list[DocScore] = []
+        summaries: list[GeneratedSummary] = []
         for index, doc_path in enumerate(docs, 1):
-            progress(f"scoring ({index}/{len(docs)}) {doc_path.name}")
-            score = score_doc(
-                doc_path=doc_path,
-                prompts=prompts,
-                config=self.config,
-                eval_prompts=eval_prompts,
-                completer=self.completer,
-                embedder=self.embedder,
-            )
-            progress(doc_score_line(score))
-            scores.append(score)
-        run = EvalRun(
-            run_id=run_id,
+            progress(f"summarizing ({index}/{len(docs)}) {doc_path.name}")
+            try:
+                doc_text = doc_path.read_text(encoding="utf-8")
+                summary = generate_summary(
+                    doc_path=doc_path,
+                    prompts=prompts,
+                    config=self.config,
+                    completer=self.completer,
+                    embedder=self.embedder,
+                )
+                summaries.append(
+                    GeneratedSummary(
+                        doc_name=doc_path.name,
+                        doc_text=doc_text,
+                        summary=summary,
+                    )
+                )
+            except (LlmError, OSError, ValueError) as error:
+                summaries.append(
+                    GeneratedSummary(
+                        doc_name=doc_path.name,
+                        doc_text="",
+                        summary="",
+                        error=str(error),
+                    )
+                )
+        return self.rescore(
+            summaries=tuple(summaries),
             prompt_versions={
                 "chunk_summary": prompts.chunk_summary.version,
                 "compression_summary": prompts.compression_summary.version,
                 "final_summary": prompts.final_summary.version,
             },
+            run_id=run_id,
+            progress=progress,
+        )
+
+    def rescore(
+        self,
+        *,
+        summaries: Sequence[GeneratedSummary],
+        prompt_versions: dict[str, str],
+        run_id: str,
+        progress: Progress = no_progress,
+    ) -> EvalRun:
+        eval_prompts = EvalPrompts.load()
+        scores: list[DocScore] = []
+        for index, summary in enumerate(summaries, 1):
+            progress(f"scoring ({index}/{len(summaries)}) {summary.doc_name}")
+            if summary.error is not None:
+                score = failed_doc_score(
+                    doc_name=summary.doc_name,
+                    error=EvalError(summary.error),
+                )
+            elif not summary.doc_text or not summary.summary:
+                score = failed_doc_score(
+                    doc_name=summary.doc_name,
+                    error=EvalError("Pipeline produced no summary for this document."),
+                )
+            else:
+                score = score_generated_summary(
+                    generated=summary,
+                    config=self.config,
+                    eval_prompts=eval_prompts,
+                    completer=self.completer,
+                )
+            progress(doc_score_line(score))
+            scores.append(score)
+        run = EvalRun(
+            run_id=run_id,
+            prompt_versions=prompt_versions,
             judge_model=self.config.settings.judge_model,
             fact_extractor_model=self.config.settings.fact_extractor_model,
             summary_fast_model=self.config.summary.fast_model,
             summary_final_model=self.config.summary.final_model,
             doc_scores=tuple(scores),
             mean_blended=mean_blended(scores),
+            generated_summaries=tuple(summaries),
         )
         write_run_artifact(run, runs_dir=self.config.runs_dir)
         return run
@@ -239,7 +334,6 @@ def score_doc(
     completer: Completer,
     embedder: Embedder,
 ) -> DocScore:
-    settings = config.settings
     try:
         doc_text = doc_path.read_text(encoding="utf-8")
         summary = generate_summary(
@@ -249,6 +343,32 @@ def score_doc(
             completer=completer,
             embedder=embedder,
         )
+    except (LlmError, OSError, ValueError) as error:
+        return failed_doc_score(doc_name=doc_path.name, error=error)
+
+    return score_generated_summary(
+        generated=GeneratedSummary(
+            doc_name=doc_path.name,
+            doc_text=doc_text,
+            summary=summary,
+        ),
+        config=config,
+        eval_prompts=eval_prompts,
+        completer=completer,
+    )
+
+
+def score_generated_summary(
+    *,
+    generated: GeneratedSummary,
+    config: EvalConfig,
+    eval_prompts: EvalPrompts,
+    completer: Completer,
+) -> DocScore:
+    settings = config.settings
+    try:
+        doc_text = generated.doc_text
+        summary = generated.summary
         facts = facts_for_doc(
             doc_text=doc_text,
             facts_dir=config.facts_dir,
@@ -256,7 +376,7 @@ def score_doc(
             completer=completer,
             settings=settings,
         )
-        covered = judge_fact_coverage(
+        fact_verdicts = judge_fact_coverage(
             facts=facts,
             summary=summary,
             template=eval_prompts.fact_coverage_judge,
@@ -269,7 +389,7 @@ def score_doc(
             completer=completer,
             settings=settings,
         )
-        supported = verify_claims(
+        claim_verdicts = verify_claims(
             doc_text=doc_text,
             claims=claims,
             template=eval_prompts.claim_verification,
@@ -283,11 +403,11 @@ def score_doc(
             settings=settings,
         )
     except (LlmError, OSError, ValueError) as error:
-        return failed_doc_score(doc_name=doc_path.name, error=error)
+        return failed_doc_score(doc_name=generated.doc_name, error=error)
 
-    covered_count = sum(covered)
+    covered_count = sum(verdict.covered for verdict in fact_verdicts)
     coverage = covered_count / len(facts)
-    faithfulness = sum(supported) / len(claims)
+    faithfulness = sum(verdict.supported for verdict in claim_verdicts) / len(claims)
     density = density_score(
         covered_count=covered_count,
         summary_word_count=len(summary.split()),
@@ -295,7 +415,7 @@ def score_doc(
     )
     rubric_score = rubric.normalized()
     return DocScore(
-        doc_name=doc_path.name,
+        doc_name=generated.doc_name,
         coverage=coverage,
         faithfulness=faithfulness,
         density=density,
@@ -308,17 +428,15 @@ def score_doc(
             settings=settings,
         ),
         missed_facts=tuple(
-            fact
-            for fact, is_covered in zip(facts, covered, strict=True)
-            if not is_covered
+            verdict.fact for verdict in fact_verdicts if not verdict.covered
         ),
         unsupported_claims=tuple(
-            claim
-            for claim, is_supported in zip(claims, supported, strict=True)
-            if not is_supported
+            verdict.claim for verdict in claim_verdicts if not verdict.supported
         ),
         rubric_notes=rubric.notes,
         summary=summary,
+        fact_verdicts=fact_verdicts,
+        claim_verdicts=claim_verdicts,
     )
 
 
@@ -428,18 +546,138 @@ def extract_facts(
     completer: Completer,
     settings: EvalSettings,
 ) -> tuple[str, ...]:
+    facts = dedupe_facts(
+        round_robin_facts(
+            tuple(
+                extract_section_facts(
+                    section=section,
+                    template=template,
+                    completer=completer,
+                    settings=settings,
+                )
+                for section in fact_sections(doc_text)
+            ),
+            limit=40,
+        )
+    )
+    if not facts:
+        raise EvalJudgeError("Fact extraction returned no facts.")
+    return facts
+
+
+@dataclass(frozen=True)
+class FactSection:
+    title: str
+    text: str
+
+
+def fact_sections(doc_text: str) -> tuple[FactSection, ...]:
+    headers = parse_markdown_headers(doc_text)
+    if not headers:
+        return (FactSection(title="Full document", text=doc_text),)
+    try:
+        chapter_level = infer_chapter_level(headers="", markdown=doc_text)
+        chapters = split_chapters(
+            lines=doc_text.splitlines(),
+            chapter_level=chapter_level,
+        )
+    except MarkdownStructureError:
+        return (FactSection(title="Full document", text=doc_text),)
+    if not chapters:
+        return (FactSection(title="Full document", text=doc_text),)
+
+    sections: list[FactSection] = []
+    first_chapter_start = chapters[0].start_index
+    preamble = "\n".join(doc_text.splitlines()[:first_chapter_start]).strip()
+    if preamble:
+        sections.append(FactSection(title="Document Preamble", text=preamble))
+
+    header_by_line = {header.line_index: header for header in headers}
+    for chapter in chapters:
+        title = section_title(
+            headers=headers,
+            header=header_by_line.get(chapter.start_index),
+        )
+        sections.append(FactSection(title=title, text="\n".join(chapter.lines)))
+    return tuple(sections)
+
+
+def section_title(
+    *,
+    headers: tuple[MarkdownHeader, ...],
+    header: MarkdownHeader | None,
+) -> str:
+    if header is None:
+        return "Untitled section"
+    parents = [
+        candidate.title
+        for candidate in headers
+        if candidate.line_index < header.line_index and candidate.level < header.level
+    ]
+    if parents:
+        return " > ".join((*parents, header.title))
+    return header.title
+
+
+def extract_section_facts(
+    *,
+    section: FactSection,
+    template: PromptTemplate,
+    completer: Completer,
+    settings: EvalSettings,
+) -> tuple[str, ...]:
+    values = {
+        "document": section.text,
+        "section_title": section.title,
+        "section_text": section.text,
+    }
     payload = parse_json_payload(
         completer.complete(
-            prompt=template.render(document=doc_text),
+            prompt=render_prompt_subset(template, values),
             model=settings.fact_extractor_model,
             max_tokens=settings.extractor_max_tokens,
         ),
         step="Fact extraction",
     )
-    facts = string_list(payload, key="facts")
-    if not facts:
-        raise EvalJudgeError("Fact extraction returned no facts.")
-    return facts
+    return string_list(payload, key="facts")
+
+
+def round_robin_facts(
+    fact_groups: Sequence[Sequence[str]],
+    *,
+    limit: int,
+) -> tuple[str, ...]:
+    selected: list[str] = []
+    max_length = max((len(group) for group in fact_groups), default=0)
+    for index in range(max_length):
+        for group in fact_groups:
+            if index < len(group):
+                selected.append(group[index])
+                if len(selected) >= limit:
+                    return tuple(selected)
+    return tuple(selected)
+
+
+def dedupe_facts(facts: Sequence[str]) -> tuple[str, ...]:
+    deduped: list[str] = []
+    seen: set[str] = set()
+    for fact in facts:
+        normalized = normalize_fact(fact)
+        if not normalized or normalized in seen:
+            continue
+        seen.add(normalized)
+        deduped.append(fact.strip())
+    return tuple(deduped)
+
+
+def normalize_fact(fact: str) -> str:
+    return re.sub(r"\s+", " ", fact.strip().casefold())
+
+
+def render_prompt_subset(template: PromptTemplate, values: Mapping[str, str]) -> str:
+    return template.render(
+        **{name: values[name] for name in template.placeholders() if name in values}
+    )
 
 
 def judge_fact_coverage(
@@ -449,7 +687,21 @@ def judge_fact_coverage(
     template: PromptTemplate,
     completer: Completer,
     settings: EvalSettings,
-) -> tuple[bool, ...]:
+) -> tuple[FactVerdict, ...]:
+    if len(facts) > JUDGE_BATCH_SIZE:
+        verdicts: list[FactVerdict] = []
+        for batch in chunks(facts, JUDGE_BATCH_SIZE):
+            verdicts.extend(
+                judge_fact_coverage(
+                    facts=tuple(batch),
+                    summary=summary,
+                    template=template,
+                    completer=completer,
+                    settings=settings,
+                )
+            )
+        return tuple(verdicts)
+
     payload = parse_json_payload(
         completer.complete(
             prompt=template.render(facts=numbered(facts), summary=summary),
@@ -458,7 +710,7 @@ def judge_fact_coverage(
         ),
         step="Fact coverage judge",
     )
-    return bool_list(payload, key="covered", expected_length=len(facts))
+    return fact_verdicts(payload, facts=facts)
 
 
 def extract_claims(
@@ -489,7 +741,21 @@ def verify_claims(
     template: PromptTemplate,
     completer: Completer,
     settings: EvalSettings,
-) -> tuple[bool, ...]:
+) -> tuple[ClaimVerdict, ...]:
+    if len(claims) > JUDGE_BATCH_SIZE:
+        verdicts: list[ClaimVerdict] = []
+        for batch in chunks(claims, JUDGE_BATCH_SIZE):
+            verdicts.extend(
+                verify_claims(
+                    doc_text=doc_text,
+                    claims=tuple(batch),
+                    template=template,
+                    completer=completer,
+                    settings=settings,
+                )
+            )
+        return tuple(verdicts)
+
     payload = parse_json_payload(
         completer.complete(
             prompt=template.render(document=doc_text, claims=numbered(claims)),
@@ -498,7 +764,13 @@ def verify_claims(
         ),
         step="Claim verification",
     )
-    return bool_list(payload, key="supported", expected_length=len(claims))
+    return claim_verdicts(payload, claims=claims)
+
+
+def chunks[T](items: Sequence[T], size: int) -> tuple[tuple[T, ...], ...]:
+    return tuple(
+        tuple(items[index : index + size]) for index in range(0, len(items), size)
+    )
 
 
 def judge_rubric(
@@ -625,6 +897,63 @@ def bool_list(payload: Any, *, key: str, expected_length: int) -> tuple[bool, ..
     return tuple(items)
 
 
+def fact_verdicts(payload: Any, *, facts: Sequence[str]) -> tuple[FactVerdict, ...]:
+    verdicts = verdict_payloads(
+        payload,
+        expected_length=len(facts),
+        verdict_key="covered",
+    )
+    return tuple(
+        FactVerdict(
+            fact=fact,
+            covered=verdict["verdict"],
+            evidence=verdict["evidence"],
+        )
+        for fact, verdict in zip(facts, verdicts, strict=True)
+    )
+
+
+def claim_verdicts(payload: Any, *, claims: Sequence[str]) -> tuple[ClaimVerdict, ...]:
+    verdicts = verdict_payloads(
+        payload,
+        expected_length=len(claims),
+        verdict_key="supported",
+    )
+    return tuple(
+        ClaimVerdict(
+            claim=claim,
+            supported=verdict["verdict"],
+            evidence=verdict["evidence"],
+        )
+        for claim, verdict in zip(claims, verdicts, strict=True)
+    )
+
+
+def verdict_payloads(
+    payload: Any,
+    *,
+    expected_length: int,
+    verdict_key: str,
+) -> tuple[dict[str, Any], ...]:
+    if not isinstance(payload, dict) or not isinstance(payload.get("verdicts"), list):
+        raise EvalJudgeError("Expected a JSON object with a 'verdicts' list.")
+    items = payload["verdicts"]
+    if len(items) != expected_length:
+        raise EvalJudgeError(f"Expected {expected_length} verdicts, got {len(items)}.")
+    verdicts: list[dict[str, Any]] = []
+    for item in items:
+        if not isinstance(item, dict):
+            raise EvalJudgeError("Each verdict must be a JSON object.")
+        verdict = item.get(verdict_key)
+        evidence = item.get("evidence")
+        if not isinstance(verdict, bool):
+            raise EvalJudgeError(f"Verdict field {verdict_key!r} must be a boolean.")
+        if not isinstance(evidence, str) or not evidence.strip():
+            raise EvalJudgeError("Verdict evidence must be a non-empty string.")
+        verdicts.append({"verdict": verdict, "evidence": evidence.strip()})
+    return tuple(verdicts)
+
+
 def write_run_artifact(run: EvalRun, *, runs_dir: Path) -> Path:
     runs_dir.mkdir(parents=True, exist_ok=True)
     artifact_path = runs_dir / f"{run.run_id}.json"
@@ -646,6 +975,22 @@ def write_run_artifact(run: EvalRun, *, runs_dir: Path) -> Path:
                 "blended": score.blended,
                 "missed_facts": list(score.missed_facts),
                 "unsupported_claims": list(score.unsupported_claims),
+                "fact_verdicts": [
+                    {
+                        "fact": verdict.fact,
+                        "covered": verdict.covered,
+                        "evidence": verdict.evidence,
+                    }
+                    for verdict in score.fact_verdicts
+                ],
+                "claim_verdicts": [
+                    {
+                        "claim": verdict.claim,
+                        "supported": verdict.supported,
+                        "evidence": verdict.evidence,
+                    }
+                    for verdict in score.claim_verdicts
+                ],
                 "rubric_notes": score.rubric_notes,
                 "summary": score.summary,
                 "error": score.error,

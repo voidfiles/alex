@@ -19,6 +19,7 @@ from alex.lib.converters.to_markdown import (
     build_datalab_submit_request,
     datalab_pdf_markdowner,
     epub_markdowner,
+    existing_markdowner,
     marker_pdf_markdowner,
     poll_datalab_result,
     pymupdf4llm_markdowner,
@@ -136,6 +137,19 @@ def test_epub_markdowner_writes_local_markdown_asset(tmp_path: Path) -> None:
         "The first paragraph.\n\n"
         "The second paragraph.\n"
     )
+
+
+def test_existing_markdowner_copies_markdown_asset(tmp_path: Path) -> None:
+    source = tmp_path / "notes.md"
+    source.write_text("# Notes\n\nBody.\n", encoding="utf-8")
+    config = ToMarkdownConfig(source=source, output_dir=tmp_path / "out", name="asset")
+
+    result = existing_markdowner(config)
+
+    assert result.config == config
+    assert result.asset == tmp_path / "out" / "asset.md"
+    assert result.asset.read_text(encoding="utf-8") == "# Notes\n\nBody.\n"
+    assert source.read_text(encoding="utf-8") == "# Notes\n\nBody.\n"
 
 
 def test_marker_pdf_markdowner_writes_markdown_asset_and_images(

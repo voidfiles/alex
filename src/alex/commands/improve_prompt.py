@@ -10,6 +10,7 @@ from alex.commands.eval_summary import (
     EvaluatorFactory,
     default_evaluator_factory,
     new_run_id,
+    with_eval_model_overrides,
 )
 from alex.lib.llm import Completer, LiteLlmCompleter
 from alex.lib.prompt_improvement import (
@@ -76,6 +77,32 @@ def build_improve_prompt_command(
         show_default=True,
         help="Eval data directory holding corpus/, facts/, runs/, lineage/.",
     )
+    @click.option(
+        "--judge-model",
+        type=str,
+        default=None,
+        help="Model for coverage, faithfulness, and rubric judges.",
+    )
+    @click.option(
+        "--fact-extractor-model",
+        type=str,
+        default=None,
+        help="Model for extracting reference facts.",
+    )
+    @click.option(
+        "--adjudication-margin",
+        type=float,
+        default=0.02,
+        show_default=True,
+        help="Rejudge when candidate delta is this close to the gate.",
+    )
+    @click.option(
+        "--adjudication-repeats",
+        type=click.IntRange(min=0),
+        default=1,
+        show_default=True,
+        help="Additional judge-only passes for near-threshold candidates.",
+    )
     def command(
         prompt_name: str,
         iterations: int,
@@ -83,9 +110,17 @@ def build_improve_prompt_command(
         promote: bool,
         doc_names: tuple[str, ...],
         evals_dir: Path,
+        judge_model: str | None,
+        fact_extractor_model: str | None,
+        adjudication_margin: float,
+        adjudication_repeats: int,
     ) -> None:
         """Iteratively rewrite a summary prompt, keeping only measured winners."""
-        config = eval_config_for(evals_dir)
+        config = with_eval_model_overrides(
+            eval_config_for(evals_dir),
+            judge_model=judge_model,
+            fact_extractor_model=fact_extractor_model,
+        )
         try:
             report = improver(
                 prompt_name=prompt_name,
@@ -95,6 +130,8 @@ def build_improve_prompt_command(
                     iterations=iterations,
                     min_delta=min_delta,
                     promote=promote,
+                    adjudication_margin=adjudication_margin,
+                    adjudication_repeats=adjudication_repeats,
                 ),
                 lineage_dir=evals_dir / "lineage",
                 run_id_prefix=new_run_id(),

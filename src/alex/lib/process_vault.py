@@ -4,19 +4,23 @@ from __future__ import annotations
 
 import json
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Literal, Protocol
 
 from alex.lib.asset_folders import (
-    DEFAULT_VAULT_ASSET_ROOT,
-    SUPPORTED_SOURCE_EXTENSIONS,
     ToAssetConfig,
     ToAssetOutput,
     build_asset,
+    default_vault_asset_root,
+    default_vault_root,
     llm_asset_namer,
 )
-from alex.lib.converters.to_markdown import epub_markdowner, pymupdf4llm_markdowner
+from alex.lib.converters.to_markdown import (
+    epub_markdowner,
+    existing_markdowner,
+    pymupdf4llm_markdowner,
+)
 from alex.lib.document_sources import source_content_hash
 from alex.lib.process_doc_assets import (
     ProcessDocAssetConfig,
@@ -26,8 +30,9 @@ from alex.lib.process_doc_assets import (
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_VAULT_ROOT = DEFAULT_VAULT_ASSET_ROOT.parent
+DEFAULT_VAULT_ROOT = default_vault_root()
 DEFAULT_LOCK_PATH = Path.home() / ".cache" / "alex" / "process-vault.lock"
+PROCESS_VAULT_SOURCE_EXTENSIONS = frozenset({".epub", ".pdf"})
 
 
 class AssetBuilder(Protocol):
@@ -40,8 +45,8 @@ class DocProcessor(Protocol):
 
 @dataclass(frozen=True)
 class ProcessVaultConfig:
-    vault_root: Path = DEFAULT_VAULT_ROOT
-    asset_root: Path = DEFAULT_VAULT_ASSET_ROOT
+    vault_root: Path = field(default_factory=default_vault_root)
+    asset_root: Path = field(default_factory=default_vault_asset_root)
     force: bool = False
     lock_path: Path = DEFAULT_LOCK_PATH
 
@@ -126,7 +131,7 @@ def find_vault_sources(
             continue
         if not entry.is_file():
             continue
-        if entry.suffix.lower() not in SUPPORTED_SOURCE_EXTENSIONS:
+        if entry.suffix.lower() not in PROCESS_VAULT_SOURCE_EXTENSIONS:
             continue
         try:
             entry.resolve().relative_to(resolved_asset_root)
@@ -142,6 +147,7 @@ def default_asset_builder(config: ToAssetConfig) -> ToAssetOutput:
         config,
         pdf_markdowner=pymupdf4llm_markdowner,
         epub_markdowner=epub_markdowner,
+        markdown_markdowner=existing_markdowner,
         asset_namer=llm_asset_namer,
     )
 

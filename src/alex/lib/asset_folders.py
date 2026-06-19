@@ -1,9 +1,10 @@
-"""Building vault asset folders from PDF and EPUB sources."""
+"""Building vault asset folders from PDF, EPUB, and Markdown sources."""
 
 from __future__ import annotations
 
 import hashlib
 import json
+import os
 import re
 import shutil
 from dataclasses import dataclass, field
@@ -21,9 +22,33 @@ from alex.lib.document_sources import (
 from alex.lib.llm import Completer, LiteLlmCompleter, resolve_asset_naming_model
 from alex.lib.markdown_structure import table_of_contents_markdown
 
-DEFAULT_VAULT_ASSET_ROOT = Path("/Users/alex/Dropbox/obsidian/Alex3/assets")
+FALLBACK_VAULT_ROOT = Path("/Users/alex/Dropbox/obsidian/Alex3")
+OBSIDIAN_ROOT_ENV = "OBSIDIAN_ROOT"
+OBSIDIAN_ASSET_ROOT_ENV = "OBSIDIAN_ASSET_ROOT"
 
-SUPPORTED_SOURCE_EXTENSIONS = frozenset({".epub", ".pdf"})
+
+def path_from_env(name: str) -> Path | None:
+    value = os.environ.get(name)
+    if not value:
+        return None
+    return Path(value).expanduser()
+
+
+def default_vault_root() -> Path:
+    return path_from_env(OBSIDIAN_ROOT_ENV) or FALLBACK_VAULT_ROOT
+
+
+def default_vault_asset_root(vault_root: Path | None = None) -> Path:
+    env_asset_root = path_from_env(OBSIDIAN_ASSET_ROOT_ENV)
+    if env_asset_root is not None:
+        return env_asset_root
+    return (vault_root or default_vault_root()) / "assets"
+
+
+DEFAULT_VAULT_ASSET_ROOT = default_vault_asset_root()
+
+MARKDOWN_SOURCE_EXTENSIONS = frozenset({".markdown", ".md"})
+SUPPORTED_SOURCE_EXTENSIONS = frozenset({".epub", ".pdf", *MARKDOWN_SOURCE_EXTENSIONS})
 
 
 class UnsupportedAssetSourceError(ValueError):
@@ -56,7 +81,7 @@ class AssetNamingError(ValueError):
 @dataclass(frozen=True)
 class ToAssetConfig:
     source: Path
-    asset_root: Path = DEFAULT_VAULT_ASSET_ROOT
+    asset_root: Path = field(default_factory=default_vault_asset_root)
     force: bool = False
     move_source: bool = True
 
@@ -105,11 +130,16 @@ def build_asset(
     *,
     pdf_markdowner: Markdowner,
     epub_markdowner: Markdowner,
+    markdown_markdowner: Markdowner,
     asset_namer: AssetNamer,
 ) -> ToAssetOutput:
-    markdowner = (
-        epub_markdowner if config.source.suffix.lower() == ".epub" else pdf_markdowner
-    )
+    source_extension = config.source.suffix.lower()
+    if source_extension == ".epub":
+        markdowner = epub_markdowner
+    elif source_extension in MARKDOWN_SOURCE_EXTENSIONS:
+        markdowner = markdown_markdowner
+    else:
+        markdowner = pdf_markdowner
     return build_markdown_asset(
         config=config,
         markdowner=markdowner,
@@ -164,12 +194,20 @@ def build_markdown_asset(
         markdown_path=markdown_path,
         canonical_name=asset_name.canonical_name,
     )
-    source_path = move_source_to_canonical_asset_path(
-        source=config.source,
-        asset_dir=work_dir,
-        canonical_name=asset_name.canonical_name,
-        move=config.move_source,
-    )
+    source_path = final_markdown
+    if config.source.suffix.lower() in MARKDOWN_SOURCE_EXTENSIONS:
+        remove_markdown_source_after_asset_copy(
+            source=config.source,
+            asset_dir=work_dir,
+            move=config.move_source,
+        )
+    else:
+        source_path = move_source_to_canonical_asset_path(
+            source=config.source,
+            asset_dir=work_dir,
+            canonical_name=asset_name.canonical_name,
+            move=config.move_source,
+        )
     shutil.move(str(work_dir), str(final_dir))
     cleanup_tmp_parent(work_dir)
 
@@ -331,6 +369,17 @@ def move_source_to_canonical_asset_path(
     else:
         copy_file(source, destination)
     return destination
+
+
+def remove_markdown_source_after_asset_copy(
+    *,
+    source: Path,
+    asset_dir: Path,
+    move: bool,
+) -> None:
+    if not move or path_contains(parent=asset_dir, child=source):
+        return
+    source.unlink()
 
 
 def cleanup_tmp_parent(work_dir: Path) -> None:

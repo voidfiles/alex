@@ -1,3 +1,4 @@
+from collections.abc import Sequence
 from dataclasses import dataclass, field, replace
 from pathlib import Path
 
@@ -5,7 +6,14 @@ from click.testing import CliRunner
 
 from alex.commands.eval_summary import build_eval_summary_command
 from alex.lib.summarize import SummaryPrompts
-from alex.lib.summary_eval import DocScore, EvalConfig, EvalRun, Progress, no_progress
+from alex.lib.summary_eval import (
+    DocScore,
+    EvalConfig,
+    EvalRun,
+    GeneratedSummary,
+    Progress,
+    no_progress,
+)
 
 
 def ok_score(doc_name: str, blended: float) -> DocScore:
@@ -67,6 +75,16 @@ class FakeEvaluator:
         self.received.append((prompts, run_id))
         return replace(self.run, run_id=run_id)
 
+    def rescore(
+        self,
+        *,
+        summaries: Sequence[GeneratedSummary],
+        prompt_versions: dict[str, str],
+        run_id: str,
+        progress: Progress = no_progress,
+    ) -> EvalRun:
+        return replace(self.run, run_id=run_id, prompt_versions=prompt_versions)
+
 
 def test_eval_summary_reports_per_doc_scores_and_artifact(tmp_path: Path) -> None:
     captured: list[tuple[EvalConfig, tuple[str, ...] | None]] = []
@@ -88,6 +106,10 @@ def test_eval_summary_reports_per_doc_scores_and_artifact(tmp_path: Path) -> Non
             "b.md",
             "--prompt",
             "chunk_summary=v001",
+            "--judge-model",
+            "judge/x",
+            "--fact-extractor-model",
+            "extractor/y",
             "--evals-dir",
             str(tmp_path / "evals"),
         ],
@@ -98,6 +120,8 @@ def test_eval_summary_reports_per_doc_scores_and_artifact(tmp_path: Path) -> Non
     assert config.corpus_dir == tmp_path / "evals" / "corpus"
     assert config.facts_dir == tmp_path / "evals" / "facts"
     assert config.runs_dir == tmp_path / "evals" / "runs"
+    assert config.settings.judge_model == "judge/x"
+    assert config.settings.fact_extractor_model == "extractor/y"
     assert doc_names == ("a.md", "b.md")
 
     prompts, run_id = evaluator.received[0]

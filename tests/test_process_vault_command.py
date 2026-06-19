@@ -82,6 +82,8 @@ def test_process_vault_processes_all_sources(tmp_path: Path) -> None:
     asset_root.mkdir()
     (vault / "a.epub").write_bytes(b"epub")
     (vault / "b.pdf").write_bytes(b"%PDF")
+    (vault / "c.md").write_text("# Notes\n", encoding="utf-8")
+    (vault / "d.markdown").write_text("# Draft\n", encoding="utf-8")
     lock_path = tmp_path / "test.lock"
 
     result = CliRunner().invoke(
@@ -102,7 +104,63 @@ def test_process_vault_processes_all_sources(tmp_path: Path) -> None:
     assert result.exit_code == 0
     assert "Ingested a.epub" in result.output
     assert "Ingested b.pdf" in result.output
+    assert "Ingested c.md" not in result.output
+    assert "Ingested d.markdown" not in result.output
     assert "Done: 2 ingested, 0 skipped, 0 failed (total 2)." in result.output
+
+
+def test_process_vault_uses_obsidian_root_env_for_default_paths(
+    tmp_path: Path,
+) -> None:
+    vault = tmp_path / "vault"
+    vault.mkdir()
+    asset_root = vault / "assets"
+    (vault / "book.pdf").write_bytes(b"%PDF")
+    lock_path = tmp_path / "test.lock"
+    captured: list[ToAssetConfig] = []
+
+    result = CliRunner().invoke(
+        build_process_vault_command(
+            asset_builder=fake_builder_for(asset_root, call_log=captured),
+            doc_processor=fake_processor_for(),
+        ),
+        ["--lock-path", str(lock_path)],
+        env={"OBSIDIAN_ROOT": str(vault)},
+    )
+
+    assert result.exit_code == 0
+    assert "Ingested book.pdf" in result.output
+    assert len(captured) == 1
+    assert captured[0].source == vault / "book.pdf"
+    assert captured[0].asset_root == asset_root
+
+
+def test_process_vault_asset_root_env_overrides_obsidian_root_assets(
+    tmp_path: Path,
+) -> None:
+    vault = tmp_path / "vault"
+    vault.mkdir()
+    asset_root = tmp_path / "custom-assets"
+    (vault / "book.pdf").write_bytes(b"%PDF")
+    lock_path = tmp_path / "test.lock"
+    captured: list[ToAssetConfig] = []
+
+    result = CliRunner().invoke(
+        build_process_vault_command(
+            asset_builder=fake_builder_for(asset_root, call_log=captured),
+            doc_processor=fake_processor_for(),
+        ),
+        ["--lock-path", str(lock_path)],
+        env={
+            "OBSIDIAN_ROOT": str(vault),
+            "OBSIDIAN_ASSET_ROOT": str(asset_root),
+        },
+    )
+
+    assert result.exit_code == 0
+    assert "Ingested book.pdf" in result.output
+    assert len(captured) == 1
+    assert captured[0].asset_root == asset_root
 
 
 def test_process_vault_empty_vault_exits_zero(tmp_path: Path) -> None:

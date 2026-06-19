@@ -1,4 +1,5 @@
 import json
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -15,6 +16,7 @@ from alex.lib.summarize import SUMMARY_PROMPT_NAMES, SummaryPrompts
 from alex.lib.summary_eval import (
     DocScore,
     EvalRun,
+    GeneratedSummary,
     Progress,
     doc_score_line,
     mean_blended,
@@ -72,6 +74,15 @@ def eval_run(run_id: str, scores: tuple[DocScore, ...]) -> EvalRun:
         summary_final_model="final",
         doc_scores=scores,
         mean_blended=mean_blended(scores),
+        generated_summaries=tuple(
+            GeneratedSummary(
+                doc_name=score.doc_name,
+                doc_text=f"Document text for {score.doc_name}.",
+                summary=score.summary,
+            )
+            for score in scores
+            if score.error is None
+        ),
     )
 
 
@@ -79,6 +90,8 @@ def eval_run(run_id: str, scores: tuple[DocScore, ...]) -> EvalRun:
 class ScriptedEvaluator:
     runs: list[EvalRun]
     received: list[tuple[dict[str, str], str]] = field(default_factory=list)
+    rescore_runs: list[EvalRun] = field(default_factory=list)
+    rescore_received: list[str] = field(default_factory=list)
 
     def evaluate(
         self, *, prompts: SummaryPrompts, run_id: str, progress: Progress = no_progress
@@ -91,6 +104,21 @@ class ScriptedEvaluator:
         self.received.append((versions, run_id))
         run = self.runs.pop(0)
         # Mirror the real evaluator so the loop's progress wiring is exercised.
+        for index, score in enumerate(run.doc_scores, 1):
+            progress(f"scoring ({index}/{len(run.doc_scores)}) {score.doc_name}")
+            progress(doc_score_line(score))
+        return run
+
+    def rescore(
+        self,
+        *,
+        summaries: Sequence[GeneratedSummary],
+        prompt_versions: dict[str, str],
+        run_id: str,
+        progress: Progress = no_progress,
+    ) -> EvalRun:
+        self.rescore_received.append(run_id)
+        run = self.rescore_runs.pop(0)
         for index, score in enumerate(run.doc_scores, 1):
             progress(f"scoring ({index}/{len(run.doc_scores)}) {score.doc_name}")
             progress(doc_score_line(score))
@@ -345,6 +373,54 @@ def test_gate_requires_wins_or_ties_on_a_strict_majority_of_docs(
     assert result.promoted is False
     assert result.rejected_reason is not None
     assert "only 1 of 3 documents" in result.rejected_reason
+
+
+def test_near_threshold_candidate_is_adjudicated_before_promotion(
+    tmp_path: Path,
+) -> None:
+    root = make_prompts_root(tmp_path)
+    evaluator = ScriptedEvaluator(
+        runs=[
+            eval_run("r1", (doc_score("a.md", 0.60), doc_score("b.md", 0.60))),
+            eval_run("r2", (doc_score("a.md", 0.62), doc_score("b.md", 0.62))),
+        ],
+        rescore_runs=[
+            eval_run("r1a", (doc_score("a.md", 0.60), doc_score("b.md", 0.60))),
+            eval_run("r2a", (doc_score("a.md", 0.66), doc_score("b.md", 0.66))),
+        ],
+    )
+
+    report = improve_prompt(
+        prompt_name="chunk_summary",
+        evaluator=evaluator,
+        critic=ScriptedCritic(responses=[IMPROVED_CHUNK_TEMPLATE]),
+        settings=ImprovementSettings(
+            iterations=1,
+            promote=True,
+            min_delta=0.02,
+            adjudication_margin=0.01,
+            adjudication_repeats=1,
+        ),
+        lineage_dir=tmp_path / "lineage",
+        run_id_prefix="t",
+        prompts_root=root,
+    )
+
+    result = report.iterations[0]
+    assert result.adjudicated is True
+    assert result.adjudication_run_ids == (
+        "t-i01-adj01-parent",
+        "t-i01-adj01-candidate",
+    )
+    assert result.delta == pytest.approx(0.04)
+    assert result.promoted is True
+    assert evaluator.rescore_received == list(result.adjudication_run_ids)
+
+    record = json.loads(
+        (tmp_path / "lineage" / "chunk_summary.jsonl").read_text(encoding="utf-8")
+    )
+    assert record["adjudicated"] is True
+    assert record["adjudication_run_ids"] == list(result.adjudication_run_ids)
 
 
 def test_loop_stops_after_two_consecutive_failures(tmp_path: Path) -> None:

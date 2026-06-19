@@ -64,6 +64,7 @@ class ProcessDocAssetOutput:
     chunk_paths: tuple[Path, ...]
     chunk_summary_path: Path | None = None
     summary_path: Path | None = None
+    graph_artifact_dir: Path | None = None
 
 
 def process_doc_asset(
@@ -132,6 +133,9 @@ def process_doc_asset(
         summary_path=asset_dir / "summary.md"
         if (asset_dir / "summary.md").exists()
         else None,
+        graph_artifact_dir=asset_dir / "summary_graph"
+        if (asset_dir / "summary_graph").exists()
+        else None,
     )
     if config.summarize:
         summary_output = summarize_doc_asset(
@@ -156,6 +160,7 @@ def process_doc_asset(
         chunk_paths=chunk_paths,
         chunk_summary_path=summary_output.chunk_summary_path,
         summary_path=summary_output.summary_path,
+        graph_artifact_dir=summary_output.graph_artifact_dir,
     )
 
 

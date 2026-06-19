@@ -73,6 +73,14 @@ def test_improve_prompt_command_reports_each_iteration(tmp_path: Path) -> None:
             "--min-delta",
             "0.05",
             "--promote",
+            "--judge-model",
+            "judge/x",
+            "--fact-extractor-model",
+            "extractor/y",
+            "--adjudication-margin",
+            "0.03",
+            "--adjudication-repeats",
+            "2",
             "--evals-dir",
             str(tmp_path / "evals"),
         ],
@@ -84,6 +92,8 @@ def test_improve_prompt_command_reports_each_iteration(tmp_path: Path) -> None:
     assert settings.iterations == 2
     assert settings.min_delta == 0.05
     assert settings.promote is True
+    assert settings.adjudication_margin == 0.03
+    assert settings.adjudication_repeats == 2
     assert captured["lineage_dir"] == tmp_path / "evals" / "lineage"
 
     assert (

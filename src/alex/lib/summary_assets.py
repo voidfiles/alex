@@ -53,6 +53,7 @@ class SummaryAssetOutput:
     chunk_paths: tuple[Path, ...]
     chunk_summary_path: Path | None
     summary_path: Path | None
+    graph_artifact_dir: Path | None = None
 
 
 @dataclass(frozen=True)
@@ -126,6 +127,7 @@ def process_summary_asset(
         chunk_paths=chunking_result.chunk_paths,
         chunk_summary_path=summary_output.chunk_summary_path,
         summary_path=summary_output.summary_path,
+        graph_artifact_dir=summary_output.graph_artifact_dir,
     )
 
 

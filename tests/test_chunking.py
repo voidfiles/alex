@@ -6,9 +6,11 @@ import pytest
 
 from alex.lib.chunking import (
     EMBED_MAX_INPUT_CHARS,
+    EMBED_MAX_INPUT_TOKENS,
     ChunkingError,
     ChunkSettings,
     chunk_markdown_document,
+    embedding_probe_text,
     merge_short_tail,
     merge_small_paragraphs,
     semantic_split,
@@ -206,6 +208,18 @@ def test_semantic_split_truncates_oversized_embedding_inputs() -> None:
 
     assert chunks == (huge, other)
     assert all(len(probe) <= EMBED_MAX_INPUT_CHARS for probe in embedder.calls[0])
+
+
+def test_embedding_probe_text_truncates_token_dense_inputs() -> None:
+    import tiktoken
+
+    text = "alpha " + ("😀" * 9_000)
+    probe = embedding_probe_text(text, model="openai/text-embedding-3-small")
+    encoding = tiktoken.encoding_for_model("text-embedding-3-small")
+
+    assert len(text) < EMBED_MAX_INPUT_CHARS
+    assert len(encoding.encode(text)) > 8_192
+    assert len(encoding.encode(probe)) <= EMBED_MAX_INPUT_TOKENS
 
 
 def test_merge_small_paragraphs_folds_short_runs_into_their_successor() -> None:

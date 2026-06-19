@@ -6,7 +6,11 @@ from pathlib import Path
 
 import click
 
-from alex.lib.asset_folders import DEFAULT_VAULT_ASSET_ROOT
+from alex.lib.asset_folders import (
+    DEFAULT_VAULT_ASSET_ROOT,
+    default_vault_asset_root,
+    default_vault_root,
+)
 from alex.lib.locking import LockHeldError, exclusive_lock
 from alex.lib.process_doc_assets import process_doc_asset
 from alex.lib.process_vault import (
@@ -30,15 +34,15 @@ def build_process_vault_command(
     @click.option(
         "--vault-root",
         type=click.Path(file_okay=False, path_type=Path),
-        default=DEFAULT_VAULT_ROOT,
-        show_default=True,
-        help="Vault root scanned for top-level PDF/EPUB files.",
+        default=None,
+        show_default=f"{DEFAULT_VAULT_ROOT} or $OBSIDIAN_ROOT",
+        help="Vault root scanned for top-level PDF and EPUB files.",
     )
     @click.option(
         "--asset-root",
         type=click.Path(file_okay=False, path_type=Path),
-        default=DEFAULT_VAULT_ASSET_ROOT,
-        show_default=True,
+        default=None,
+        show_default=f"{DEFAULT_VAULT_ASSET_ROOT} or $OBSIDIAN_ASSET_ROOT",
         help="Root vault asset folder.",
     )
     @click.option(
@@ -54,12 +58,12 @@ def build_process_vault_command(
         help="Mutual-exclusion lock file (machine-local; prevents overlapping runs).",
     )
     def command(
-        vault_root: Path,
-        asset_root: Path,
+        vault_root: Path | None,
+        asset_root: Path | None,
         force: bool,
         lock_path: Path,
     ) -> None:
-        """Ingest every top-level PDF/EPUB in the vault root.
+        """Ingest every top-level PDF or EPUB file in the vault root.
 
         Discovers .pdf and .epub files at the vault root (non-recursive),
         converts each to a vault asset folder via to-asset, then chunks and
@@ -70,9 +74,13 @@ def build_process_vault_command(
         and exits without doing any work.  Per-file failures are reported in
         the summary; they do not abort the rest of the batch.
         """
+        resolved_vault_root = vault_root or default_vault_root()
+        resolved_asset_root = asset_root or default_vault_asset_root(
+            resolved_vault_root
+        )
         config = ProcessVaultConfig(
-            vault_root=vault_root,
-            asset_root=asset_root,
+            vault_root=resolved_vault_root,
+            asset_root=resolved_asset_root,
             force=force,
             lock_path=lock_path,
         )

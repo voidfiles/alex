@@ -48,6 +48,8 @@ class ImprovementSettings:
     critic_model: str = field(default_factory=resolve_prompt_critic_model)
     critic_max_tokens: int = 16_000
     max_consecutive_failures: int = 2
+    adjudication_margin: float = 0.02
+    adjudication_repeats: int = 1
 
 
 @dataclass(frozen=True)
@@ -61,6 +63,8 @@ class IterationResult:
     doc_deltas: dict[str, float]
     promoted: bool
     rejected_reason: str | None
+    adjudicated: bool = False
+    adjudication_run_ids: tuple[str, ...] = ()
 
     def improved(self) -> bool:
         return self.candidate_version is not None and self.rejected_reason is None
@@ -212,6 +216,33 @@ def run_iteration(
             promoted=False,
             rejected_reason="no document scored cleanly in both runs",
         )
+    adjudication_run_ids: tuple[str, ...] = ()
+    if should_adjudicate(doc_deltas=doc_deltas, settings=settings):
+        progress(f"{tag}: near promotion threshold; adjudicating judge scores")
+        doc_deltas, adjudication_run_ids = adjudicated_deltas(
+            evaluator=evaluator,
+            incumbent_run=incumbent_run,
+            candidate_run=candidate_run,
+            initial_deltas=doc_deltas,
+            repeats=settings.adjudication_repeats,
+            run_id_prefix=f"{run_id_prefix}-i{iteration:02d}",
+            progress=scoring,
+        )
+        if not doc_deltas:
+            progress(f"{tag}: rejected, adjudication produced no paired scores")
+            return IterationResult(
+                iteration=iteration,
+                parent_version=incumbent.version,
+                candidate_version=candidate_version,
+                parent_score=incumbent_run.mean_blended,
+                candidate_score=candidate_run.mean_blended,
+                delta=None,
+                doc_deltas={},
+                promoted=False,
+                rejected_reason="adjudication produced no paired scores",
+                adjudicated=True,
+                adjudication_run_ids=adjudication_run_ids,
+            )
     delta = sum(doc_deltas.values()) / len(doc_deltas)
     gate_passed, gate_reason = promotion_gate(
         delta=delta, doc_deltas=doc_deltas, settings=settings
@@ -236,6 +267,8 @@ def run_iteration(
         doc_deltas=doc_deltas,
         promoted=promoted,
         rejected_reason=gate_reason,
+        adjudicated=bool(adjudication_run_ids),
+        adjudication_run_ids=adjudication_run_ids,
     )
 
 
@@ -282,13 +315,18 @@ def critique(
     incumbent: PromptTemplate,
     worst: DocScore,
 ) -> str:
+    values = {
+        "prompt_name": incumbent.name,
+        "prompt_text": incumbent.text,
+        "summary": worst.summary,
+        "missed_facts": bulleted(worst.missed_facts),
+        "unsupported_claims": bulleted(worst.unsupported_claims),
+        "missed_fact_evidence": missed_fact_evidence(worst),
+        "unsupported_claim_evidence": unsupported_claim_evidence(worst),
+        "rubric_notes": worst.rubric_notes or "(none recorded)",
+    }
     prompt = critic_template.render(
-        prompt_name=incumbent.name,
-        prompt_text=incumbent.text,
-        summary=worst.summary,
-        missed_facts=bulleted(worst.missed_facts),
-        unsupported_claims=bulleted(worst.unsupported_claims),
-        rubric_notes=worst.rubric_notes or "(none recorded)",
+        **{name: values[name] for name in critic_template.placeholders()}
     )
     raw = critic.complete(
         prompt=prompt,
@@ -296,6 +334,24 @@ def critique(
         max_tokens=settings.critic_max_tokens,
     )
     return strip_code_fence(raw)
+
+
+def missed_fact_evidence(score: DocScore) -> str:
+    verdicts = [verdict for verdict in score.fact_verdicts if not verdict.covered]
+    if not verdicts:
+        return "(none recorded)"
+    return "\n".join(
+        f"- {verdict.fact} Evidence: {verdict.evidence}" for verdict in verdicts
+    )
+
+
+def unsupported_claim_evidence(score: DocScore) -> str:
+    verdicts = [verdict for verdict in score.claim_verdicts if not verdict.supported]
+    if not verdicts:
+        return "(none recorded)"
+    return "\n".join(
+        f"- {verdict.claim} Evidence: {verdict.evidence}" for verdict in verdicts
+    )
 
 
 def bulleted(items: Sequence[str]) -> str:
@@ -320,6 +376,65 @@ def paired_deltas(incumbent: EvalRun, candidate: EvalRun) -> dict[str, float]:
         if parent is not None and score.error is None:
             deltas[score.doc_name] = score.blended - parent.blended
     return deltas
+
+
+def should_adjudicate(
+    *,
+    doc_deltas: dict[str, float],
+    settings: ImprovementSettings,
+) -> bool:
+    if settings.adjudication_repeats <= 0 or not doc_deltas:
+        return False
+    delta = sum(doc_deltas.values()) / len(doc_deltas)
+    return abs(delta - settings.min_delta) <= settings.adjudication_margin
+
+
+def adjudicated_deltas(
+    *,
+    evaluator: SummaryEvaluator,
+    incumbent_run: EvalRun,
+    candidate_run: EvalRun,
+    initial_deltas: dict[str, float],
+    repeats: int,
+    run_id_prefix: str,
+    progress: Progress,
+) -> tuple[dict[str, float], tuple[str, ...]]:
+    if not incumbent_run.generated_summaries or not candidate_run.generated_summaries:
+        return initial_deltas, ()
+
+    deltas_by_doc: dict[str, list[float]] = {
+        doc_name: [delta] for doc_name, delta in initial_deltas.items()
+    }
+    run_ids: list[str] = []
+    for repeat in range(1, repeats + 1):
+        incumbent_rescore_id = f"{run_id_prefix}-adj{repeat:02d}-parent"
+        candidate_rescore_id = f"{run_id_prefix}-adj{repeat:02d}-candidate"
+        incumbent_rescore = evaluator.rescore(
+            summaries=incumbent_run.generated_summaries,
+            prompt_versions=incumbent_run.prompt_versions,
+            run_id=incumbent_rescore_id,
+            progress=progress,
+        )
+        candidate_rescore = evaluator.rescore(
+            summaries=candidate_run.generated_summaries,
+            prompt_versions=candidate_run.prompt_versions,
+            run_id=candidate_rescore_id,
+            progress=progress,
+        )
+        run_ids.extend([incumbent_rescore_id, candidate_rescore_id])
+        for doc_name, delta in paired_deltas(
+            incumbent_rescore,
+            candidate_rescore,
+        ).items():
+            deltas_by_doc.setdefault(doc_name, []).append(delta)
+
+    return (
+        {
+            doc_name: sum(values) / len(values)
+            for doc_name, values in deltas_by_doc.items()
+        },
+        tuple(run_ids),
+    )
 
 
 def promotion_gate(
@@ -360,6 +475,8 @@ def append_lineage(
         "doc_deltas": result.doc_deltas,
         "promoted": result.promoted,
         "rejected_reason": result.rejected_reason,
+        "adjudicated": result.adjudicated,
+        "adjudication_run_ids": list(result.adjudication_run_ids),
     }
     with (lineage_dir / f"{prompt_name}.jsonl").open(
         "a", encoding="utf-8"

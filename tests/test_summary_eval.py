@@ -12,18 +12,25 @@ from alex.lib.summary_eval import (
     EvalConfig,
     EvalError,
     EvalJudgeError,
+    EvalPrompts,
     EvalSettings,
+    FactVerdict,
     PipelineSummaryEvaluator,
     bool_list,
+    claim_verdicts,
     corpus_docs,
     density_score,
     eval_config_for,
     fact_cache_path,
+    fact_sections,
+    fact_verdicts,
+    judge_fact_coverage,
     mean_blended,
     parse_json_payload,
     rubric_grade,
     string_list,
     strip_code_fence,
+    verify_claims,
 )
 
 GUIDE_MD = (
@@ -75,10 +82,58 @@ class NullEmbedder:
 
 def judge_responses() -> list[tuple[str, str]]:
     return [
+        (
+            "source-grounded claims",
+            json.dumps(
+                {
+                    "claims": [
+                        {
+                            "claim": "The guide explains owl habitat.",
+                            "evidence": "Owls live in cavities.",
+                        },
+                        {
+                            "claim": "The guide explains owl diet.",
+                            "evidence": "Owls eat voles.",
+                        },
+                    ]
+                }
+            ),
+        ),
+        ("graph-guided abstractive summary", "The graph covers owl habitat and diet."),
+        (
+            "merging two independently generated summaries",
+            "The guide explains owl habitat and diet.",
+        ),
+        (
+            "filtering a merged summary for source faithfulness",
+            "The guide explains owl habitat and diet.",
+        ),
         ('"facts"', json.dumps({"facts": FACTS})),
-        ('"covered"', json.dumps({"covered": [True, True, True, False]})),
+        (
+            '"covered"',
+            json.dumps(
+                {
+                    "verdicts": [
+                        {"covered": True, "evidence": "habitat"},
+                        {"covered": True, "evidence": "diet"},
+                        {"covered": True, "evidence": "author"},
+                        {"covered": False, "evidence": "missing coverage scope"},
+                    ]
+                }
+            ),
+        ),
         ('"claims"', json.dumps({"claims": ["Claim habitat.", "Claim diet."]})),
-        ('"supported"', json.dumps({"supported": [True, False]})),
+        (
+            '"supported"',
+            json.dumps(
+                {
+                    "verdicts": [
+                        {"supported": True, "evidence": "document says habitat"},
+                        {"supported": False, "evidence": "document does not say diet"},
+                    ]
+                }
+            ),
+        ),
         (
             '"coherence"',
             json.dumps(
@@ -121,7 +176,7 @@ def guide_cache_path(config: EvalConfig) -> Path:
         facts_dir=config.facts_dir,
         doc_text=GUIDE_MD,
         extractor_model="test/extractor-1",
-        extractor_version="v001",
+        extractor_version="v002",
     )
 
 
@@ -135,10 +190,10 @@ def test_evaluate_scores_a_doc_and_writes_run_artifact(tmp_path: Path) -> None:
         embedder=NullEmbedder(),
     ).evaluate(prompts=SummaryPrompts.load(), run_id="testrun")
 
-    assert run.prompt_versions == {
-        "chunk_summary": "v001",
-        "compression_summary": "v001",
-        "final_summary": "v001",
+    assert set(run.prompt_versions) == {
+        "chunk_summary",
+        "compression_summary",
+        "final_summary",
     }
     assert len(run.doc_scores) == 1
     score = run.doc_scores[0]
@@ -153,6 +208,11 @@ def test_evaluate_scores_a_doc_and_writes_run_artifact(tmp_path: Path) -> None:
     assert score.missed_facts == ("The guide covers habitat and diet.",)
     assert score.unsupported_claims == ("Claim diet.",)
     assert score.rubric_notes == "Could be tighter."
+    assert score.fact_verdicts[-1] == FactVerdict(
+        fact="The guide covers habitat and diet.",
+        covered=False,
+        evidence="missing coverage scope",
+    )
     assert "The guide explains owl habitat and diet." in score.summary
 
     artifact = json.loads(
@@ -160,10 +220,10 @@ def test_evaluate_scores_a_doc_and_writes_run_artifact(tmp_path: Path) -> None:
     )
     assert artifact["run_id"] == "testrun"
     assert artifact["mean_blended"] == pytest.approx(0.6875)
-    assert artifact["prompt_versions"] == {
-        "chunk_summary": "v001",
-        "compression_summary": "v001",
-        "final_summary": "v001",
+    assert set(artifact["prompt_versions"]) == {
+        "chunk_summary",
+        "compression_summary",
+        "final_summary",
     }
     assert artifact["judge_model"] == "test-judge"
     assert artifact["fact_extractor_model"] == "test/extractor-1"
@@ -171,6 +231,11 @@ def test_evaluate_scores_a_doc_and_writes_run_artifact(tmp_path: Path) -> None:
     assert artifact["summary_final_model"] == config.summary.final_model
     assert artifact["docs"][0]["doc_name"] == "guide.md"
     assert artifact["docs"][0]["missed_facts"] == ["The guide covers habitat and diet."]
+    assert artifact["docs"][0]["fact_verdicts"][-1] == {
+        "fact": "The guide covers habitat and diet.",
+        "covered": False,
+        "evidence": "missing coverage scope",
+    }
 
     cache_path = guide_cache_path(config)
     assert json.loads(cache_path.read_text(encoding="utf-8")) == {"facts": FACTS}
@@ -203,7 +268,15 @@ def test_evaluate_reuses_cached_facts_without_calling_the_extractor(
     cache_path.write_text(json.dumps({"facts": ["Cached fact."]}), encoding="utf-8")
     # No fact-extraction response scripted: an extractor call would raise.
     responses = [pair for pair in judge_responses() if pair[0] != '"facts"']
-    responses[0] = ('"covered"', json.dumps({"covered": [True]}))
+    responses = [
+        (
+            marker,
+            json.dumps({"verdicts": [{"covered": True, "evidence": "cached"}]}),
+        )
+        if marker == '"covered"'
+        else (marker, response)
+        for marker, response in responses
+    ]
 
     run = PipelineSummaryEvaluator(
         config=config,
@@ -266,7 +339,10 @@ def test_evaluate_records_malformed_judge_output_as_failed_doc(
 ) -> None:
     config = eval_config(tmp_path)
     responses = judge_responses()
-    responses[1] = ('"covered"', "this is not json")
+    responses = [
+        (marker, "this is not json") if marker == '"covered"' else (marker, response)
+        for marker, response in responses
+    ]
 
     run = PipelineSummaryEvaluator(
         config=config,
@@ -346,6 +422,108 @@ def test_bool_list_validates_values_and_length() -> None:
         bool_list({"covered": [True, 1]}, key="covered", expected_length=2)
     with pytest.raises(EvalJudgeError, match="Expected 3 'covered' verdicts"):
         bool_list(payload, key="covered", expected_length=3)
+
+
+def test_fact_verdicts_require_evidence_and_match_fact_order() -> None:
+    payload = {
+        "verdicts": [
+            {"covered": True, "evidence": "summary says a"},
+            {"covered": False, "evidence": "missing b"},
+        ]
+    }
+
+    assert fact_verdicts(payload, facts=("Fact A.", "Fact B.")) == (
+        FactVerdict(fact="Fact A.", covered=True, evidence="summary says a"),
+        FactVerdict(fact="Fact B.", covered=False, evidence="missing b"),
+    )
+
+    with pytest.raises(EvalJudgeError, match="non-empty string"):
+        fact_verdicts(
+            {"verdicts": [{"covered": True, "evidence": ""}]},
+            facts=("Fact A.",),
+        )
+
+
+def test_claim_verdicts_require_supported_booleans() -> None:
+    payload = {"verdicts": [{"supported": False, "evidence": "not in doc"}]}
+
+    assert claim_verdicts(payload, claims=("Claim A.",))[0].supported is False
+
+    with pytest.raises(EvalJudgeError, match="'supported' must be a boolean"):
+        claim_verdicts(
+            {"verdicts": [{"supported": "false", "evidence": "not in doc"}]},
+            claims=("Claim A.",),
+        )
+
+
+def test_judges_batch_large_fact_and_claim_lists() -> None:
+    class CountingCompleter:
+        calls: list[str]
+
+        def __init__(self) -> None:
+            self.calls = []
+
+        def complete(self, *, prompt: str, model: str, max_tokens: int) -> str:
+            self.calls.append(prompt)
+            if '"covered"' in prompt:
+                return json.dumps(
+                    {
+                        "verdicts": [
+                            {"covered": True, "evidence": "covered"}
+                            for _ in range(numbered_item_count(prompt))
+                        ]
+                    }
+                )
+            return json.dumps(
+                {
+                    "verdicts": [
+                        {"supported": True, "evidence": "supported"}
+                        for _ in range(numbered_item_count(prompt))
+                    ]
+                }
+            )
+
+    def numbered_item_count(prompt: str) -> int:
+        return sum(
+            1 for line in prompt.splitlines() if line[:1].isdigit() and ". " in line[:5]
+        )
+
+    completer = CountingCompleter()
+    settings = EvalSettings(judge_model="judge", fact_extractor_model="extractor")
+    prompts = EvalPrompts.load()
+
+    facts = tuple(f"Fact {index}." for index in range(45))
+    fact_results = judge_fact_coverage(
+        facts=facts,
+        summary="A summary.",
+        template=prompts.fact_coverage_judge,
+        completer=completer,
+        settings=settings,
+    )
+
+    claims = tuple(f"Claim {index}." for index in range(45))
+    claim_results = verify_claims(
+        doc_text="A document.",
+        claims=claims,
+        template=prompts.claim_verification,
+        completer=completer,
+        settings=settings,
+    )
+
+    assert len(fact_results) == 45
+    assert len(claim_results) == 45
+    assert len(completer.calls) == 10
+
+
+def test_fact_sections_use_inferred_chapters_and_preamble() -> None:
+    sections = fact_sections(GUIDE_MD)
+
+    assert tuple(section.title for section in sections) == (
+        "Document Preamble",
+        "Field Guide > Habitat",
+        "Field Guide > Diet",
+    )
+    assert "By Pat Author" in sections[0].text
 
 
 def test_rubric_grade_requires_integers_between_one_and_five() -> None:

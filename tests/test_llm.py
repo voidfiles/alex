@@ -1,3 +1,4 @@
+import shutil
 import sys
 import time
 from collections.abc import Callable
@@ -7,6 +8,7 @@ from typing import Any
 
 import pytest
 
+import alex.lib.llm as llm
 from alex.lib.llm import (
     DEFAULT_EMBEDDING_MODEL,
     DEFAULT_FAST_SUMMARY_MODEL,
@@ -199,6 +201,54 @@ def test_litellm_embedder_batches_inputs_and_preserves_order(
     assert result[99] == (2.0, 3.0)
 
 
+def test_litellm_embedder_batches_inputs_by_total_token_budget(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured_inputs: list[list[str]] = []
+
+    def fake_embedding(**kwargs: Any) -> SimpleNamespace:
+        captured_inputs.append(list(kwargs["input"]))
+        batch_number = float(len(captured_inputs))
+        return embedding_response(
+            [[batch_number, float(index)] for index in range(len(kwargs["input"]))]
+        )
+
+    monkeypatch.setattr(llm, "EMBEDDING_BATCH_MAX_TOKENS", 10)
+    monkeypatch.setattr(llm, "count_embedding_tokens", lambda text, *, model: int(text))
+    install_fake_litellm_embedding(monkeypatch, fake_embedding)
+
+    result = LiteLlmEmbedder().embed(
+        texts=["4", "4", "4", "4"],
+        model="openai/text-embedding-3-small",
+    )
+
+    assert captured_inputs == [["4", "4"], ["4", "4"]]
+    assert result == ((1.0, 0.0), (1.0, 1.0), (2.0, 0.0), (2.0, 1.0))
+
+
+def test_litellm_embedder_sends_single_input_over_batch_token_budget(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured_inputs: list[list[str]] = []
+
+    def fake_embedding(**kwargs: Any) -> SimpleNamespace:
+        captured_inputs.append(list(kwargs["input"]))
+        return embedding_response(
+            [[float(index)] for index in range(len(kwargs["input"]))]
+        )
+
+    monkeypatch.setattr(llm, "EMBEDDING_BATCH_MAX_TOKENS", 10)
+    monkeypatch.setattr(llm, "count_embedding_tokens", lambda text, *, model: int(text))
+    install_fake_litellm_embedding(monkeypatch, fake_embedding)
+
+    LiteLlmEmbedder().embed(
+        texts=["11", "1"],
+        model="openai/text-embedding-3-small",
+    )
+
+    assert captured_inputs == [["11"], ["1"]]
+
+
 def test_litellm_embedder_makes_no_calls_for_empty_input(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -352,4 +402,87 @@ def test_litellm_transcriber_wraps_provider_errors(
     install_fake_litellm_transcription(monkeypatch, failing_transcription)
 
     with pytest.raises(LlmError, match=r"whisper-1.*bad audio"):
+        LiteLlmTranscriber().transcribe(audio_path=audio_path, model="whisper-1")
+
+
+def test_litellm_transcriber_chunks_oversized_audio_and_offsets_segments(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    audio_path = tmp_path / "meeting.wav"
+    audio_path.write_bytes(b"too big now")
+    captured_files: list[str] = []
+
+    monkeypatch.setattr(llm, "MAX_TRANSCRIPTION_FILE_BYTES", 10)
+    monkeypatch.setattr(shutil, "which", lambda name: f"/usr/bin/{name}")
+    monkeypatch.setattr(llm, "_probe_audio_duration", lambda audio_path: 125.0)
+
+    def fake_transcode_audio_chunk(
+        *,
+        input_path: Path,
+        output_path: Path,
+        start_seconds: float,
+        duration_seconds: float | None,
+    ) -> None:
+        output_path.write_bytes(b"chunk")
+
+    monkeypatch.setattr(llm, "_transcode_audio_chunk", fake_transcode_audio_chunk)
+
+    def fake_transcription(**kwargs: Any) -> SimpleNamespace:
+        captured_files.append(Path(kwargs["file"].name).name)
+        chunk_number = len(captured_files)
+        return SimpleNamespace(
+            text=f"Chunk {chunk_number}.",
+            language="en",
+            duration=5.0,
+            segments=[
+                {
+                    "start": 1.0,
+                    "end": 2.0,
+                    "text": f"Chunk {chunk_number}.",
+                }
+            ],
+        )
+
+    install_fake_litellm_transcription(monkeypatch, fake_transcription)
+
+    result = LiteLlmTranscriber().transcribe(audio_path=audio_path, model="whisper-1")
+
+    assert captured_files == ["audio-0001.mp3", "audio-0002.mp3", "audio-0003.mp3"]
+    assert result.text == "Chunk 1. Chunk 2. Chunk 3."
+    assert result.language == "en"
+    assert result.duration_seconds == 125.0
+    assert result.segments == (
+        TranscriptSegment(
+            text="Chunk 1.",
+            speaker=None,
+            start_seconds=1.0,
+            end_seconds=2.0,
+        ),
+        TranscriptSegment(
+            text="Chunk 2.",
+            speaker=None,
+            start_seconds=61.0,
+            end_seconds=62.0,
+        ),
+        TranscriptSegment(
+            text="Chunk 3.",
+            speaker=None,
+            start_seconds=121.0,
+            end_seconds=122.0,
+        ),
+    )
+
+
+def test_litellm_transcriber_requires_ffmpeg_for_oversized_audio(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    audio_path = tmp_path / "meeting.wav"
+    audio_path.write_bytes(b"too big now")
+    monkeypatch.setattr(llm, "MAX_TRANSCRIPTION_FILE_BYTES", 10)
+    monkeypatch.setattr(shutil, "which", lambda name: None)
+    install_fake_litellm_transcription(monkeypatch, lambda **kwargs: SimpleNamespace())
+
+    with pytest.raises(LlmError, match="ffmpeg is required"):
         LiteLlmTranscriber().transcribe(audio_path=audio_path, model="whisper-1")

@@ -15,7 +15,11 @@ def test_cli_help_lists_available_commands() -> None:
 
     assert result.exit_code == 0
     assert "Alex command line tools." in result.output
+    assert "eval-claim-graph" in result.output
+    assert "eval-merged-summary" in result.output
+    assert "eval-report" in result.output
     assert "dump-env" in result.output
+    assert "eval-judges" in result.output
     assert "process-doc" in result.output
     assert "process-vault" in result.output
     assert "summary" in result.output
@@ -69,6 +73,10 @@ def test_cli_help_does_not_import_pdf_converter_dependencies() -> None:
 
     assert result.returncode == 0, result.stderr
     assert "process-doc" in result.stdout
+    assert "eval-claim-graph" in result.stdout
+    assert "eval-merged-summary" in result.stdout
+    assert "eval-report" in result.stdout
+    assert "eval-judges" in result.stdout
     assert "summary" in result.stdout
     assert "to-asset" in result.stdout
     assert "to-markdown" not in result.stdout

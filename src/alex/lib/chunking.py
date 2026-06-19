@@ -34,7 +34,9 @@ MIN_PARAGRAPH_CHARS = 200
 TAIL_MERGE_SLACK = 1.2
 # Embedding models cap input around 8k tokens; similarity only needs the
 # head of a paragraph, so probe inputs are truncated while chunks keep the
-# full text.
+# full text. Keep a margin under OpenAI's 8192-token embedding limit because
+# LiteLLM forwards the input verbatim.
+EMBED_MAX_INPUT_TOKENS = 7_500
 EMBED_MAX_INPUT_CHARS = 20_000
 FENCE_OPEN_PATTERN = re.compile(r"^(`{3,}|~{3,})")
 
@@ -151,7 +153,10 @@ def semantic_split(
         return (text,)
 
     vectors = embedder.embed(
-        texts=[paragraph[:EMBED_MAX_INPUT_CHARS] for paragraph in paragraphs],
+        texts=[
+            embedding_probe_text(paragraph, model=settings.embedding_model)
+            for paragraph in paragraphs
+        ],
         model=settings.embedding_model,
     )
     if len(vectors) != len(paragraphs):
@@ -205,6 +210,39 @@ def split_paragraphs(text: str) -> tuple[str, ...]:
     if current:
         blocks.append("\n".join(current))
     return tuple(blocks)
+
+
+def embedding_probe_text(text: str, *, model: str) -> str:
+    clipped = text[:EMBED_MAX_INPUT_CHARS]
+    return truncate_to_embedding_token_budget(
+        clipped,
+        model=model,
+        max_tokens=EMBED_MAX_INPUT_TOKENS,
+    )
+
+
+def truncate_to_embedding_token_budget(
+    text: str,
+    *,
+    model: str,
+    max_tokens: int,
+) -> str:
+    if max_tokens <= 0:
+        raise ChunkingError("Embedding token budget must be positive.")
+    try:
+        import tiktoken
+    except ImportError:
+        return text[:max_tokens]
+
+    model_name = model.split("/", 1)[1] if "/" in model else model
+    try:
+        encoding = tiktoken.encoding_for_model(model_name)
+    except KeyError:
+        encoding = tiktoken.get_encoding("cl100k_base")
+    tokens = encoding.encode(text)
+    if len(tokens) <= max_tokens:
+        return text
+    return encoding.decode(tokens[:max_tokens])
 
 
 def merge_small_paragraphs(

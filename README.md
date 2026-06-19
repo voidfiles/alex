@@ -34,18 +34,21 @@ are already exported.
 ```bash
 alex to-asset paper.pdf
 alex to-asset book.epub
+alex to-asset notes.md
 alex to-asset paper.pdf --asset-root /Users/alex/Dropbox/obsidian/Alex3/assets
 alex to-asset paper.pdf --miner     # local marker-pdf instead of PyMuPDF4LLM
 alex to-asset paper.pdf --datalab   # Datalab Convert API
 ```
 
-Converts a PDF or EPUB into a vault asset folder. Extracts Markdown in a
-temporary workspace, asks an LLM for canonical title/author metadata, then
-finalizes the asset as `ASSET_ROOT/CANONICAL_NAME` (default asset root is
-the Obsidian vault above). The folder ends up with `CANONICAL_NAME.md`,
-`headers.md`, `metadata.json`, `canonical_name.txt`, extracted images, and
-the original source file renamed to `CANONICAL_NAME.ext`. The converter
-flags only apply to PDFs.
+Converts a PDF, EPUB, or Markdown file into a vault asset folder. Extracts
+or copies Markdown in a temporary workspace, asks an LLM for canonical
+title/author metadata, then finalizes the asset as
+`ASSET_ROOT/CANONICAL_NAME` (default asset root is the Obsidian vault
+above). The folder ends up with `CANONICAL_NAME.md`, `headers.md`,
+`metadata.json`, `canonical_name.txt`, extracted images when applicable,
+and the original non-Markdown source file renamed to `CANONICAL_NAME.ext`.
+Markdown inputs become the canonical `CANONICAL_NAME.md` directly. The
+converter flags only apply to PDFs.
 
 ### process-doc
 
@@ -56,8 +59,9 @@ alex process-doc assets/book_asset
 Processes an existing asset directory (it must contain the original file,
 one Markdown extract, and `headers.md`). Infers the chapter level, writes
 `chapter_level.txt`, `metadata.json`, and `canonical_name.txt`, regenerates
-`chunks/*.md`, and generates `chunk_summary.md` plus `summary.md` unless
-`summary.md` already exists.
+`chunks/*.md`, and generates `chunk_summary.md` plus graph-enhanced
+`summary.md` unless `summary.md` already exists. The graph pass writes
+debug artifacts under `summary_graph/`.
 
 ### summary
 
@@ -69,9 +73,10 @@ alex summary book.md assets
 Summarizes a PDF, Markdown, TXT, or EPUB input end-to-end into a workspace
 at `OUTPUT_PATH/INPUT_STEM`: source copy, extracted Markdown, images,
 `headers.md`, `metadata.json`, semantic chunks under `chunks/`, and the
-generated `chunk_summary.md` and `summary.md`. Use `summary` for the
-stem-named one-command workflow, or `to-asset` followed by `process-doc`
-for the canonical-named pipeline.
+generated `chunk_summary.md`, graph-enhanced `summary.md`, and debug
+artifacts under `summary_graph/`. Use `summary` for the stem-named
+one-command workflow, or `to-asset` followed by `process-doc` for the
+canonical-named pipeline.
 
 Chunking is structure-first: documents split along their headers, and only
 oversized chapters (or documents with no usable structure) are split
@@ -96,18 +101,23 @@ includes speaker metadata. OpenAI `whisper-1` does not do real speaker
 diarization, so Whisper output is labelled as `Speaker 1` until you switch
 to a model that returns speaker-aware segments.
 
+Files above the transcription request size budget are transcoded to 16 kHz
+mono mp3 and split into bounded chunks automatically. Oversized inputs
+require `ffmpeg` and `ffprobe` on `PATH`.
+
 ### eval-summary
 
 ```bash
 just eval                                   # = alex eval-summary
 alex eval-summary --docs guide.md --prompt chunk_summary=v002
+alex eval-summary --judge-model anthropic/claude-sonnet-4-6
 ```
 
 Scores summary quality over the documents in `evals/corpus/`. Each doc is
 summarized through the real pipeline and graded on fact coverage,
 faithfulness to the source, information density, and an LLM rubric for
 writing quality; the blended score and per-doc evidence land in
-`evals/runs/<run-id>.json`. Salient facts are extracted once per document
+`evals/runs/<run-id>.json`. Salient facts are extracted section-by-section
 and cached in `evals/facts/`, so prompt comparisons grade against the same
 answer key.
 
@@ -116,6 +126,7 @@ answer key.
 ```bash
 alex improve-prompt chunk_summary --iterations 3
 alex improve-prompt chunk_summary --promote   # activate gate-passing winners
+alex improve-prompt chunk_summary --adjudication-repeats 2
 ```
 
 Iteratively rewrites one of the summary prompts: evaluate the incumbent,
@@ -123,8 +134,34 @@ have a critic model rewrite it from the worst document's failures, save
 the rewrite as the next `vNNN.md` under `src/alex/prompts/`, and re-score
 on the same docs. A candidate passes the gate only with a mean improvement
 of at least `--min-delta` and wins-or-ties on a strict majority of docs,
-and `active.txt` is only rewritten with `--promote`. Every iteration is
+and `active.txt` is only rewritten with `--promote`. Candidates near the
+promotion threshold are rejudged without regenerating summaries, then the
+promotion gate uses averaged per-document deltas. Every iteration is
 appended to `evals/lineage/<prompt>.jsonl`.
+
+### eval-judges
+
+```bash
+alex eval-judges
+alex eval-judges --fail-under 0.85
+```
+
+Scores the coverage and faithfulness judges against labelled JSON cases in
+`evals/calibration/*.json`. This is report-only unless `--fail-under` is
+provided.
+
+### eval-report
+
+```bash
+alex eval-report
+alex eval-report --output-dir evals/reports/latest
+```
+
+Builds `evals/reports/eval-report.md` plus SVG charts from standard
+`evals/runs/*.json` and graph-guided `evals/claim_graph/*/run.json`
+artifacts. The report compares the latest graph-guided run with the latest
+standard run on matching clean documents, then checks the graph-guided scores
+against the best historical standard score for each doc.
 
 ### pdf-samples
 
@@ -151,8 +188,8 @@ model string works. Each role has an env override (see `src/alex/lib/llm.py`):
 | Final synthesis | `ALEX_FINAL_SUMMARY_MODEL` | `anthropic/claude-opus-4-8` |
 | Asset naming | `ALEX_NAMING_MODEL` | `anthropic/claude-sonnet-4-6` |
 | Semantic chunking embeddings | `ALEX_EMBEDDING_MODEL` | `openai/text-embedding-3-small` |
-| Eval judging | `ALEX_EVAL_JUDGE_MODEL` | `anthropic/claude-haiku-4-5` |
-| Eval fact extraction | `ALEX_FACT_EXTRACTOR_MODEL` | `anthropic/claude-sonnet-4-6` |
+| Eval judging | `ALEX_EVAL_JUDGE_MODEL` | `anthropic/claude-sonnet-4-6` |
+| Eval fact extraction | `ALEX_FACT_EXTRACTOR_MODEL` | `anthropic/claude-opus-4-8` |
 | Prompt critic | `ALEX_PROMPT_CRITIC_MODEL` | `anthropic/claude-opus-4-8` |
 | Audio transcription | `ALEX_TRANSCRIPTION_MODEL` | `whisper-1` |
 
@@ -201,7 +238,7 @@ src/alex/lib/       # Reusable library code
   asset_folders.py       # to-asset flow
   summary_assets.py      # end-to-end summary workspace flow
   process_doc_assets.py  # asset validation + process-doc orchestration
-  converters/            # PDF/EPUB -> Markdown backends
+  converters/            # PDF/EPUB/Markdown -> Markdown backends
 tests/              # Focused CLI tests
 evals/              # Eval corpus, cached facts, run artifacts, lineage
 ```

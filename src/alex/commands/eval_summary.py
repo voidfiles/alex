@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Sequence
+from dataclasses import replace
 from datetime import datetime
 from pathlib import Path
 
@@ -42,6 +43,26 @@ def parse_prompt_overrides(values: Sequence[str]) -> dict[str, str]:
     return overrides
 
 
+def with_eval_model_overrides(
+    config: EvalConfig,
+    *,
+    judge_model: str | None,
+    fact_extractor_model: str | None,
+) -> EvalConfig:
+    if judge_model is None and fact_extractor_model is None:
+        return config
+    return replace(
+        config,
+        settings=replace(
+            config.settings,
+            judge_model=judge_model or config.settings.judge_model,
+            fact_extractor_model=(
+                fact_extractor_model or config.settings.fact_extractor_model
+            ),
+        ),
+    )
+
+
 def new_run_id() -> str:
     return datetime.now().strftime("%Y%m%dT%H%M%S")
 
@@ -71,14 +92,32 @@ def build_eval_summary_command(
         show_default=True,
         help="Eval data directory holding corpus/, facts/, and runs/.",
     )
+    @click.option(
+        "--judge-model",
+        type=str,
+        default=None,
+        help="Model for coverage, faithfulness, and rubric judges.",
+    )
+    @click.option(
+        "--fact-extractor-model",
+        type=str,
+        default=None,
+        help="Model for extracting reference facts.",
+    )
     def command(
         doc_names: tuple[str, ...],
         prompt_overrides: tuple[str, ...],
         evals_dir: Path,
+        judge_model: str | None,
+        fact_extractor_model: str | None,
     ) -> None:
         """Score summary quality over the eval corpus."""
         overrides = parse_prompt_overrides(prompt_overrides)
-        config = eval_config_for(evals_dir)
+        config = with_eval_model_overrides(
+            eval_config_for(evals_dir),
+            judge_model=judge_model,
+            fact_extractor_model=fact_extractor_model,
+        )
         evaluator = evaluator_factory(config, doc_names or None)
         try:
             prompts = SummaryPrompts.load(overrides=overrides or None)
