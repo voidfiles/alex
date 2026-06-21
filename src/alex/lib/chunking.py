@@ -14,7 +14,6 @@ Texts that fit the budget never touch the embedding model.
 
 from __future__ import annotations
 
-import math
 import re
 import shutil
 from collections.abc import Callable, Sequence
@@ -29,6 +28,7 @@ from alex.lib.markdown_structure import (
     slugify_title,
     write_chunks,
 )
+from alex.lib.vectors import cosine_similarity, mean_vector
 
 MIN_PARAGRAPH_CHARS = 200
 TAIL_MERGE_SLACK = 1.2
@@ -283,20 +283,6 @@ def boundary_similarities(
         right = mean_vector(vectors[boundary + 1 : boundary + 1 + window])
         similarities.append(cosine_similarity(left, right))
     return tuple(similarities)
-
-
-def mean_vector(vectors: Sequence[tuple[float, ...]]) -> tuple[float, ...]:
-    count = len(vectors)
-    return tuple(sum(values) / count for values in zip(*vectors, strict=True))
-
-
-def cosine_similarity(a: tuple[float, ...], b: tuple[float, ...]) -> float:
-    dot = sum(x * y for x, y in zip(a, b, strict=True))
-    norm_a = math.sqrt(sum(x * x for x in a))
-    norm_b = math.sqrt(sum(y * y for y in b))
-    if norm_a == 0.0 or norm_b == 0.0:
-        return 0.0
-    return dot / (norm_a * norm_b)
 
 
 def plan_cut_boundaries(

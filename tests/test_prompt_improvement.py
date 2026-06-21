@@ -25,6 +25,10 @@ from alex.lib.summary_eval import (
 
 STUB_TEMPLATES = {
     "chunk_summary": "Summarize {{chunk}} of {{title}} by {{authors}} via {{headers}}.",
+    "chunk_summary_with_graph": (
+        "Summarize {{chunk}} of {{title}} by {{authors}} via {{headers}} "
+        "using {{selected_chunk_graph}}."
+    ),
     "compression_summary": "Compress {{content}} from {{title}} by {{authors}}.",
     "final_summary": (
         "Synthesize {{section_summaries}} for {{title}} by {{authors}} "

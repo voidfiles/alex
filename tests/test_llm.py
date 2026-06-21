@@ -1,5 +1,6 @@
 import shutil
 import sys
+import threading
 import time
 from collections.abc import Callable
 from pathlib import Path
@@ -10,13 +11,20 @@ import pytest
 
 import alex.lib.llm as llm
 from alex.lib.llm import (
+    CHUNK_GRAPH_MAX_CLAIMS_ENV,
+    DEFAULT_CHUNK_GRAPH_MAX_CLAIMS,
     DEFAULT_EMBEDDING_MODEL,
     DEFAULT_FAST_SUMMARY_MODEL,
     DEFAULT_FINAL_SUMMARY_MODEL,
+    DEFAULT_GRAPH_MAX_CLAIMS,
+    DEFAULT_SOURCE_CLAIMS_PER_SECTION,
     DEFAULT_TRANSCRIPTION_MODEL,
     EMBEDDING_MODEL_ENV,
     FAST_SUMMARY_MODEL_ENV,
     FINAL_SUMMARY_MODEL_ENV,
+    GRAPH_MAX_CLAIMS_ENV,
+    SOURCE_CLAIMS_PER_SECTION_ENV,
+    SUMMARY_MAX_WORKERS_ENV,
     TRANSCRIPTION_MODEL_ENV,
     AudioTranscript,
     LiteLlmCompleter,
@@ -25,9 +33,14 @@ from alex.lib.llm import (
     LlmError,
     TranscriptSegment,
     complete_all,
+    ordered_parallel_map,
+    resolve_chunk_graph_max_claims,
     resolve_embedding_model,
     resolve_fast_summary_model,
     resolve_final_summary_model,
+    resolve_graph_max_claims,
+    resolve_source_claims_per_section,
+    resolve_summary_max_workers,
     resolve_transcription_model,
 )
 
@@ -139,6 +152,60 @@ def test_complete_all_returns_empty_for_no_prompts() -> None:
     )
 
     assert results == ()
+
+
+def test_ordered_parallel_map_limits_workers_and_preserves_order() -> None:
+    active = 0
+    max_active = 0
+    seen: list[int] = []
+    lock = threading.Lock()
+
+    def run(value: int) -> str:
+        nonlocal active, max_active
+        with lock:
+            active += 1
+            max_active = max(max_active, active)
+            seen.append(value)
+        try:
+            if value == 0:
+                time.sleep(0.05)
+            else:
+                time.sleep(0.01)
+            return f"done:{value}"
+        finally:
+            with lock:
+                active -= 1
+
+    results = ordered_parallel_map(tuple(range(6)), run, max_workers=2)
+
+    assert results == tuple(f"done:{value}" for value in range(6))
+    assert max_active <= 2
+    assert set(seen) == set(range(6))
+
+
+def test_ordered_parallel_map_propagates_exceptions() -> None:
+    def run(value: int) -> int:
+        if value == 2:
+            raise RuntimeError("boom")
+        time.sleep(0.02)
+        return value
+
+    with pytest.raises(RuntimeError, match="boom"):
+        ordered_parallel_map(tuple(range(5)), run, max_workers=3)
+
+
+def test_resolve_summary_max_workers_env_override(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv(SUMMARY_MAX_WORKERS_ENV, raising=False)
+    assert resolve_summary_max_workers() == 4
+
+    monkeypatch.setenv(SUMMARY_MAX_WORKERS_ENV, "1")
+    assert resolve_summary_max_workers() == 1
+
+    monkeypatch.setenv(SUMMARY_MAX_WORKERS_ENV, "0")
+    with pytest.raises(ValueError, match=SUMMARY_MAX_WORKERS_ENV):
+        resolve_summary_max_workers()
 
 
 def install_fake_litellm_embedding(
@@ -324,6 +391,30 @@ def test_summary_models_can_be_swapped_via_environment(
 
     assert resolve_fast_summary_model() == "gemini/gemini-2.5-flash"
     assert resolve_final_summary_model() == "openai/gpt-5"
+
+
+def test_claim_caps_default_to_pre_knob_values(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv(GRAPH_MAX_CLAIMS_ENV, raising=False)
+    monkeypatch.delenv(CHUNK_GRAPH_MAX_CLAIMS_ENV, raising=False)
+    monkeypatch.delenv(SOURCE_CLAIMS_PER_SECTION_ENV, raising=False)
+
+    assert resolve_graph_max_claims() == DEFAULT_GRAPH_MAX_CLAIMS == 48
+    assert resolve_chunk_graph_max_claims() == DEFAULT_CHUNK_GRAPH_MAX_CLAIMS == 12
+    assert resolve_source_claims_per_section() == DEFAULT_SOURCE_CLAIMS_PER_SECTION == 8
+
+
+def test_claim_caps_can_be_raised_via_environment(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv(GRAPH_MAX_CLAIMS_ENV, "80")
+    monkeypatch.setenv(CHUNK_GRAPH_MAX_CLAIMS_ENV, "20")
+    monkeypatch.setenv(SOURCE_CLAIMS_PER_SECTION_ENV, "12")
+
+    assert resolve_graph_max_claims() == 80
+    assert resolve_chunk_graph_max_claims() == 20
+    assert resolve_source_claims_per_section() == 12
 
 
 def test_transcription_model_defaults_to_openai_whisper(

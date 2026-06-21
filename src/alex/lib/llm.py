@@ -12,8 +12,8 @@ import os
 import shutil
 import subprocess
 import tempfile
-from collections.abc import Mapping, Sequence
-from concurrent.futures import ThreadPoolExecutor
+from collections.abc import Callable, Mapping, Sequence
+from concurrent.futures import FIRST_EXCEPTION, Future, ThreadPoolExecutor, wait
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Protocol, TypeGuard
@@ -28,6 +28,15 @@ DEFAULT_EVAL_JUDGE_MODEL = "anthropic/claude-sonnet-4-6"
 DEFAULT_FACT_EXTRACTOR_MODEL = "anthropic/claude-opus-4-8"
 DEFAULT_PROMPT_CRITIC_MODEL = "anthropic/claude-opus-4-8"
 DEFAULT_TRANSCRIPTION_MODEL = "whisper-1"
+# Cosine cutoff for linking similar claims in the claim graph. Tuned for
+# text-embedding-3-small (paraphrases land ~0.6-0.85, unrelated text ~0.1-0.4).
+# This is the main knob to retune if similar_to edges feel too sparse/dense.
+DEFAULT_CLAIM_SIMILARITY_THRESHOLD = 0.8
+# Claim caps that throttle how many facts reach the summary. Defaults match the
+# pre-knob behavior; raise via env to trade brevity for coverage (eval-gated).
+DEFAULT_GRAPH_MAX_CLAIMS = 48
+DEFAULT_CHUNK_GRAPH_MAX_CLAIMS = 12
+DEFAULT_SOURCE_CLAIMS_PER_SECTION = 8
 FAST_SUMMARY_MODEL_ENV = "ALEX_FAST_SUMMARY_MODEL"
 FINAL_SUMMARY_MODEL_ENV = "ALEX_FINAL_SUMMARY_MODEL"
 ASSET_NAMING_MODEL_ENV = "ALEX_NAMING_MODEL"
@@ -36,6 +45,11 @@ EVAL_JUDGE_MODEL_ENV = "ALEX_EVAL_JUDGE_MODEL"
 FACT_EXTRACTOR_MODEL_ENV = "ALEX_FACT_EXTRACTOR_MODEL"
 PROMPT_CRITIC_MODEL_ENV = "ALEX_PROMPT_CRITIC_MODEL"
 TRANSCRIPTION_MODEL_ENV = "ALEX_TRANSCRIPTION_MODEL"
+CLAIM_SIMILARITY_THRESHOLD_ENV = "ALEX_CLAIM_SIMILARITY_THRESHOLD"
+GRAPH_MAX_CLAIMS_ENV = "ALEX_GRAPH_MAX_CLAIMS"
+CHUNK_GRAPH_MAX_CLAIMS_ENV = "ALEX_CHUNK_GRAPH_MAX_CLAIMS"
+SOURCE_CLAIMS_PER_SECTION_ENV = "ALEX_SOURCE_CLAIMS_PER_SECTION"
+SUMMARY_MAX_WORKERS_ENV = "ALEX_SUMMARY_MAX_WORKERS"
 DEFAULT_LLM_TIMEOUT_SECONDS = 900.0
 DEFAULT_LLM_RETRIES = 6
 EMBEDDING_BATCH_SIZE = 96
@@ -74,6 +88,36 @@ def resolve_prompt_critic_model() -> str:
 
 def resolve_transcription_model() -> str:
     return os.getenv(TRANSCRIPTION_MODEL_ENV) or DEFAULT_TRANSCRIPTION_MODEL
+
+
+def resolve_claim_similarity_threshold() -> float:
+    raw = os.getenv(CLAIM_SIMILARITY_THRESHOLD_ENV)
+    return float(raw) if raw else DEFAULT_CLAIM_SIMILARITY_THRESHOLD
+
+
+def resolve_graph_max_claims() -> int:
+    raw = os.getenv(GRAPH_MAX_CLAIMS_ENV)
+    return int(raw) if raw else DEFAULT_GRAPH_MAX_CLAIMS
+
+
+def resolve_chunk_graph_max_claims() -> int:
+    raw = os.getenv(CHUNK_GRAPH_MAX_CLAIMS_ENV)
+    return int(raw) if raw else DEFAULT_CHUNK_GRAPH_MAX_CLAIMS
+
+
+def resolve_source_claims_per_section() -> int:
+    raw = os.getenv(SOURCE_CLAIMS_PER_SECTION_ENV)
+    return int(raw) if raw else DEFAULT_SOURCE_CLAIMS_PER_SECTION
+
+
+def resolve_summary_max_workers() -> int:
+    raw = os.getenv(SUMMARY_MAX_WORKERS_ENV)
+    if raw is None:
+        return 4
+    value = int(raw)
+    if value <= 0:
+        raise ValueError(f"{SUMMARY_MAX_WORKERS_ENV} must be positive.")
+    return value
 
 
 class LlmError(RuntimeError):
@@ -589,15 +633,40 @@ def complete_all(
     max_tokens: int,
     max_workers: int,
 ) -> tuple[str, ...]:
-    if not prompts:
-        return ()
-
     def run(prompt: str) -> str:
         return completer.complete(prompt=prompt, model=model, max_tokens=max_tokens)
 
-    worker_count = min(max(1, max_workers), len(prompts))
-    if worker_count == 1:
-        return tuple(run(prompt) for prompt in prompts)
+    return ordered_parallel_map(prompts, run, max_workers=max_workers)
 
-    with ThreadPoolExecutor(max_workers=worker_count) as executor:
-        return tuple(executor.map(run, prompts))
+
+def ordered_parallel_map[T, U](
+    items: Sequence[T],
+    func: Callable[[T], U],
+    *,
+    max_workers: int,
+) -> tuple[U, ...]:
+    if not items:
+        return ()
+
+    worker_count = min(max(1, max_workers), len(items))
+    if worker_count == 1:
+        return tuple(func(item) for item in items)
+
+    executor = ThreadPoolExecutor(max_workers=worker_count)
+    futures: list[Future[U]] = []
+    try:
+        futures = [executor.submit(func, item) for item in items]
+        wait(futures, return_when=FIRST_EXCEPTION)
+        for future in futures:
+            if future.done():
+                exception = future.exception()
+                if exception is not None:
+                    raise exception
+        return tuple(future.result() for future in futures)
+    except BaseException:
+        for future in futures:
+            future.cancel()
+        executor.shutdown(wait=True, cancel_futures=True)
+        raise
+    else:
+        executor.shutdown(wait=True)

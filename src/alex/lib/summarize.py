@@ -3,23 +3,31 @@
 from __future__ import annotations
 
 import json
+import re
 import shutil
 from collections.abc import Callable, Mapping, Sequence
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
 from importlib.resources.abc import Traversable
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, cast
 
 from alex.lib.chunking import count_tokens_estimate
 from alex.lib.document_sources import DocumentMetadata
 from alex.lib.llm import (
     Completer,
+    Embedder,
     complete_all,
+    ordered_parallel_map,
+    resolve_chunk_graph_max_claims,
     resolve_eval_judge_model,
     resolve_fact_extractor_model,
     resolve_fast_summary_model,
     resolve_final_summary_model,
+    resolve_graph_max_claims,
+    resolve_source_claims_per_section,
+    resolve_summary_max_workers,
 )
+from alex.lib.production_prompts import MergePrompts
 from alex.lib.prompt_templates import PromptTemplate, load_prompt
 
 if TYPE_CHECKING:
@@ -29,7 +37,6 @@ if TYPE_CHECKING:
 DEFAULT_CHUNK_SUMMARY_MAX_TOKENS = 20_000
 DEFAULT_FINAL_SUMMARY_MAX_TOKENS = 8_192
 DEFAULT_MAX_SUMMARY_CONTEXT_TOKENS = 180_000
-DEFAULT_SUMMARY_MAX_WORKERS = 4
 MAX_SUMMARY_COMPRESSION_ITERATIONS = 8
 
 
@@ -92,17 +99,24 @@ class SummarySettings:
     judge_model: str = field(default_factory=resolve_eval_judge_model)
     fact_extractor_model: str = field(default_factory=resolve_fact_extractor_model)
     prompts: SummaryPrompts = field(default_factory=SummaryPrompts.load)
+    prompt_overrides: Mapping[str, str] = field(default_factory=dict)
     chunk_summary_max_tokens: int = DEFAULT_CHUNK_SUMMARY_MAX_TOKENS
     final_summary_max_tokens: int = DEFAULT_FINAL_SUMMARY_MAX_TOKENS
     judge_max_tokens: int = 8_192
     extractor_max_tokens: int = 8_192
     graph_enhanced: bool = True
     chunk_graph_enhanced: bool = True
-    chunk_graph_max_claims: int = 12
-    graph_max_claims: int = 48
+    coverage_repair: bool = True
+    chunk_graph_max_claims: int = field(default_factory=resolve_chunk_graph_max_claims)
+    graph_max_claims: int = field(default_factory=resolve_graph_max_claims)
+    source_claims_per_section: int = field(
+        default_factory=resolve_source_claims_per_section
+    )
     graph_artifacts: bool = True
+    evidence_ledger: bool = True
+    verification_passes: int = 2
     max_context_tokens: int = DEFAULT_MAX_SUMMARY_CONTEXT_TOKENS
-    max_workers: int = DEFAULT_SUMMARY_MAX_WORKERS
+    max_workers: int = field(default_factory=resolve_summary_max_workers)
     force: bool = False
 
 
@@ -127,11 +141,71 @@ class GraphEnhancedSummary:
 
 
 @dataclass(frozen=True)
+class GraphSummaryDraft:
+    document_graph: ClaimGraph
+    selected: ClaimGraph
+    selected_markdown: str
+    graph_summary_text: str
+
+
+@dataclass(frozen=True)
 class ChunkGraphBundle:
     chunk_path: Path
     graph: ClaimGraph
     selected: ClaimGraph
     selected_markdown: str
+
+
+@dataclass(frozen=True)
+class SourceBlock:
+    id: str
+    kind: str
+    source_path: str
+    heading_path: str
+    text: str
+    start_char: int
+    end_char: int
+    chunk_index: int | None = None
+    chunk_filename: str | None = None
+
+
+@dataclass(frozen=True)
+class EvidenceRecord:
+    id: str
+    source_block_id: str
+    kind: str
+    text: str
+    claim: str
+    entities: tuple[str, ...]
+    dates: tuple[str, ...]
+    quantities: tuple[str, ...]
+    section_path: str
+    score: float
+    validated_exact_span: bool
+
+
+@dataclass(frozen=True)
+class SummaryPlanTopic:
+    title: str
+    evidence_ids: tuple[str, ...]
+    section_path: str
+    word_budget_hint: int
+
+
+@dataclass(frozen=True)
+class SummaryPlan:
+    document: str
+    topics: tuple[SummaryPlanTopic, ...]
+    section_coverage: dict[str, int]
+
+
+@dataclass(frozen=True)
+class RepairPass:
+    pass_index: int
+    input_summary: str
+    output_summary: str
+    repaired_claims: tuple[str, ...]
+    unsupported_claims: tuple[str, ...]
 
 
 def summarize_doc_asset(
@@ -143,6 +217,7 @@ def summarize_doc_asset(
     headers_path: Path,
     chunk_paths: tuple[Path, ...],
     completer: Completer,
+    embedder: Embedder,
 ) -> SummaryOutput:
     summary_path = asset_dir / "summary.md"
     chunk_summary_path = asset_dir / "chunk_summary.md"
@@ -175,6 +250,7 @@ def summarize_doc_asset(
             doc_name=markdown_path.name,
             chunk_paths=chunk_paths,
             completer=completer,
+            embedder=embedder,
         )
         if settings.chunk_graph_enhanced:
             selected_graph_by_chunk = {
@@ -239,36 +315,71 @@ def summarize_doc_asset(
     )
     shutil.rmtree(chunk_summaries_dir)
 
-    standard_final_summary = completer.complete(
-        prompt=settings.prompts.final_summary.render(
-            title=metadata.title,
-            authors=authors,
-            section_summaries=consolidated,
-            chunk_reference_list=chunk_reference_list(references),
-        ),
-        model=settings.final_model,
-        max_tokens=settings.final_summary_max_tokens,
+    final_summary_prompt = settings.prompts.final_summary.render(
+        title=metadata.title,
+        authors=authors,
+        section_summaries=consolidated,
+        chunk_reference_list=chunk_reference_list(references),
     )
-    final_summary = standard_final_summary
-    final_graph_artifact_dir: Path | None = None
-    if settings.graph_enhanced:
-        source_markdown = markdown_path.read_text(encoding="utf-8")
+
+    def build_standard_final_summary() -> str:
+        return completer.complete(
+            prompt=final_summary_prompt,
+            model=settings.final_model,
+            max_tokens=settings.final_summary_max_tokens,
+        )
+
+    if not settings.graph_enhanced:
+        final_summary = build_standard_final_summary()
+        summary_path.write_text(
+            summary_content(
+                title=metadata.title,
+                authors=authors,
+                markdown_filename=markdown_path.name,
+                final_summary=final_summary,
+                references=references,
+            ),
+            encoding="utf-8",
+        )
+        return SummaryOutput(
+            chunk_summary_path=chunk_summary_path,
+            summary_path=summary_path,
+            graph_artifact_dir=None,
+        )
+
+    source_markdown = markdown_path.read_text(encoding="utf-8")
+
+    def build_graph_summary_draft() -> GraphSummaryDraft:
         document_graph = merged_document_graph(
             doc_name=markdown_path.name,
             chunk_graph_bundles=chunk_graph_bundles,
+            embedder=embedder,
         )
-        graph_summary = graph_enhanced_summary(
+        return graph_summary_draft(
             settings=settings,
-            asset_dir=asset_dir,
             doc_name=markdown_path.name,
-            doc_text=source_markdown,
-            standard_summary=standard_final_summary,
             document_graph=document_graph,
-            chunk_graph_bundles=chunk_graph_bundles,
             completer=completer,
         )
-        final_summary = graph_summary.final_summary
-        final_graph_artifact_dir = graph_summary.artifact_dir
+
+    standard_final_summary, graph_draft_result = ordered_parallel_map(
+        (build_standard_final_summary, build_graph_summary_draft),
+        lambda task: task(),
+        max_workers=min(settings.max_workers, 2),
+    )
+    graph_draft = cast(GraphSummaryDraft, graph_draft_result)
+    graph_summary = graph_enhanced_summary(
+        settings=settings,
+        asset_dir=asset_dir,
+        doc_name=markdown_path.name,
+        doc_text=source_markdown,
+        standard_summary=cast(str, standard_final_summary),
+        graph_draft=graph_draft,
+        chunk_graph_bundles=chunk_graph_bundles,
+        completer=completer,
+    )
+    final_summary = graph_summary.final_summary
+    final_graph_artifact_dir = graph_summary.artifact_dir
     summary_path.write_text(
         summary_content(
             title=metadata.title,
@@ -276,6 +387,13 @@ def summarize_doc_asset(
             markdown_filename=markdown_path.name,
             final_summary=final_summary,
             references=references,
+            evidence_ledger=(
+                "summary_evidence.md"
+                if settings.graph_enhanced
+                and settings.graph_artifacts
+                and settings.evidence_ledger
+                else None
+            ),
         ),
         encoding="utf-8",
     )
@@ -319,6 +437,7 @@ def build_chunk_graph_bundles(
     doc_name: str,
     chunk_paths: Sequence[Path],
     completer: Completer,
+    embedder: Embedder,
 ) -> tuple[ChunkGraphBundle, ...]:
     from alex.lib.claim_graph import (
         GraphPrompts,
@@ -336,10 +455,14 @@ def build_chunk_graph_bundles(
         judge_max_tokens=settings.judge_max_tokens,
         extractor_max_tokens=settings.extractor_max_tokens,
     )
-    graph_prompts = GraphPrompts.load()
-    graph_settings = GraphSettings(max_claims=settings.chunk_graph_max_claims)
-    bundles: list[ChunkGraphBundle] = []
-    for chunk_index, chunk_path in enumerate(chunk_paths, 1):
+    graph_prompts = GraphPrompts.load(overrides=settings.prompt_overrides)
+    graph_settings = GraphSettings(
+        max_claims=settings.chunk_graph_max_claims,
+        source_claims_per_section=settings.source_claims_per_section,
+    )
+
+    def build_bundle(item: tuple[int, Path]) -> ChunkGraphBundle:
+        chunk_index, chunk_path = item
         chunk_text = chunk_path.read_text(encoding="utf-8")
         graph = build_claim_graph(
             source=chunk_graph_source(
@@ -350,25 +473,30 @@ def build_chunk_graph_bundles(
             ),
             prompts=graph_prompts,
             completer=completer,
+            embedder=embedder,
             eval_settings=eval_settings,
             settings=graph_settings,
         )
         selected = select_claim_subgraph(graph, settings=graph_settings)
-        bundles.append(
-            ChunkGraphBundle(
-                chunk_path=chunk_path,
-                graph=graph,
-                selected=selected,
-                selected_markdown=render_selected_subgraph(selected),
-            )
+        return ChunkGraphBundle(
+            chunk_path=chunk_path,
+            graph=graph,
+            selected=selected,
+            selected_markdown=render_selected_subgraph(selected),
         )
-    return tuple(bundles)
+
+    return ordered_parallel_map(
+        tuple(enumerate(chunk_paths, 1)),
+        build_bundle,
+        max_workers=settings.max_workers,
+    )
 
 
 def merged_document_graph(
     *,
     doc_name: str,
     chunk_graph_bundles: Sequence[ChunkGraphBundle],
+    embedder: Embedder,
 ) -> ClaimGraph:
     from alex.lib.claim_graph import merge_chunk_graphs
 
@@ -376,6 +504,7 @@ def merged_document_graph(
         doc_name=doc_name,
         source_path=doc_name,
         chunk_graphs=tuple(bundle.graph for bundle in chunk_graph_bundles),
+        embedder=embedder,
     )
 
 
@@ -386,16 +515,11 @@ def graph_enhanced_summary(
     doc_name: str,
     doc_text: str,
     standard_summary: str,
-    document_graph: ClaimGraph,
+    graph_draft: GraphSummaryDraft,
     chunk_graph_bundles: Sequence[ChunkGraphBundle],
     completer: Completer,
 ) -> GraphEnhancedSummary:
     from alex.lib.claim_graph import (
-        GraphPrompts,
-        GraphSettings,
-        graph_summary_prompt,
-        render_selected_subgraph,
-        select_claim_subgraph,
         write_graph_json,
     )
     from alex.lib.summary_eval import (
@@ -410,12 +534,206 @@ def graph_enhanced_summary(
         fact_extractor_model=settings.fact_extractor_model,
         judge_max_tokens=settings.judge_max_tokens,
         extractor_max_tokens=settings.extractor_max_tokens,
+        max_workers=settings.max_workers,
     )
-    graph_prompts = GraphPrompts.load()
     eval_prompts = EvalPrompts.load()
-    merge_template = load_prompt("merged_summary")
-    filter_template = load_prompt("merged_summary_faithfulness_filter")
+    merge_prompts = MergePrompts.load(overrides=settings.prompt_overrides)
+    merged_summary = completer.complete(
+        prompt=merge_prompts.merged_summary.render(
+            document_name=doc_name,
+            standard_summary=standard_summary,
+            graph_summary=graph_draft.graph_summary_text,
+        ),
+        model=settings.final_model,
+        max_tokens=settings.final_summary_max_tokens,
+    )
+    # The merge favors brevity and the faithfulness filter only ever removes, so
+    # left alone the graph path sheds real facts. Repair re-adds high-value claims
+    # that are in the graph but missing from the merge, BEFORE the filter, so any
+    # claim it reintroduces is still verified against the full source and dropped
+    # if unsupported. Coverage up, faithfulness still guaranteed.
+    summary_for_verification = merged_summary
+    if settings.coverage_repair:
+        summary_for_verification = completer.complete(
+            prompt=merge_prompts.merged_summary_repair.render(
+                document_name=doc_name,
+                selected_subgraph=graph_draft.selected_markdown,
+                merged_summary=merged_summary,
+            ),
+            model=settings.final_model,
+            max_tokens=settings.final_summary_max_tokens,
+        )
+    claims = extract_claims(
+        summary=summary_for_verification,
+        template=eval_prompts.claim_extraction,
+        completer=completer,
+        settings=eval_settings,
+    )
+    verdicts = verify_claims(
+        doc_text=doc_text,
+        claims=claims,
+        template=eval_prompts.claim_verification,
+        completer=completer,
+        settings=eval_settings,
+    )
+    repair_passes = tuple(
+        [
+            RepairPass(
+                pass_index=1,
+                input_summary=summary_for_verification,
+                output_summary="",
+                repaired_claims=tuple(
+                    verdict.claim for verdict in verdicts if not verdict.supported
+                ),
+                unsupported_claims=tuple(
+                    verdict.claim for verdict in verdicts if not verdict.supported
+                ),
+            )
+        ]
+        if any(not verdict.supported for verdict in verdicts)
+        and settings.verification_passes > 0
+        else []
+    )
+    filtered_summary = completer.complete(
+        prompt=merge_prompts.merged_summary_faithfulness_filter.render(
+            document_name=doc_name,
+            candidate_summary=summary_for_verification,
+            supported_claims=render_supported_claims(verdicts),
+            unsupported_claims=render_unsupported_claims(verdicts),
+        ),
+        model=settings.final_model,
+        max_tokens=settings.final_summary_max_tokens,
+    )
+    if repair_passes:
+        repair_passes = (
+            RepairPass(
+                pass_index=repair_passes[0].pass_index,
+                input_summary=repair_passes[0].input_summary,
+                output_summary=filtered_summary,
+                repaired_claims=repair_passes[0].repaired_claims,
+                unsupported_claims=repair_passes[0].unsupported_claims,
+            ),
+        )
 
+    artifact_dir: Path | None = None
+    if settings.graph_artifacts:
+        artifact_dir = asset_dir / "summary_graph"
+        if artifact_dir.exists():
+            shutil.rmtree(artifact_dir)
+        artifact_dir.mkdir(parents=True)
+        (artifact_dir / "standard_summary.md").write_text(
+            standard_summary,
+            encoding="utf-8",
+        )
+        (artifact_dir / "graph_summary.md").write_text(
+            graph_draft.graph_summary_text,
+            encoding="utf-8",
+        )
+        (artifact_dir / "merged_summary.md").write_text(
+            merged_summary,
+            encoding="utf-8",
+        )
+        if settings.coverage_repair:
+            (artifact_dir / "repaired_summary.md").write_text(
+                summary_for_verification,
+                encoding="utf-8",
+            )
+        (artifact_dir / "faithfulness_filtered_summary.md").write_text(
+            filtered_summary,
+            encoding="utf-8",
+        )
+        write_chunk_graph_artifacts(
+            artifact_dir=artifact_dir,
+            chunk_graph_bundles=chunk_graph_bundles,
+            write_graph_json=write_graph_json,
+        )
+        write_graph_json(
+            artifact_dir / "document_graph.json",
+            graph_draft.document_graph,
+        )
+        write_graph_json(
+            artifact_dir / "selected_document_subgraph.json",
+            graph_draft.selected,
+        )
+        (artifact_dir / "selected_document_subgraph.md").write_text(
+            graph_draft.selected_markdown,
+            encoding="utf-8",
+        )
+        write_graph_json(artifact_dir / "graph.json", graph_draft.document_graph)
+        write_graph_json(artifact_dir / "selected_subgraph.json", graph_draft.selected)
+        (artifact_dir / "selected_subgraph.md").write_text(
+            graph_draft.selected_markdown,
+            encoding="utf-8",
+        )
+        write_claim_verdicts_json(
+            artifact_dir / "pre_filter_claim_verdicts.json",
+            verdicts,
+        )
+        if settings.evidence_ledger:
+            source_blocks = source_blocks_for_summary(
+                doc_name=doc_name,
+                doc_text=doc_text,
+                chunk_graph_bundles=chunk_graph_bundles,
+            )
+            evidence_records = evidence_records_for_graph(
+                graph_draft.selected,
+                source_blocks=source_blocks,
+            )
+            summary_plan = summary_plan_for_evidence(
+                doc_name=doc_name,
+                evidence_records=evidence_records,
+            )
+            write_json_dataclasses(artifact_dir / "source_blocks.json", source_blocks)
+            write_json_dataclasses(
+                artifact_dir / "evidence_records.json",
+                evidence_records,
+            )
+            write_json_dataclass(artifact_dir / "summary_plan.json", summary_plan)
+            write_summary_claims_json(
+                artifact_dir / "summary_claims.json",
+                verdicts,
+                evidence_records=evidence_records,
+            )
+            write_claim_verdicts_json(
+                artifact_dir / "claim_verification.json",
+                verdicts,
+            )
+            write_json_dataclasses(
+                artifact_dir / "revision_passes.json",
+                repair_passes,
+            )
+            (asset_dir / "summary_evidence.md").write_text(
+                summary_evidence_markdown(
+                    doc_name=doc_name,
+                    evidence_records=evidence_records,
+                    verdicts=verdicts,
+                    repair_passes=repair_passes,
+                ),
+                encoding="utf-8",
+            )
+
+    return GraphEnhancedSummary(
+        final_summary=filtered_summary,
+        artifact_dir=artifact_dir,
+    )
+
+
+def graph_summary_draft(
+    *,
+    settings: SummarySettings,
+    doc_name: str,
+    document_graph: ClaimGraph,
+    completer: Completer,
+) -> GraphSummaryDraft:
+    from alex.lib.claim_graph import (
+        GraphPrompts,
+        GraphSettings,
+        graph_summary_prompt,
+        render_selected_subgraph,
+        select_claim_subgraph,
+    )
+
+    graph_prompts = GraphPrompts.load(overrides=settings.prompt_overrides)
     selected = select_claim_subgraph(
         document_graph,
         settings=GraphSettings(max_claims=settings.graph_max_claims),
@@ -430,86 +748,11 @@ def graph_enhanced_summary(
         model=settings.final_model,
         max_tokens=settings.final_summary_max_tokens,
     )
-    merged_summary = completer.complete(
-        prompt=merge_template.render(
-            document_name=doc_name,
-            standard_summary=standard_summary,
-            graph_summary=graph_summary_text,
-        ),
-        model=settings.final_model,
-        max_tokens=settings.final_summary_max_tokens,
-    )
-    claims = extract_claims(
-        summary=merged_summary,
-        template=eval_prompts.claim_extraction,
-        completer=completer,
-        settings=eval_settings,
-    )
-    verdicts = verify_claims(
-        doc_text=doc_text,
-        claims=claims,
-        template=eval_prompts.claim_verification,
-        completer=completer,
-        settings=eval_settings,
-    )
-    filtered_summary = completer.complete(
-        prompt=filter_template.render(
-            document_name=doc_name,
-            candidate_summary=merged_summary,
-            supported_claims=render_supported_claims(verdicts),
-            unsupported_claims=render_unsupported_claims(verdicts),
-        ),
-        model=settings.final_model,
-        max_tokens=settings.final_summary_max_tokens,
-    )
-
-    artifact_dir: Path | None = None
-    if settings.graph_artifacts:
-        artifact_dir = asset_dir / "summary_graph"
-        if artifact_dir.exists():
-            shutil.rmtree(artifact_dir)
-        artifact_dir.mkdir(parents=True)
-        (artifact_dir / "standard_summary.md").write_text(
-            standard_summary,
-            encoding="utf-8",
-        )
-        (artifact_dir / "graph_summary.md").write_text(
-            graph_summary_text,
-            encoding="utf-8",
-        )
-        (artifact_dir / "merged_summary.md").write_text(
-            merged_summary,
-            encoding="utf-8",
-        )
-        (artifact_dir / "faithfulness_filtered_summary.md").write_text(
-            filtered_summary,
-            encoding="utf-8",
-        )
-        write_chunk_graph_artifacts(
-            artifact_dir=artifact_dir,
-            chunk_graph_bundles=chunk_graph_bundles,
-            write_graph_json=write_graph_json,
-        )
-        write_graph_json(artifact_dir / "document_graph.json", document_graph)
-        write_graph_json(artifact_dir / "selected_document_subgraph.json", selected)
-        (artifact_dir / "selected_document_subgraph.md").write_text(
-            selected_markdown,
-            encoding="utf-8",
-        )
-        write_graph_json(artifact_dir / "graph.json", document_graph)
-        write_graph_json(artifact_dir / "selected_subgraph.json", selected)
-        (artifact_dir / "selected_subgraph.md").write_text(
-            selected_markdown,
-            encoding="utf-8",
-        )
-        write_claim_verdicts_json(
-            artifact_dir / "pre_filter_claim_verdicts.json",
-            verdicts,
-        )
-
-    return GraphEnhancedSummary(
-        final_summary=filtered_summary,
-        artifact_dir=artifact_dir,
+    return GraphSummaryDraft(
+        document_graph=document_graph,
+        selected=selected,
+        selected_markdown=selected_markdown,
+        graph_summary_text=graph_summary_text,
     )
 
 
@@ -530,6 +773,266 @@ def write_chunk_graph_artifacts(
             bundle.selected_markdown,
             encoding="utf-8",
         )
+
+
+def source_blocks_for_summary(
+    *,
+    doc_name: str,
+    doc_text: str,
+    chunk_graph_bundles: Sequence[ChunkGraphBundle],
+) -> tuple[SourceBlock, ...]:
+    blocks = [
+        SourceBlock(
+            id="doc:full",
+            kind="document",
+            source_path=doc_name,
+            heading_path=doc_name,
+            text=doc_text,
+            start_char=0,
+            end_char=len(doc_text),
+        )
+    ]
+    for index, bundle in enumerate(chunk_graph_bundles, 1):
+        text = bundle.chunk_path.read_text(encoding="utf-8")
+        blocks.append(
+            SourceBlock(
+                id=f"chunk:{index:03d}",
+                kind="chunk",
+                source_path=f"chunks/{bundle.chunk_path.name}",
+                heading_path=heading_path_for_chunk(
+                    text, fallback=bundle.chunk_path.stem
+                ),
+                text=text,
+                start_char=0,
+                end_char=len(text),
+                chunk_index=index,
+                chunk_filename=bundle.chunk_path.name,
+            )
+        )
+    return tuple(blocks)
+
+
+def heading_path_for_chunk(text: str, *, fallback: str) -> str:
+    headings = [
+        line.strip().lstrip("#").strip()
+        for line in text.splitlines()
+        if line.startswith("#")
+    ]
+    return " > ".join(heading for heading in headings if heading) or fallback
+
+
+def evidence_records_for_graph(
+    graph: ClaimGraph,
+    *,
+    source_blocks: Sequence[SourceBlock],
+) -> tuple[EvidenceRecord, ...]:
+    nodes_by_id = graph.node_map()
+    records: list[EvidenceRecord] = []
+    for node in graph.nodes:
+        if node.type not in {"claim", "evidence", "concept", "key_passage"}:
+            continue
+        text = node.text
+        if node.type == "concept":
+            text = f"{node.label}: {node.text}"
+        source_block = source_block_for_node(node.metadata, source_blocks)
+        section_path = node.metadata.get("section") or source_block.heading_path
+        claim_text = node.text
+        if node.type == "evidence":
+            claim_text = claims_supported_by_evidence(node.id, graph)
+        if node.type == "claim":
+            evidence_id = node.metadata.get("evidence_id")
+            if evidence_id and evidence_id in nodes_by_id:
+                text = nodes_by_id[evidence_id].text
+        records.append(
+            EvidenceRecord(
+                id=stable_evidence_record_id(node.id),
+                source_block_id=source_block.id,
+                kind=node.type,
+                text=text,
+                claim=claim_text,
+                entities=extract_capitalized_entities(claim_text),
+                dates=extract_dates(f"{claim_text} {text}"),
+                quantities=extract_quantities(f"{claim_text} {text}"),
+                section_path=section_path,
+                score=node.score,
+                validated_exact_span=bool(text and text in source_block.text),
+            )
+        )
+    return tuple(records)
+
+
+def source_block_for_node(
+    metadata: Mapping[str, str],
+    source_blocks: Sequence[SourceBlock],
+) -> SourceBlock:
+    chunk_filename = metadata.get("chunk_filename")
+    if chunk_filename:
+        for block in source_blocks:
+            if block.chunk_filename == chunk_filename:
+                return block
+    return source_blocks[0]
+
+
+def claims_supported_by_evidence(evidence_id: str, graph: ClaimGraph) -> str:
+    node_map = graph.node_map()
+    claims = [
+        node_map[edge.target].text
+        for edge in graph.edges
+        if edge.source == evidence_id
+        and edge.type == "supports"
+        and edge.target in node_map
+    ]
+    return " ".join(claims)
+
+
+def stable_evidence_record_id(node_id: str) -> str:
+    return "ev:" + re.sub(r"[^a-zA-Z0-9._:-]+", "-", node_id).strip("-")
+
+
+def extract_capitalized_entities(text: str) -> tuple[str, ...]:
+    candidates = re.findall(r"\b[A-Z][A-Za-z0-9]*(?:\s+[A-Z][A-Za-z0-9]*)*\b", text)
+    return tuple(
+        dict.fromkeys(candidate for candidate in candidates if len(candidate) > 1)
+    )
+
+
+def extract_dates(text: str) -> tuple[str, ...]:
+    return tuple(
+        dict.fromkeys(
+            re.findall(r"\b(?:1[6-9]\d{2}|20\d{2}|21\d{2})\b", text)
+            + re.findall(
+                r"\b(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{1,2},?\s+\d{4}\b",
+                text,
+            )
+        )
+    )
+
+
+def extract_quantities(text: str) -> tuple[str, ...]:
+    return tuple(dict.fromkeys(re.findall(r"\b\d+(?:\.\d+)?%?|\b\d+/\d+\b", text)))
+
+
+def summary_plan_for_evidence(
+    *,
+    doc_name: str,
+    evidence_records: Sequence[EvidenceRecord],
+) -> SummaryPlan:
+    by_section: dict[str, list[EvidenceRecord]] = {}
+    for record in evidence_records:
+        by_section.setdefault(record.section_path, []).append(record)
+    topics = tuple(
+        SummaryPlanTopic(
+            title=section,
+            evidence_ids=tuple(record.id for record in records[:8]),
+            section_path=section,
+            word_budget_hint=max(80, min(300, len(records) * 45)),
+        )
+        for section, records in by_section.items()
+    )
+    return SummaryPlan(
+        document=doc_name,
+        topics=topics,
+        section_coverage={
+            section: len(records) for section, records in by_section.items()
+        },
+    )
+
+
+def write_json_dataclass(path: Path, item: Any) -> None:
+    path.write_text(json.dumps(asdict(item), indent=2) + "\n", encoding="utf-8")
+
+
+def write_json_dataclasses(path: Path, items: Sequence[Any]) -> None:
+    path.write_text(
+        json.dumps([asdict(item) for item in items], indent=2) + "\n",
+        encoding="utf-8",
+    )
+
+
+def write_summary_claims_json(
+    path: Path,
+    verdicts: Sequence[ClaimVerdict],
+    *,
+    evidence_records: Sequence[EvidenceRecord],
+) -> None:
+    evidence_ids = tuple(record.id for record in evidence_records)
+    payload = [
+        {
+            "claim": verdict.claim,
+            "status": verdict_status(verdict),
+            "supported": verdict.supported,
+            "evidence": verdict.evidence,
+            "evidence_ids": list(evidence_ids[:3]),
+            "issue_categories": list(getattr(verdict, "issue_categories", ())),
+        }
+        for verdict in verdicts
+    ]
+    path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+
+
+def summary_evidence_markdown(
+    *,
+    doc_name: str,
+    evidence_records: Sequence[EvidenceRecord],
+    verdicts: Sequence[ClaimVerdict],
+    repair_passes: Sequence[RepairPass],
+) -> str:
+    lines = [
+        f"# Evidence Ledger: {doc_name}",
+        "",
+        "## Final Claim Verification",
+        "",
+    ]
+    if verdicts:
+        for index, verdict in enumerate(verdicts, 1):
+            lines.extend(
+                [
+                    f"{index}. **{verdict_status(verdict)}** {verdict.claim}",
+                    f"   - Evidence: {verdict.evidence}",
+                    "",
+                ]
+            )
+    else:
+        lines.extend(["No final summary claims were extracted.", ""])
+    lines.extend(["## Evidence Records", ""])
+    if evidence_records:
+        for record in evidence_records:
+            exact_span = str(record.validated_exact_span).lower()
+            lines.extend(
+                [
+                    f"### {record.id}",
+                    "",
+                    f"- Kind: {record.kind}",
+                    f"- Source block: `{record.source_block_id}`",
+                    f"- Section: {record.section_path}",
+                    f"- Exact span validated: {exact_span}",
+                    f"- Claim: {record.claim or 'None'}",
+                    "",
+                    record.text,
+                    "",
+                ]
+            )
+    else:
+        lines.extend(["No evidence records were selected.", ""])
+    lines.extend(["## Repair Passes", ""])
+    if repair_passes:
+        for repair in repair_passes:
+            lines.extend(
+                [
+                    f"- Pass {repair.pass_index}: "
+                    f"{len(repair.repaired_claims)} claim(s) targeted.",
+                ]
+            )
+    else:
+        lines.append("- No unsupported claims required a targeted repair pass.")
+    return "\n".join(lines).strip() + "\n"
+
+
+def verdict_status(verdict: ClaimVerdict) -> str:
+    status = getattr(verdict, "status", "")
+    if status:
+        return status
+    return "SUPPORTED" if verdict.supported else "NOT_IN_SOURCE"
 
 
 def render_supported_claims(verdicts: Sequence[ClaimVerdict]) -> str:
@@ -557,7 +1060,9 @@ def write_claim_verdicts_json(
         {
             "claim": verdict.claim,
             "supported": verdict.supported,
+            "status": verdict_status(verdict),
             "evidence": verdict.evidence,
+            "issue_categories": list(getattr(verdict, "issue_categories", ())),
         }
         for verdict in verdicts
     ]
@@ -716,15 +1221,23 @@ def summary_content(
     markdown_filename: str,
     final_summary: str,
     references: tuple[SummaryChunkReference, ...],
+    evidence_ledger: str | None = None,
 ) -> str:
     chunk_index = "\n".join(
         f"{reference.index}. [{reference.filename}]({reference.path})"
         for reference in references
     )
+    evidence_link = (
+        f" | [View evidence ledger]({evidence_ledger})" if evidence_ledger else ""
+    )
+    navigation = (
+        f"[Back to full document]({markdown_filename}) | "
+        f"[View chunk summary](chunk_summary.md){evidence_link}"
+    )
     return f"""# Summary: {title}
 **Author(s):** {authors}
 
-[Back to full document]({markdown_filename}) | [View chunk summary](chunk_summary.md)
+{navigation}
 
 ---
 

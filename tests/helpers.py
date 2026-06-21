@@ -1,7 +1,33 @@
 """Shared test doubles for the summarize pipeline."""
 
 import json
+import re
+from collections.abc import Sequence
 from typing import NamedTuple
+
+
+class BagOfWordsEmbedder:
+    """Deterministic, offline stand-in for a real embedder.
+
+    Each text becomes a term-frequency vector over the vocabulary of the batch,
+    so cosine similarity reduces to word overlap. Real embeddings would catch
+    paraphrases this misses, but tests only need similar texts to score high and
+    dissimilar ones to score low, deterministically and without a network call.
+    """
+
+    def embed(
+        self, *, texts: Sequence[str], model: str
+    ) -> tuple[tuple[float, ...], ...]:
+        tokenized = [re.findall(r"[a-z]+", text.lower()) for text in texts]
+        vocab = sorted({word for tokens in tokenized for word in tokens})
+        position = {word: index for index, word in enumerate(vocab)}
+        vectors: list[tuple[float, ...]] = []
+        for tokens in tokenized:
+            counts = [0.0] * len(vocab)
+            for word in tokens:
+                counts[position[word]] += 1.0
+            vectors.append(tuple(counts))
+        return tuple(vectors)
 
 
 class CompletionCall(NamedTuple):
@@ -36,7 +62,7 @@ class RecordingCompleter:
             return self.chunk_responses.pop(0)
         if "<section_summaries>" in prompt:
             return self.final_response
-        if "source-grounded claims" in prompt:
+        if "source-grounded items" in prompt:
             return json.dumps(
                 {
                     "claims": [
@@ -44,13 +70,30 @@ class RecordingCompleter:
                             "claim": "The document preserves important claims.",
                             "evidence": "The document states important claims.",
                         }
-                    ]
+                    ],
+                    "concepts": [
+                        {
+                            "concept": "Summary graph",
+                            "definition": "A graph that preserves important claims.",
+                            "evidence": "The document states important claims.",
+                        }
+                    ],
+                    "key_passages": [
+                        {
+                            "passage": "The document states important claims.",
+                            "why_it_matters": (
+                                "It anchors the summary in source wording."
+                            ),
+                        }
+                    ],
                 }
             )
-        if "graph-guided abstractive summary" in prompt:
+        if "Use the selected summary graph as the only source of truth" in prompt:
             return "Graph-grounded summary."
         if "merging two independently generated summaries" in prompt:
             return f"Merged summary from {self.final_response}"
+        if "revising a merged summary" in prompt:
+            return f"Repaired {self.final_response}"
         if "extracting factual claims from a summary" in prompt:
             return json.dumps({"claims": ["Merged summary is supported."]})
         if "verifying summary claims against the source document" in prompt:

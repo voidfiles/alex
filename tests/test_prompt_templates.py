@@ -142,10 +142,9 @@ def test_in_source_checkout_distinguishes_repo_from_site_packages(
     assert not in_source_checkout(installed)
 
 
-def test_packaged_summary_prompts_ship_v001_as_active() -> None:
+def test_packaged_summary_prompts_ship_active_versions() -> None:
     for name in SUMMARY_PROMPT_NAMES:
-        assert active_version(name) == "v001"
-        assert "v001" in list_versions(name)
+        assert active_version(name) in list_versions(name)
 
 
 def test_summary_prompts_load_uses_active_versions() -> None:
@@ -163,6 +162,32 @@ def test_summary_prompts_load_uses_active_versions() -> None:
     assert prompts.final_summary.placeholders() == frozenset(
         {"title", "authors", "section_summaries", "chunk_reference_list"}
     )
+
+
+def test_source_claim_extraction_active_exposes_max_claims_knob() -> None:
+    template = load_prompt("source_claim_extraction")
+
+    assert template.version == "v005"
+    assert "max_claims" in template.placeholders()
+    assert "Extract up to {{max_claims}} items per category" in template.text
+    assert "concepts" in template.text
+    assert "key_passages" in template.text
+
+
+def test_merged_summary_repair_pins_selected_subgraph_placeholder() -> None:
+    template = load_prompt("merged_summary_repair")
+
+    assert template.placeholders() == frozenset(
+        {"document_name", "selected_subgraph", "merged_summary"}
+    )
+    # Passing the wrong key (selected_graph) fails because selected_subgraph is
+    # then missing, so the repair call can never silently render an empty graph.
+    with pytest.raises(PromptTemplateError, match=r"missing values.*selected_subgraph"):
+        template.render(
+            document_name="doc.md",
+            selected_graph="wrong key",
+            merged_summary="summary",
+        )
 
 
 def test_summary_prompts_load_accepts_known_overrides_only() -> None:

@@ -19,8 +19,9 @@ from alex.lib.claim_graph import (
     select_claim_subgraph,
     write_graph_json,
 )
-from alex.lib.llm import Completer, LiteLlmCompleter, LiteLlmEmbedder
-from alex.lib.prompt_templates import PromptTemplate, load_prompt
+from alex.lib.llm import Completer, Embedder, LiteLlmCompleter, LiteLlmEmbedder
+from alex.lib.production_prompts import MergePrompts
+from alex.lib.prompt_templates import PromptTemplate
 from alex.lib.summarize import SummaryPrompts
 from alex.lib.summary_eval import (
     ClaimVerdict,
@@ -39,27 +40,6 @@ from alex.lib.summary_eval import (
     score_generated_summary,
     verify_claims,
 )
-
-MERGED_SUMMARY_PROMPT_NAME = "merged_summary"
-MERGED_SUMMARY_REPAIR_PROMPT_NAME = "merged_summary_repair"
-MERGED_SUMMARY_FAITHFULNESS_FILTER_PROMPT_NAME = "merged_summary_faithfulness_filter"
-
-
-@dataclass(frozen=True)
-class MergePrompts:
-    merged_summary: PromptTemplate
-    merged_summary_repair: PromptTemplate
-    merged_summary_faithfulness_filter: PromptTemplate
-
-    @classmethod
-    def load(cls) -> MergePrompts:
-        return cls(
-            merged_summary=load_prompt(MERGED_SUMMARY_PROMPT_NAME),
-            merged_summary_repair=load_prompt(MERGED_SUMMARY_REPAIR_PROMPT_NAME),
-            merged_summary_faithfulness_filter=load_prompt(
-                MERGED_SUMMARY_FAITHFULNESS_FILTER_PROMPT_NAME
-            ),
-        )
 
 
 @dataclass(frozen=True)
@@ -95,6 +75,7 @@ class MergedEvalRun:
 
 
 CompleterFactory = Callable[[], Completer]
+EmbedderFactory = Callable[[], Embedder]
 
 
 def new_run_id() -> str:
@@ -103,6 +84,7 @@ def new_run_id() -> str:
 
 def build_eval_merged_summary_command(
     completer_factory: CompleterFactory = LiteLlmCompleter,
+    embedder_factory: EmbedderFactory = LiteLlmEmbedder,
 ) -> click.Command:
     @click.command("eval-merged-summary")
     @click.option(
@@ -179,6 +161,7 @@ def build_eval_merged_summary_command(
                 repair=repair,
                 faithfulness_filter=faithfulness_filter,
                 completer=completer_factory(),
+                embedder=embedder_factory(),
                 progress=click.echo,
             )
         except (OSError, RuntimeError, ValueError) as error:
@@ -198,6 +181,7 @@ def evaluate_merged_summary(
     repair: bool,
     faithfulness_filter: bool,
     completer: Completer,
+    embedder: Embedder,
     progress: Progress = no_progress,
 ) -> MergedEvalRun:
     docs = corpus_docs(config.corpus_dir, doc_names)
@@ -223,6 +207,7 @@ def evaluate_merged_summary(
                 repair=repair,
                 faithfulness_filter=faithfulness_filter,
                 completer=completer,
+                embedder=embedder,
             )
         except (OSError, RuntimeError, ValueError) as error:
             result = failed_merged_doc_result(
@@ -270,6 +255,7 @@ def evaluate_merged_summary_doc(
     repair: bool,
     faithfulness_filter: bool,
     completer: Completer,
+    embedder: Embedder,
 ) -> MergedDocResult:
     doc_text = doc_path.read_text(encoding="utf-8")
     standard_summary = generate_summary(
@@ -277,13 +263,14 @@ def evaluate_merged_summary_doc(
         prompts=summary_prompts,
         config=replace(config, summary=replace(config.summary, graph_enhanced=False)),
         completer=completer,
-        embedder=LiteLlmEmbedder(),
-    )
+        embedder=embedder,
+    ).text
 
     graph = build_claim_graph(
         source=document_graph_source(doc_name=doc_path.name, doc_text=doc_text),
         prompts=graph_prompts,
         completer=completer,
+        embedder=embedder,
         eval_settings=config.settings,
     )
     selected = select_claim_subgraph(graph, settings=graph_settings)

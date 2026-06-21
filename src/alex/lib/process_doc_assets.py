@@ -25,6 +25,7 @@ GENERATED_MARKDOWN_FILES = frozenset(
     {
         "headers.md",
         "summary.md",
+        "summary_evidence.md",
         "chunk_summary.md",
     }
 )
@@ -73,6 +74,8 @@ def process_doc_asset(
     completer: Completer | None = None,
     embedder: Embedder | None = None,
 ) -> ProcessDocAssetOutput:
+    resolved_completer = completer or LiteLlmCompleter()
+    resolved_embedder = embedder or LiteLlmEmbedder()
     asset_dir = config.asset_path
     if not asset_dir.is_dir():
         raise ProcessDocAssetError(f"Asset path must be a directory: {asset_dir}")
@@ -91,7 +94,7 @@ def process_doc_asset(
         markdown_filename=markdown_path.name,
         headers=headers,
         settings=config.chunking,
-        embedder=embedder or LiteLlmEmbedder(),
+        embedder=resolved_embedder,
     )
     chunk_paths = chunking_result.chunk_paths
 
@@ -145,7 +148,8 @@ def process_doc_asset(
             markdown_path=markdown_path,
             headers_path=headers_path,
             chunk_paths=chunk_paths,
-            completer=completer or LiteLlmCompleter(),
+            completer=resolved_completer,
+            embedder=resolved_embedder,
         )
 
     return ProcessDocAssetOutput(

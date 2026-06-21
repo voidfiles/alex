@@ -4,11 +4,12 @@ from pathlib import Path
 from click.testing import CliRunner
 
 from alex.commands.eval_claim_graph import build_eval_claim_graph_command
+from helpers import BagOfWordsEmbedder
 
 
 class GraphEvalCompleter:
     def complete(self, *, prompt: str, model: str, max_tokens: int) -> str:
-        if "source-grounded claims" in prompt:
+        if "source-grounded items" in prompt:
             return json.dumps(
                 {
                     "claims": [
@@ -16,10 +17,23 @@ class GraphEvalCompleter:
                             "claim": "Graph summaries preserve provenance.",
                             "evidence": "Graph summaries cite claim nodes.",
                         }
-                    ]
+                    ],
+                    "concepts": [
+                        {
+                            "concept": "Provenance",
+                            "definition": "Traceable support in graph summaries.",
+                            "evidence": "Graph summaries cite claim nodes.",
+                        }
+                    ],
+                    "key_passages": [
+                        {
+                            "passage": "Graph summaries preserve provenance.",
+                            "why_it_matters": "It states the evaluated benefit.",
+                        }
+                    ],
                 }
             )
-        if "graph-guided abstractive summary" in prompt:
+        if "Use the selected summary graph as the only source of truth" in prompt:
             return (
                 "Graph summaries preserve provenance "
                 "(claim:graph-summaries-preserve-provenance:1)."
@@ -40,7 +54,7 @@ class GraphEvalCompleter:
                     ]
                 }
             )
-        if "judging the writing quality" in prompt:
+        if "writing quality" in prompt:
             return json.dumps(
                 {
                     "coherence": 5,
@@ -69,7 +83,9 @@ def test_eval_claim_graph_writes_artifacts_and_reports_scores(tmp_path: Path) ->
     )
 
     result = CliRunner().invoke(
-        build_eval_claim_graph_command(lambda: GraphEvalCompleter()),
+        build_eval_claim_graph_command(
+            lambda: GraphEvalCompleter(), lambda: BagOfWordsEmbedder()
+        ),
         [
             "--evals-dir",
             str(evals_dir),
@@ -123,7 +139,9 @@ def test_eval_claim_graph_records_failed_docs_and_continues(tmp_path: Path) -> N
     )
 
     result = CliRunner().invoke(
-        build_eval_claim_graph_command(lambda: FailingGraphEvalCompleter()),
+        build_eval_claim_graph_command(
+            lambda: FailingGraphEvalCompleter(), lambda: BagOfWordsEmbedder()
+        ),
         [
             "--evals-dir",
             str(evals_dir),

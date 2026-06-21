@@ -10,7 +10,7 @@ from alex.lib.process_doc_assets import (
     process_doc_asset,
 )
 from alex.lib.summarize import SummarySettings
-from helpers import RecordingCompleter
+from helpers import BagOfWordsEmbedder, RecordingCompleter
 
 
 def test_process_doc_asset_chunks_an_existing_asset_folder(tmp_path: Path) -> None:
@@ -67,6 +67,7 @@ def test_process_doc_asset_chunks_an_existing_asset_folder(tmp_path: Path) -> No
             summary=SummarySettings(max_workers=1),
         ),
         completer=completer,
+        embedder=BagOfWordsEmbedder(),
     )
 
     assert result.asset_dir == asset_dir
@@ -113,11 +114,14 @@ def test_process_doc_asset_chunks_an_existing_asset_folder(tmp_path: Path) -> No
     assert len(chunk_calls) == 2
     assert {call.model for call in chunk_calls} == {"anthropic/claude-haiku-4-5"}
     assert {call.max_tokens for call in chunk_calls} == {20_000}
-    assert "<document_metadata>" in chunk_calls[0].prompt
+    # graph_enhanced is on by default, so chunks summarize through the
+    # graph-aware template that embeds the selected chunk subgraph.
     assert "Title: Systems Book" in chunk_calls[0].prompt
     assert "Authors: Dana Example" in chunk_calls[0].prompt
-    assert "<document_structure>" in chunk_calls[0].prompt
+    assert "Document outline:" in chunk_calls[0].prompt
     assert "- Systems Book (H1, line 1, 14 lines)" in chunk_calls[0].prompt
+    assert "<selected_chunk_graph>" in chunk_calls[0].prompt
+    assert "<section_content>" in chunk_calls[0].prompt
     assert "Foundations body." in chunk_calls[0].prompt
     assert completer.compression_calls() == []
 
@@ -179,6 +183,7 @@ def test_process_doc_asset_recursively_compresses_large_chunk_summaries(
             summary=SummarySettings(max_context_tokens=50, max_workers=1),
         ),
         completer=completer,
+        embedder=BagOfWordsEmbedder(),
     )
 
     assert len(completer.chunk_calls()) == 1
@@ -220,6 +225,7 @@ def test_process_doc_asset_can_rerun_after_generated_files_exist(
             summary=SummarySettings(max_workers=1),
         ),
         completer=completer,
+        embedder=BagOfWordsEmbedder(),
     )
     (first.chunks_dir / "stale.md").write_text("stale", encoding="utf-8")
 
@@ -229,6 +235,7 @@ def test_process_doc_asset_can_rerun_after_generated_files_exist(
             summary=SummarySettings(max_workers=1),
         ),
         completer=completer,
+        embedder=BagOfWordsEmbedder(),
     )
 
     assert second.original_file == asset_dir / "rerunnable.pdf"
@@ -259,6 +266,7 @@ def test_process_doc_asset_handles_structureless_markdown(tmp_path: Path) -> Non
             summary=SummarySettings(max_workers=1),
         ),
         completer=completer,
+        embedder=BagOfWordsEmbedder(),
     )
 
     assert result.chapter_level_path is None

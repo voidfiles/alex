@@ -18,19 +18,22 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+import shutil
 import tempfile
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from pathlib import Path
-from typing import Any, Protocol
+from typing import Any, Literal, Protocol
 
 from alex.lib.chunking import ChunkSettings
 from alex.lib.llm import (
     Completer,
     Embedder,
     LlmError,
+    ordered_parallel_map,
     resolve_eval_judge_model,
     resolve_fact_extractor_model,
+    resolve_summary_max_workers,
 )
 from alex.lib.markdown_structure import (
     MarkdownHeader,
@@ -39,6 +42,7 @@ from alex.lib.markdown_structure import (
     parse_markdown_headers,
     split_chapters,
 )
+from alex.lib.production_prompts import MergePrompts
 from alex.lib.prompt_templates import PromptTemplate, load_prompt
 from alex.lib.summarize import SummaryPrompts, SummarySettings
 from alex.lib.summary_assets import SummaryAssetConfig, process_summary_asset
@@ -83,6 +87,7 @@ class EvalSettings:
     # A detailed, information-dense summary lands around one salient fact
     # per hundred words; density saturates at this rate.
     target_facts_per_100_words: float = 1.0
+    max_workers: int = field(default_factory=resolve_summary_max_workers)
 
 
 @dataclass(frozen=True)
@@ -146,6 +151,29 @@ class ClaimVerdict:
     claim: str
     supported: bool
     evidence: str
+    status: Literal[
+        "SUPPORTED",
+        "PARTIALLY_SUPPORTED",
+        "CONTRADICTED",
+        "NOT_IN_SOURCE",
+        "AMBIGUOUS",
+    ] = "SUPPORTED"
+    issue_categories: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class ChunkGraphArtifact:
+    chunk: str
+    graph_json: str
+    selected_subgraph_json: str
+    selected_subgraph_markdown: str
+
+
+@dataclass(frozen=True)
+class SummaryGraphArtifacts:
+    artifact_dir: str
+    chunk_graphs_markdown: str
+    chunk_graphs: tuple[ChunkGraphArtifact, ...]
 
 
 @dataclass(frozen=True)
@@ -153,7 +181,14 @@ class GeneratedSummary:
     doc_name: str
     doc_text: str
     summary: str
+    graph_artifacts: SummaryGraphArtifacts | None = None
     error: str | None = None
+
+
+@dataclass(frozen=True)
+class SummaryGeneration:
+    text: str
+    graph_artifacts: SummaryGraphArtifacts | None = None
 
 
 @dataclass(frozen=True)
@@ -222,26 +257,44 @@ class PipelineSummaryEvaluator:
         self, *, prompts: SummaryPrompts, run_id: str, progress: Progress = no_progress
     ) -> EvalRun:
         docs = corpus_docs(self.config.corpus_dir, self.doc_names)
+        progress(f"loaded {len(docs)} eval document(s) from {self.config.corpus_dir}")
         summaries: list[GeneratedSummary] = []
+        graph_artifacts_root = self.config.runs_dir / run_id / "graphs"
         for index, doc_path in enumerate(docs, 1):
             progress(f"summarizing ({index}/{len(docs)}) {doc_path.name}")
             try:
+                progress(f"  reading source: {doc_path}")
                 doc_text = doc_path.read_text(encoding="utf-8")
+                progress(
+                    f"  source size: {len(doc_text.split())} words, "
+                    f"{len(doc_text)} chars"
+                )
+                progress("  running summary pipeline")
                 summary = generate_summary(
                     doc_path=doc_path,
                     prompts=prompts,
                     config=self.config,
                     completer=self.completer,
                     embedder=self.embedder,
+                    graph_output_dir=graph_artifacts_root / doc_path.stem,
                 )
+                if summary.graph_artifacts is not None:
+                    progress(
+                        "  chunk graphs: "
+                        f"{len(summary.graph_artifacts.chunk_graphs)} persisted to "
+                        f"{summary.graph_artifacts.chunk_graphs_markdown}"
+                    )
+                progress(f"  summary complete: {len(summary.text.split())} words")
                 summaries.append(
                     GeneratedSummary(
                         doc_name=doc_path.name,
                         doc_text=doc_text,
-                        summary=summary,
+                        summary=summary.text,
+                        graph_artifacts=summary.graph_artifacts,
                     )
                 )
             except (LlmError, OSError, ValueError) as error:
+                progress(f"  summarizing failed: {error}")
                 summaries.append(
                     GeneratedSummary(
                         doc_name=doc_path.name,
@@ -252,11 +305,10 @@ class PipelineSummaryEvaluator:
                 )
         return self.rescore(
             summaries=tuple(summaries),
-            prompt_versions={
-                "chunk_summary": prompts.chunk_summary.version,
-                "compression_summary": prompts.compression_summary.version,
-                "final_summary": prompts.final_summary.version,
-            },
+            prompt_versions=summary_prompt_versions(
+                prompts=prompts,
+                overrides=self.config.summary.prompt_overrides,
+            ),
             run_id=run_id,
             progress=progress,
         )
@@ -289,6 +341,7 @@ class PipelineSummaryEvaluator:
                     config=self.config,
                     eval_prompts=eval_prompts,
                     completer=self.completer,
+                    progress=progress,
                 )
             progress(doc_score_line(score))
             scores.append(score)
@@ -342,7 +395,7 @@ def score_doc(
             config=config,
             completer=completer,
             embedder=embedder,
-        )
+        ).text
     except (LlmError, OSError, ValueError) as error:
         return failed_doc_score(doc_name=doc_path.name, error=error)
 
@@ -364,18 +417,23 @@ def score_generated_summary(
     config: EvalConfig,
     eval_prompts: EvalPrompts,
     completer: Completer,
+    progress: Progress = no_progress,
 ) -> DocScore:
     settings = config.settings
     try:
         doc_text = generated.doc_text
         summary = generated.summary
+        progress("  facts: loading or extracting reference facts")
         facts = facts_for_doc(
             doc_text=doc_text,
             facts_dir=config.facts_dir,
             template=eval_prompts.fact_extraction,
             completer=completer,
             settings=settings,
+            progress=progress,
         )
+        progress(f"  facts: {len(facts)} reference facts")
+        progress("  coverage: judging summary against reference facts")
         fact_verdicts = judge_fact_coverage(
             facts=facts,
             summary=summary,
@@ -383,12 +441,19 @@ def score_generated_summary(
             completer=completer,
             settings=settings,
         )
+        progress(
+            "  coverage: "
+            f"{sum(verdict.covered for verdict in fact_verdicts)}/{len(facts)} "
+            "facts covered"
+        )
+        progress("  faithfulness: extracting summary claims")
         claims = extract_claims(
             summary=summary,
             template=eval_prompts.claim_extraction,
             completer=completer,
             settings=settings,
         )
+        progress(f"  faithfulness: verifying {len(claims)} summary claims")
         claim_verdicts = verify_claims(
             doc_text=doc_text,
             claims=claims,
@@ -396,13 +461,26 @@ def score_generated_summary(
             completer=completer,
             settings=settings,
         )
+        progress(
+            "  faithfulness: "
+            f"{sum(verdict.supported for verdict in claim_verdicts)}/{len(claims)} "
+            "claims supported"
+        )
+        progress("  rubric: judging coherence, organization, and readability")
         rubric = judge_rubric(
             summary=summary,
             template=eval_prompts.rubric_judge,
             completer=completer,
             settings=settings,
         )
+        progress(
+            "  rubric: "
+            f"coherence={rubric.coherence}/5 "
+            f"organization={rubric.organization}/5 "
+            f"readability={rubric.readability}/5"
+        )
     except (LlmError, OSError, ValueError) as error:
+        progress(f"  scoring failed: {error}")
         return failed_doc_score(doc_name=generated.doc_name, error=error)
 
     covered_count = sum(verdict.covered for verdict in fact_verdicts)
@@ -463,7 +541,8 @@ def generate_summary(
     config: EvalConfig,
     completer: Completer,
     embedder: Embedder,
-) -> str:
+    graph_output_dir: Path | None = None,
+) -> SummaryGeneration:
     with tempfile.TemporaryDirectory(prefix="alex-eval-") as workspace:
         output = process_summary_asset(
             SummaryAssetConfig(
@@ -478,7 +557,74 @@ def generate_summary(
         )
         if output.summary_path is None:
             raise EvalError("Pipeline produced no summary for this document.")
-        return output.summary_path.read_text(encoding="utf-8")
+        graph_artifacts = persist_summary_graph_artifacts(
+            source_dir=output.graph_artifact_dir,
+            output_dir=graph_output_dir,
+        )
+        return SummaryGeneration(
+            text=output.summary_path.read_text(encoding="utf-8"),
+            graph_artifacts=graph_artifacts,
+        )
+
+
+def persist_summary_graph_artifacts(
+    *,
+    source_dir: Path | None,
+    output_dir: Path | None,
+) -> SummaryGraphArtifacts | None:
+    if source_dir is None or output_dir is None or not source_dir.is_dir():
+        return None
+    if output_dir.exists():
+        shutil.rmtree(output_dir)
+    output_dir.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copytree(source_dir, output_dir)
+    return write_chunk_graphs_index(output_dir)
+
+
+def write_chunk_graphs_index(artifact_dir: Path) -> SummaryGraphArtifacts:
+    chunks_dir = artifact_dir / "chunks"
+    chunk_graphs: list[ChunkGraphArtifact] = []
+    sections = ["# Chunk Graphs", ""]
+    if chunks_dir.is_dir():
+        for chunk_dir in sorted(path for path in chunks_dir.iterdir() if path.is_dir()):
+            selected_markdown = chunk_dir / "selected_subgraph.md"
+            graph_json = chunk_dir / "graph.json"
+            selected_json = chunk_dir / "selected_subgraph.json"
+            chunk_graphs.append(
+                ChunkGraphArtifact(
+                    chunk=chunk_dir.name,
+                    graph_json=str(graph_json),
+                    selected_subgraph_json=str(selected_json),
+                    selected_subgraph_markdown=str(selected_markdown),
+                )
+            )
+            sections.extend(
+                [
+                    f"## {chunk_dir.name}",
+                    "",
+                    f"- Graph JSON: `{graph_json}`",
+                    f"- Selected subgraph JSON: `{selected_json}`",
+                    f"- Selected subgraph Markdown: `{selected_markdown}`",
+                    "",
+                ]
+            )
+            if selected_markdown.is_file():
+                sections.extend(
+                    [
+                        selected_markdown.read_text(encoding="utf-8").strip(),
+                        "",
+                    ]
+                )
+    if not chunk_graphs:
+        sections.extend(["No chunk graph artifacts were produced.", ""])
+
+    index_path = artifact_dir / "chunk_graphs.md"
+    index_path.write_text("\n".join(sections).strip() + "\n", encoding="utf-8")
+    return SummaryGraphArtifacts(
+        artifact_dir=str(artifact_dir),
+        chunk_graphs_markdown=str(index_path),
+        chunk_graphs=tuple(chunk_graphs),
+    )
 
 
 def fact_cache_path(
@@ -500,6 +646,7 @@ def facts_for_doc(
     template: PromptTemplate,
     completer: Completer,
     settings: EvalSettings,
+    progress: Progress = no_progress,
 ) -> tuple[str, ...]:
     cache_path = fact_cache_path(
         facts_dir=facts_dir,
@@ -509,8 +656,10 @@ def facts_for_doc(
     )
     cached = read_facts_cache(cache_path)
     if cached is not None:
+        progress(f"  facts cache hit: {cache_path}")
         return cached
 
+    progress(f"  facts cache miss: {cache_path}")
     facts = extract_facts(
         doc_text=doc_text,
         template=template,
@@ -522,6 +671,7 @@ def facts_for_doc(
         json.dumps({"facts": list(facts)}, indent=2) + "\n",
         encoding="utf-8",
     )
+    progress(f"  facts cache wrote: {cache_path}")
     return facts
 
 
@@ -546,17 +696,19 @@ def extract_facts(
     completer: Completer,
     settings: EvalSettings,
 ) -> tuple[str, ...]:
+    sections = fact_sections(doc_text)
+
+    def run(section: FactSection) -> tuple[str, ...]:
+        return extract_section_facts(
+            section=section,
+            template=template,
+            completer=completer,
+            settings=settings,
+        )
+
     facts = dedupe_facts(
         round_robin_facts(
-            tuple(
-                extract_section_facts(
-                    section=section,
-                    template=template,
-                    completer=completer,
-                    settings=settings,
-                )
-                for section in fact_sections(doc_text)
-            ),
+            ordered_parallel_map(sections, run, max_workers=settings.max_workers),
             limit=40,
         )
     )
@@ -658,6 +810,30 @@ def round_robin_facts(
     return tuple(selected)
 
 
+def summary_prompt_versions(
+    *,
+    prompts: SummaryPrompts,
+    overrides: Mapping[str, str],
+) -> dict[str, str]:
+    from alex.lib.claim_graph import GraphPrompts
+
+    graph_prompts = GraphPrompts.load(overrides=overrides)
+    merge_prompts = MergePrompts.load(overrides=overrides)
+    return {
+        "chunk_summary": prompts.chunk_summary.version,
+        "chunk_summary_with_graph": prompts.chunk_summary_with_graph.version,
+        "compression_summary": prompts.compression_summary.version,
+        "final_summary": prompts.final_summary.version,
+        "source_claim_extraction": graph_prompts.source_claim_extraction.version,
+        "graph_guided_summary": graph_prompts.graph_guided_summary.version,
+        "merged_summary": merge_prompts.merged_summary.version,
+        "merged_summary_repair": merge_prompts.merged_summary_repair.version,
+        "merged_summary_faithfulness_filter": (
+            merge_prompts.merged_summary_faithfulness_filter.version
+        ),
+    }
+
+
 def dedupe_facts(facts: Sequence[str]) -> tuple[str, ...]:
     deduped: list[str] = []
     seen: set[str] = set()
@@ -689,18 +865,26 @@ def judge_fact_coverage(
     settings: EvalSettings,
 ) -> tuple[FactVerdict, ...]:
     if len(facts) > JUDGE_BATCH_SIZE:
-        verdicts: list[FactVerdict] = []
-        for batch in chunks(facts, JUDGE_BATCH_SIZE):
-            verdicts.extend(
-                judge_fact_coverage(
-                    facts=tuple(batch),
-                    summary=summary,
-                    template=template,
-                    completer=completer,
-                    settings=settings,
-                )
+        batches = chunks(facts, JUDGE_BATCH_SIZE)
+
+        def run(batch: tuple[str, ...]) -> tuple[FactVerdict, ...]:
+            return judge_fact_coverage(
+                facts=batch,
+                summary=summary,
+                template=template,
+                completer=completer,
+                settings=settings,
             )
-        return tuple(verdicts)
+
+        return tuple(
+            verdict
+            for batch_verdicts in ordered_parallel_map(
+                batches,
+                run,
+                max_workers=settings.max_workers,
+            )
+            for verdict in batch_verdicts
+        )
 
     payload = parse_json_payload(
         completer.complete(
@@ -743,18 +927,26 @@ def verify_claims(
     settings: EvalSettings,
 ) -> tuple[ClaimVerdict, ...]:
     if len(claims) > JUDGE_BATCH_SIZE:
-        verdicts: list[ClaimVerdict] = []
-        for batch in chunks(claims, JUDGE_BATCH_SIZE):
-            verdicts.extend(
-                verify_claims(
-                    doc_text=doc_text,
-                    claims=tuple(batch),
-                    template=template,
-                    completer=completer,
-                    settings=settings,
-                )
+        batches = chunks(claims, JUDGE_BATCH_SIZE)
+
+        def run(batch: tuple[str, ...]) -> tuple[ClaimVerdict, ...]:
+            return verify_claims(
+                doc_text=doc_text,
+                claims=batch,
+                template=template,
+                completer=completer,
+                settings=settings,
             )
-        return tuple(verdicts)
+
+        return tuple(
+            verdict
+            for batch_verdicts in ordered_parallel_map(
+                batches,
+                run,
+                max_workers=settings.max_workers,
+            )
+            for verdict in batch_verdicts
+        )
 
     payload = parse_json_payload(
         completer.complete(
@@ -924,9 +1116,42 @@ def claim_verdicts(payload: Any, *, claims: Sequence[str]) -> tuple[ClaimVerdict
             claim=claim,
             supported=verdict["verdict"],
             evidence=verdict["evidence"],
+            status=claim_verdict_status(verdict, supported=verdict["verdict"]),
+            issue_categories=issue_categories(verdict),
         )
         for claim, verdict in zip(claims, verdicts, strict=True)
     )
+
+
+def claim_verdict_status(
+    verdict: Mapping[str, Any],
+    *,
+    supported: bool,
+) -> Literal[
+    "SUPPORTED",
+    "PARTIALLY_SUPPORTED",
+    "CONTRADICTED",
+    "NOT_IN_SOURCE",
+    "AMBIGUOUS",
+]:
+    raw = verdict.get("status")
+    allowed = {
+        "SUPPORTED",
+        "PARTIALLY_SUPPORTED",
+        "CONTRADICTED",
+        "NOT_IN_SOURCE",
+        "AMBIGUOUS",
+    }
+    if isinstance(raw, str) and raw in allowed:
+        return raw  # type: ignore[return-value]
+    return "SUPPORTED" if supported else "NOT_IN_SOURCE"
+
+
+def issue_categories(verdict: Mapping[str, Any]) -> tuple[str, ...]:
+    raw = verdict.get("issue_categories")
+    if not isinstance(raw, list):
+        return ()
+    return tuple(item for item in raw if isinstance(item, str) and item.strip())
 
 
 def verdict_payloads(
@@ -950,7 +1175,14 @@ def verdict_payloads(
             raise EvalJudgeError(f"Verdict field {verdict_key!r} must be a boolean.")
         if not isinstance(evidence, str) or not evidence.strip():
             raise EvalJudgeError("Verdict evidence must be a non-empty string.")
-        verdicts.append({"verdict": verdict, "evidence": evidence.strip()})
+        parsed = {"verdict": verdict, "evidence": evidence.strip()}
+        status = item.get("status")
+        if isinstance(status, str):
+            parsed["status"] = status
+        issue_values = item.get("issue_categories")
+        if isinstance(issue_values, list):
+            parsed["issue_categories"] = issue_values
+        verdicts.append(parsed)
     return tuple(verdicts)
 
 
@@ -966,36 +1198,15 @@ def write_run_artifact(run: EvalRun, *, runs_dir: Path) -> Path:
         "summary_final_model": run.summary_final_model,
         "mean_blended": run.mean_blended,
         "docs": [
-            {
-                "doc_name": score.doc_name,
-                "coverage": score.coverage,
-                "faithfulness": score.faithfulness,
-                "density": score.density,
-                "rubric": score.rubric,
-                "blended": score.blended,
-                "missed_facts": list(score.missed_facts),
-                "unsupported_claims": list(score.unsupported_claims),
-                "fact_verdicts": [
-                    {
-                        "fact": verdict.fact,
-                        "covered": verdict.covered,
-                        "evidence": verdict.evidence,
-                    }
-                    for verdict in score.fact_verdicts
-                ],
-                "claim_verdicts": [
-                    {
-                        "claim": verdict.claim,
-                        "supported": verdict.supported,
-                        "evidence": verdict.evidence,
-                    }
-                    for verdict in score.claim_verdicts
-                ],
-                "rubric_notes": score.rubric_notes,
-                "summary": score.summary,
-                "error": score.error,
-            }
-            for score in run.doc_scores
+            doc_score_payload(
+                score,
+                generated=(
+                    run.generated_summaries[index]
+                    if index < len(run.generated_summaries)
+                    else None
+                ),
+            )
+            for index, score in enumerate(run.doc_scores)
         ],
     }
     artifact_path.write_text(
@@ -1003,3 +1214,64 @@ def write_run_artifact(run: EvalRun, *, runs_dir: Path) -> Path:
         encoding="utf-8",
     )
     return artifact_path
+
+
+def doc_score_payload(
+    score: DocScore,
+    *,
+    generated: GeneratedSummary | None,
+) -> dict[str, Any]:
+    return {
+        "doc_name": score.doc_name,
+        "coverage": score.coverage,
+        "faithfulness": score.faithfulness,
+        "density": score.density,
+        "rubric": score.rubric,
+        "blended": score.blended,
+        "missed_facts": list(score.missed_facts),
+        "unsupported_claims": list(score.unsupported_claims),
+        "fact_verdicts": [
+            {
+                "fact": verdict.fact,
+                "covered": verdict.covered,
+                "evidence": verdict.evidence,
+            }
+            for verdict in score.fact_verdicts
+        ],
+        "claim_verdicts": [
+            {
+                "claim": verdict.claim,
+                "supported": verdict.supported,
+                "status": verdict.status,
+                "evidence": verdict.evidence,
+                "issue_categories": list(verdict.issue_categories),
+            }
+            for verdict in score.claim_verdicts
+        ],
+        "rubric_notes": score.rubric_notes,
+        "summary": score.summary,
+        "error": score.error,
+        "chunk_graphs": graph_artifacts_payload(
+            generated.graph_artifacts if generated is not None else None
+        ),
+    }
+
+
+def graph_artifacts_payload(
+    artifacts: SummaryGraphArtifacts | None,
+) -> dict[str, Any] | None:
+    if artifacts is None:
+        return None
+    return {
+        "artifact_dir": artifacts.artifact_dir,
+        "chunk_graphs_markdown": artifacts.chunk_graphs_markdown,
+        "chunks": [
+            {
+                "chunk": chunk.chunk,
+                "graph_json": chunk.graph_json,
+                "selected_subgraph_json": chunk.selected_subgraph_json,
+                "selected_subgraph_markdown": chunk.selected_subgraph_markdown,
+            }
+            for chunk in artifacts.chunk_graphs
+        ],
+    }

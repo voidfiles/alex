@@ -62,7 +62,9 @@ one Markdown extract, and `headers.md`). Infers the chapter level, writes
 `chunks/*.md`, and generates `chunk_summary.md` plus graph-enhanced
 `summary.md` unless `summary.md` already exists. The graph pass extracts
 claim/evidence graphs from raw chunks before chunk summarization, merges them
-into a document graph, and writes debug artifacts under `summary_graph/`.
+into a document graph, and writes debug artifacts under `summary_graph/`. The
+final summary links to `summary_evidence.md`, a sidecar ledger that maps final
+claims back to selected evidence, verification status, and repair-pass records.
 
 ### summary
 
@@ -76,9 +78,10 @@ at `OUTPUT_PATH/INPUT_STEM`: source copy, extracted Markdown, images,
 `headers.md`, `metadata.json`, semantic chunks under `chunks/`, and the
 generated `chunk_summary.md`, graph-enhanced `summary.md`, and debug
 artifacts under `summary_graph/`, including per-chunk graphs under
-`summary_graph/chunks/` and merged document graph artifacts. Use `summary` for
-the stem-named one-command workflow, or `to-asset` followed by `process-doc`
-for the canonical-named pipeline.
+`summary_graph/chunks/`, merged document graph artifacts,
+`evidence_records.json`, `summary_plan.json`, `summary_claims.json`, and
+`revision_passes.json`. Use `summary` for the stem-named one-command workflow,
+or `to-asset` followed by `process-doc` for the canonical-named pipeline.
 
 Chunking is structure-first: documents split along their headers, and only
 oversized chapters (or documents with no usable structure) are split
@@ -113,6 +116,8 @@ require `ffmpeg` and `ffprobe` on `PATH`.
 just eval                                   # = alex eval-summary
 alex eval-summary --docs guide.md --prompt chunk_summary=v002
 alex eval-summary --judge-model anthropic/claude-sonnet-4-6
+alex eval-summary --run-id 20260619-graph             # graph-enhanced pipeline
+alex eval-summary --no-graph --run-id 20260619-nograph  # plain no-graph baseline
 ```
 
 Scores summary quality over the documents in `evals/corpus/`. Each doc is
@@ -122,6 +127,20 @@ writing quality; the blended score and per-doc evidence land in
 `evals/runs/<run-id>.json`. Salient facts are extracted section-by-section
 and cached in `evals/facts/`, so prompt comparisons grade against the same
 answer key.
+
+`--no-graph` disables the claim-graph pass so the same harness scores the
+plain pipeline; pairing a default run with a `--no-graph` run on the same
+corpus (same cached facts and judges) gives a clean A/B of the graph
+method against the no-graph baseline. `--no-coverage-repair` disables just
+the coverage-repair pass (the step that re-adds graph-supported facts the
+merge dropped, before the faithfulness filter) so you can A/B repair on its
+own. `--run-id` pins the artifact name so those paired runs are labelled
+instead of bare timestamps.
+
+The claim caps that trade brevity for coverage are env-tunable for sweeps:
+`ALEX_GRAPH_MAX_CLAIMS` (document subgraph, default 48),
+`ALEX_CHUNK_GRAPH_MAX_CLAIMS` (per-chunk subgraph, default 12), and
+`ALEX_SOURCE_CLAIMS_PER_SECTION` (claims extracted per section, default 8).
 
 ### improve-prompt
 
@@ -140,6 +159,22 @@ and `active.txt` is only rewritten with `--promote`. Candidates near the
 promotion threshold are rejudged without regenerating summaries, then the
 promotion gate uses averaged per-document deltas. Every iteration is
 appended to `evals/lineage/<prompt>.jsonl`.
+
+### improve-prompts
+
+```bash
+alex improve-prompts --critic-model-b openai/gpt-5.5
+alex improve-prompts --critic-model-b openai/gpt-5.5 --promote
+```
+
+Improves the production summarization prompt stack as one bundle. Two critic
+models independently propose rewrites for the summary, graph, and merge prompts;
+a synthesis pass blends the proposals; then the candidate bundle is scored
+against the fixed eval judges. Changed prompt versions are saved for audit, and
+`active.txt` files are only rewritten with `--promote` after the bundle clears
+the same mean-delta and majority-doc gate. Raw critic/synthesis artifacts are
+written under `evals/prompt_bundles/`, and bundle lineage is appended to
+`evals/lineage/production_prompt_bundle.jsonl`.
 
 ### eval-judges
 
@@ -199,8 +234,13 @@ Example: `ALEX_FINAL_SUMMARY_MODEL=openai/gpt-5 alex process-doc assets/book_ass
 
 Anthropic has no embeddings endpoint, so the embedding default needs an
 OpenAI key (or point `ALEX_EMBEDDING_MODEL` at another provider, e.g.
-`voyage/voyage-3.5-lite`). It is only ever called for oversized or
-structureless documents.
+`voyage/voyage-3.5-lite`). Embeddings power semantic chunking (only for
+oversized or structureless documents) and claim-graph similarity (claims are
+linked by embedding cosine similarity whenever a graph is built).
+
+The claim graph links claims whose embeddings exceed a cosine threshold
+(`ALEX_CLAIM_SIMILARITY_THRESHOLD`, default `0.8`). Lower it to draw more
+`similar_to` edges between claims, raise it to draw fewer.
 
 ## Prompts
 
