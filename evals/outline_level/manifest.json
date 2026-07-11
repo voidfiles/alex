@@ -1,0 +1,180 @@
+{
+  "version": 1,
+  "cases": [
+    {
+      "id": "mr-america-the-tragic-history-of-a-bodybuilding-icon-john-d-fair-4d18edfeca42",
+      "source": "mr_america_the_tragic_history_of_a_bodybuilding_icon_john_d_fair/headers.md",
+      "sha256": "4d18edfeca42f157fb11740b6d113f21f706b49cdd72117e9df8ff8b433b2fec",
+      "entry_count": 1,
+      "size_bytes": 81
+    },
+    {
+      "id": "muscle-confessions-of-an-unlikely-bodybuilder-samuel-wilson-fussell-8d9a6e3de665",
+      "source": "muscle_confessions_of_an_unlikely_bodybuilder_samuel_wilson_fussell/headers.md",
+      "sha256": "8d9a6e3de665ba2ff0127aa89046a307e37a3e2dc6e017abfe49b69450697383",
+      "entry_count": 2,
+      "size_bytes": 117
+    },
+    {
+      "id": "creating-the-american-way-of-business-evidence-from-wwii-in-the-us-michela-giorcelli-96b1783a50a7",
+      "source": "creating_the_american_way_of_business_evidence_from_wwii_in_the_us_michela_giorcelli/headers.md",
+      "sha256": "96b1783a50a7bfe7401a30b8b2dd6c71b895fc2a37c30e9252213fae29a733d3",
+      "entry_count": 8,
+      "size_bytes": 560
+    },
+    {
+      "id": "the-revised-selfleadership-questionnaire-testing-a-hierarchical-factor-structure-for-selfleadership-jeffery-d-houghton-and-christopher-p-neck-1af6daac9473",
+      "source": "the_revised_selfleadership_questionnaire_testing_a_hierarchical_factor_structure_for_selfleadership_jeffery_d_houghton_and_christopher_p_neck/headers.md",
+      "sha256": "1af6daac94733c9cb66d6e7968eca98db92306e17b7b5a14eb17a9d03e3fb0ab",
+      "entry_count": 13,
+      "size_bytes": 864
+    },
+    {
+      "id": "insight-why-were-not-as-selfaware-as-we-think-and-how-seeing-ourselves-clearly-helps-us-succeed-in-work-and-life-tasha-eurich-54ae19a3bd5d",
+      "source": "insight_why_were_not_as_selfaware_as_we_think_and_how_seeing_ourselves_clearly_helps_us_succeed_in_work_and_life_tasha_eurich/headers.md",
+      "sha256": "54ae19a3bd5deeffd1889118fa22b95a1967786356b590291efd06d3d7d0993d",
+      "entry_count": 15,
+      "size_bytes": 1059
+    },
+    {
+      "id": "selfcontrolled-feedback-does-it-enhance-learning-because-performers-get-feedback-when-they-need-it-suzete-chiviacowsky-and-gabriele-wulf-1cc29480c450",
+      "source": "selfcontrolled_feedback_does_it_enhance_learning_because_performers_get_feedback_when_they_need_it_suzete_chiviacowsky_and_gabriele_wulf/headers.md",
+      "sha256": "1cc29480c4501560ea90c2377af920b8d3eecf638eb8f1f027275afbdb079d7c",
+      "entry_count": 17,
+      "size_bytes": 979
+    },
+    {
+      "id": "edfaith-evaluating-dialogue-summarization-on-faithfulness-sicong-huang-asli-celikyilmaz-and-haoran-li-1f9b5e447f5c",
+      "source": "edfaith_evaluating_dialogue_summarization_on_faithfulness_sicong_huang_asli_celikyilmaz_and_haoran_li/headers.md",
+      "sha256": "1f9b5e447f5c3364ac8dcfe44b42b350541720bf11e3e284a67ff5a403a7fb79",
+      "entry_count": 19,
+      "size_bytes": 1033
+    },
+    {
+      "id": "structuring-competency-based-courses-through-skill-trees-hildo-bijl-3fc2c5017399",
+      "source": "structuring_competency_based_courses_through_skill_trees_hildo_bijl/headers.md",
+      "sha256": "3fc2c50173990b24b9a52fb0ecd46f0dc0ecf6a6ba59826735e04581332b7fc3",
+      "entry_count": 21,
+      "size_bytes": 1149
+    },
+    {
+      "id": "natural-language-processing-to-enhance-deliberation-in-political-online-discussions-a-survey-maike-behrendt-stefan-sylviius-wagner-carina-weinmann-mar-ed3d39945786",
+      "source": "natural_language_processing_to_enhance_deliberation_in_political_online_discussions_a_survey_maike_behrendt_stefan_sylviius_wagner_carina_weinmann_mar/headers.md",
+      "sha256": "ed3d39945786a0a3db3d0c927bfe957ae620f9cb98c1e1b05811ff5da0a4121c",
+      "entry_count": 23,
+      "size_bytes": 1475
+    },
+    {
+      "id": "how-much-and-what-type-of-guidance-is-optimal-for-learning-from-instruction-richard-e-clark-5871eb14698d",
+      "source": "how_much_and_what_type_of_guidance_is_optimal_for_learning_from_instruction_richard_e_clark/headers.md",
+      "sha256": "5871eb14698d283e0da3c4931366dac71c3f068da4de36ea4c3b0dce5ba18c73",
+      "entry_count": 25,
+      "size_bytes": 2352
+    },
+    {
+      "id": "topicaware-contrastive-learning-for-abstractive-dialogue-summarization-junpeng-liu-yanyan-zou-hainan-zhang-hongshen-chen-zhuoye-ding-caixia-yuan-and-x-bf15423fcf98",
+      "source": "topicaware_contrastive_learning_for_abstractive_dialogue_summarization_junpeng_liu_yanyan_zou_hainan_zhang_hongshen_chen_zhuoye_ding_caixia_yuan_and_x/headers.md",
+      "sha256": "bf15423fcf98a6666812839f9dbca4f741ebd6658895157600457734f12dbb54",
+      "entry_count": 28,
+      "size_bytes": 1571
+    },
+    {
+      "id": "cliff-contrastive-learning-for-improving-faithfulness-and-factuality-in-abstractive-summarization-shuyang-cao-and-lu-wang-dc91db4f24ce",
+      "source": "cliff_contrastive_learning_for_improving_faithfulness_and_factuality_in_abstractive_summarization_shuyang_cao_and_lu_wang/headers.md",
+      "sha256": "dc91db4f24ce7322b11538c64fe0d177258c861a3a94908aa264f31c602cb466",
+      "entry_count": 30,
+      "size_bytes": 1782
+    },
+    {
+      "id": "swimming-crossfit-style-tim-morrison-67232d035f55",
+      "source": "swimming_crossfit_style_tim_morrison/headers.md",
+      "sha256": "67232d035f551dda17995ea07b8814516dcf0d680ffe59d529a01f2928742f45",
+      "entry_count": 34,
+      "size_bytes": 1496
+    },
+    {
+      "id": "optimizing-performance-through-intrinsic-motivation-and-attention-for-learning-the-optimal-theory-of-motor-learning-gabriele-wulf-and-rebecca-lewthwaite-1e46c6685cce",
+      "source": "optimizing_performance_through_intrinsic_motivation_and_attention_for_learning_the_optimal_theory_of_motor_learning_gabriele_wulf_and_rebecca_lewthwaite/headers.md",
+      "sha256": "1e46c6685cce58014d01c07a881287ab33fa3e958e0b96dcdc84ea1372e4ecc6",
+      "entry_count": 37,
+      "size_bytes": 2275
+    },
+    {
+      "id": "range-why-generalists-triumph-in-a-specialized-world-david-epstein-c481a785a6e8",
+      "source": "range_why_generalists_triumph_in_a_specialized_world_david_epstein/headers.md",
+      "sha256": "c481a785a6e8f527da43790aea8d905a5cb8a59ae7c2fa83b0bb93a61b7be875",
+      "entry_count": 43,
+      "size_bytes": 2462
+    },
+    {
+      "id": "531-the-simplest-and-most-effective-training-system-for-raw-strength-jim-wendler-4a9497e30a95",
+      "source": "531_the_simplest_and_most_effective_training_system_for_raw_strength_jim_wendler/headers.md",
+      "sha256": "4a9497e30a959e1d219e669b9669d7802eb41d17d70dfe68ca5e92a7513df6aa",
+      "entry_count": 54,
+      "size_bytes": 3120
+    },
+    {
+      "id": "writing-quality-scale-wqs-he-version-administration-and-scoring-guide-stuart-n-and-barnett-al-f6e6b770e88d",
+      "source": "writing_quality_scale_wqs_he_version_administration_and_scoring_guide_stuart_n_and_barnett_al/headers.md",
+      "sha256": "f6e6b770e88d352b63a541a4c5c9a04d7fae3f73538b4d89ec5f122d0c74ab72",
+      "entry_count": 74,
+      "size_bytes": 4174
+    },
+    {
+      "id": "thinking-fast-and-slow-daniel-kahneman-d1077f6071dc",
+      "source": "thinking_fast_and_slow_daniel_kahneman/headers.md",
+      "sha256": "d1077f6071dcfeac24c1cd3fd44386977e59dfd2f04fc5f90c568964b3b4e67b",
+      "entry_count": 98,
+      "size_bytes": 4211
+    },
+    {
+      "id": "highpowered-plyometrics-james-c-radcliffe-ccd486313de9",
+      "source": "highpowered_plyometrics_james_c_radcliffe/headers.md",
+      "sha256": "ccd486313de92d9dc97694e83dd56441c9ee2d75301467f5d27e8fae06b32dfb",
+      "entry_count": 148,
+      "size_bytes": 7754
+    },
+    {
+      "id": "the-sciences-of-the-artificial-herbert-a-simon-f8d4a0ad8168",
+      "source": "the_sciences_of_the_artificial_herbert_a_simon/headers.md",
+      "sha256": "f8d4a0ad81681dc45b5d7d09cd6581b3abee3fe1bcefe92119a6e214fd8c9ddb",
+      "entry_count": 191,
+      "size_bytes": 11002
+    },
+    {
+      "id": "primal-leadership-unleashing-the-power-of-emotional-intelligence-daniel-goleman-richard-boyatzis-and-annie-mckee-892840db5712",
+      "source": "primal_leadership_unleashing_the_power_of_emotional_intelligence_daniel_goleman_richard_boyatzis_and_annie_mckee/headers.md",
+      "sha256": "892840db5712fa8ce7ae818e89c348575d87c5c7f83340df2706b45b39c3a768",
+      "entry_count": 227,
+      "size_bytes": 13379
+    },
+    {
+      "id": "domain-modeling-made-functional-scott-wlaschin-0ed508fbe87c",
+      "source": "domain_modeling_made_functional_scott_wlaschin/headers.md",
+      "sha256": "0ed508fbe87cbef0b3b303b0f42557c894804d2ecebd7b8cfd01a06ef4a2e06a",
+      "entry_count": 290,
+      "size_bytes": 18154
+    },
+    {
+      "id": "work-culture-organizational-performance-and-business-success-measurement-and-management-thomas-rollins-and-darryl-roberts-5529d88392de",
+      "source": "work_culture_organizational_performance_and_business_success_measurement_and_management_thomas_rollins_and_darryl_roberts/headers.md",
+      "sha256": "5529d88392de2c0fc46de0ebb216af49100145a13d87d57c6d8295c3da22cf3a",
+      "entry_count": 351,
+      "size_bytes": 23055
+    },
+    {
+      "id": "the-programmers-brain-felienne-hermans-b9f94760547d",
+      "source": "the_programmers_brain_felienne_hermans/headers.md",
+      "sha256": "b9f94760547df2ef6de31a636dcf91ea78369a9deb3ea97483887650b7ab5e1b",
+      "entry_count": 490,
+      "size_bytes": 33523
+    },
+    {
+      "id": "nscas-essentials-of-personal-training-brad-j-schoenfeld-and-ronald-l-snarr-303466f1188e",
+      "source": "nscas_essentials_of_personal_training_brad_j_schoenfeld_and_ronald_l_snarr/headers.md",
+      "sha256": "303466f1188e4a0842c7bf0c53f0bc34989456fafe065a644565381bde6f222e",
+      "entry_count": 1947,
+      "size_bytes": 109563
+    }
+  ]
+}

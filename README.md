@@ -263,6 +263,25 @@ just fmt        # autoformat + autofix
 
 CI runs the same four steps on every push (`.github/workflows/ci.yml`).
 
+### prepare-outline-level-eval
+
+Create a deterministic sample of raw outlines for manual chapter-level
+annotation. Each `output.md` starts with a `chapter-level` marker; replace
+`TODO` with `H1` through `H6` without changing the retained outline.
+
+```bash
+alex prepare-outline-level-eval --asset-root ~/Documents/Alex3/assets --count 25
+```
+
+### eval-outline-level
+
+Score the current chapter-level selector against the annotations and write a
+run artifact under the ignored `evals/outline_level/runs/` directory.
+
+```bash
+alex eval-outline-level --run-id baseline
+```
+
 ## Project Layout
 
 ```text
