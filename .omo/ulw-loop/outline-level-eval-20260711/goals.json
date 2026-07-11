@@ -1,7 +1,7 @@
 {
   "version": 1,
   "createdAt": "2026-07-11T18:33:12.754Z",
-  "updatedAt": "2026-07-11T19:20:40.656Z",
+  "updatedAt": "2026-07-11T20:04:43.940Z",
   "briefPath": ".omo/ulw-loop/outline-level-eval-20260711/brief.md",
   "goalsPath": ".omo/ulw-loop/outline-level-eval-20260711/goals.json",
   "ledgerPath": ".omo/ulw-loop/outline-level-eval-20260711/ledger.jsonl",
@@ -11,7 +11,7 @@
       "id": "G001-build-an-outline-chapter-level-evalu",
       "title": "Build an outline chapter-level evaluation for Alex. Prepare 25 divers...",
       "objective": "Build an outline chapter-level evaluation for Alex. Prepare 25 diverse raw headers.md extractions sampled from ~/Documents/Alex3/assets into repository eval artifacts. Each case must contain input.md and a manually editable output.md annotation sidecar. Add a deterministic CLI eval that predicts chapter heading level with the production selector, validates annotations, reports exact-match accuracy and per-case results, and writes a run artifact. Do not change the production selector until manual gold annotations exist. Start a durable optimization loop that can resume after the user completes output.md annotations and then iterate toward the gold outputs. Preserve unrelated dirty-worktree changes.",
-      "status": "in_progress",
+      "status": "complete",
       "successCriteria": [
         {
           "id": "C001",
@@ -46,14 +46,16 @@
       ],
       "attempt": 1,
       "createdAt": "2026-07-11T18:33:12.754Z",
-      "updatedAt": "2026-07-11T19:14:36.607Z",
-      "startedAt": "2026-07-11T18:33:43.988Z"
+      "updatedAt": "2026-07-11T20:04:39.796Z",
+      "startedAt": "2026-07-11T18:33:43.988Z",
+      "completedAt": "2026-07-11T20:04:39.796Z",
+      "evidence": "commit 066412a; all G001 criteria pass; review-work lanes pass; 51 focused tests, Ruff, format, MyPy, and real 25-case QA pass"
     },
     {
       "id": "G002",
       "title": "Optimize chapter-level selection against manual annotations",
       "objective": "After all 25 evals/outline_level/cases/*/output.md first-line annotations are changed from TODO to H1-H6, run the exact-match baseline, diagnose error classes, iteratively improve chapter-level selection to maximize exact accuracy without changing outline extraction, and explicitly protect or isolate the summary_eval fact-partitioning caller before promotion.",
-      "status": "pending",
+      "status": "in_progress",
       "successCriteria": [
         {
           "id": "C001",
@@ -83,12 +85,13 @@
           "status": "pending"
         }
       ],
-      "attempt": 0,
+      "attempt": 1,
       "createdAt": "2026-07-11T19:20:28.216Z",
-      "updatedAt": "2026-07-11T19:20:40.656Z",
-      "evidence": "The baseline-unannotated run reports accuracy=null, annotated_count=0, pending_count=25; optimization cannot produce evidence until the user supplies gold labels."
+      "updatedAt": "2026-07-11T20:04:43.940Z",
+      "evidence": "The baseline-unannotated run reports accuracy=null, annotated_count=0, pending_count=25; optimization cannot produce evidence until the user supplies gold labels.",
+      "startedAt": "2026-07-11T20:04:43.940Z"
     }
   ],
   "codexObjective": "Complete the durable ulw-loop plan in .omo/ulw-loop/outline-level-eval-20260711/goals.json, including later accepted/appended stories, under the original brief constraints; use .omo/ulw-loop/outline-level-eval-20260711/ledger.jsonl as the audit trail.",
-  "activeGoalId": "G001-build-an-outline-chapter-level-evalu"
+  "activeGoalId": "G002"
 }
