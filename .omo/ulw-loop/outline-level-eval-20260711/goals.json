@@ -1,7 +1,7 @@
 {
   "version": 1,
   "createdAt": "2026-07-11T18:33:12.754Z",
-  "updatedAt": "2026-07-11T20:04:43.940Z",
+  "updatedAt": "2026-07-11T20:07:08.176Z",
   "briefPath": ".omo/ulw-loop/outline-level-eval-20260711/brief.md",
   "goalsPath": ".omo/ulw-loop/outline-level-eval-20260711/goals.json",
   "ledgerPath": ".omo/ulw-loop/outline-level-eval-20260711/ledger.jsonl",
@@ -55,7 +55,7 @@
       "id": "G002",
       "title": "Optimize chapter-level selection against manual annotations",
       "objective": "After all 25 evals/outline_level/cases/*/output.md first-line annotations are changed from TODO to H1-H6, run the exact-match baseline, diagnose error classes, iteratively improve chapter-level selection to maximize exact accuracy without changing outline extraction, and explicitly protect or isolate the summary_eval fact-partitioning caller before promotion.",
-      "status": "in_progress",
+      "status": "blocked",
       "successCriteria": [
         {
           "id": "C001",
@@ -87,11 +87,14 @@
       ],
       "attempt": 1,
       "createdAt": "2026-07-11T19:20:28.216Z",
-      "updatedAt": "2026-07-11T20:04:43.940Z",
+      "updatedAt": "2026-07-11T20:07:08.176Z",
       "evidence": "The baseline-unannotated run reports accuracy=null, annotated_count=0, pending_count=25; optimization cannot produce evidence until the user supplies gold labels.",
-      "startedAt": "2026-07-11T20:04:43.940Z"
+      "startedAt": "2026-07-11T20:04:43.940Z",
+      "blockedReason": "BLOCKER_AUDIT turn=3: 25 TODO, 0 H1-H6; no labeled baseline or candidate comparison is possible without user-authored gold annotations.",
+      "blockerSignature": "EXTERNAL_AUTHORIZATION_REQUIRED",
+      "blockerOccurrenceCount": 1,
+      "requiredExternalDecision": "Resolve external authorization: EXTERNAL_AUTHORIZATION_REQUIRED"
     }
   ],
-  "codexObjective": "Complete the durable ulw-loop plan in .omo/ulw-loop/outline-level-eval-20260711/goals.json, including later accepted/appended stories, under the original brief constraints; use .omo/ulw-loop/outline-level-eval-20260711/ledger.jsonl as the audit trail.",
-  "activeGoalId": "G002"
+  "codexObjective": "Complete the durable ulw-loop plan in .omo/ulw-loop/outline-level-eval-20260711/goals.json, including later accepted/appended stories, under the original brief constraints; use .omo/ulw-loop/outline-level-eval-20260711/ledger.jsonl as the audit trail."
 }
