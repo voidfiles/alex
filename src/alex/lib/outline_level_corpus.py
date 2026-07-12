@@ -11,18 +11,10 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
 
 from alex.lib.markdown_structure import parse_toc_header_levels
-
-ANNOTATION_PREFIX = b"<!-- chapter-level: TODO -->\n"
-INSTRUCTION_PREFIX = b"Replace TODO with H1-H6. Keep the outline below unchanged.\n\n"
-
-
-@dataclass(frozen=True, slots=True)
-class OutlineLevelEvalError(ValueError):
-    path: Path
-    problem: str
-
-    def __str__(self) -> str:
-        return f"{self.path}: {self.problem}"
+from alex.lib.outline_level_annotation import (
+    OutlineLevelEvalError,
+    render_pending_outline_level_output,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -176,7 +168,7 @@ def _write_corpus(
         case_dir.mkdir()
         (case_dir / "input.md").write_bytes(candidate.content)
         (case_dir / "output.md").write_bytes(
-            ANNOTATION_PREFIX + INSTRUCTION_PREFIX + candidate.content
+            render_pending_outline_level_output(candidate.content)
         )
         manifest_cases.append(
             {

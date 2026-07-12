@@ -1,6 +1,24 @@
-<!-- chapter-level: TODO -->
-Replace TODO with H1-H6. Keep the outline below unchanged.
+---
+document:
+  title: "Topic-Aware Contrastive Learning for Abstractive Dialogue Summarization"
+  level: H1
+  line: 3
 
+section:
+  level: H2
+  first_heading: "Abstract"
+  line: 18
+
+chapter:
+  level: H3
+  first_heading: "2.1 Sequence-to-Sequence Learning"
+  line: 71
+
+subchapter:
+  level: TODO
+  first_heading: TODO
+  line: TODO
+---
 # Document Structure
 
 Table of Contents:

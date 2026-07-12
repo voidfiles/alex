@@ -1,6 +1,24 @@
-<!-- chapter-level: TODO -->
-Replace TODO with H1-H6. Keep the outline below unchanged.
+---
+document:
+  title: "CLIFF: Contrastive Learning for Improving Faithfulness and Factuality in Abstractive Summarization"
+  level: H1
+  line: 3
 
+section:
+  level: TODO
+  first_heading: TODO
+  line: TODO
+
+chapter:
+  level: H2
+  first_heading: "1 Introduction"
+  line: 43
+
+subchapter:
+  level: H4
+  first_heading: TODO
+  line: TODO
+---
 # Document Structure
 
 Table of Contents:

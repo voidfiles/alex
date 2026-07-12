@@ -1,6 +1,24 @@
-<!-- chapter-level: TODO -->
-Replace TODO with H1-H6. Keep the outline below unchanged.
+---
+document:
+  title: "Structuring Competency-Based Courses Through Skill Trees"
+  level: H1
+  line: 1
 
+section:
+  level: H2
+  first_heading: "1 Introduction"
+  line: 27
+
+chapter:
+  level: H2
+  first_heading: "2.1 Definitions"
+  line: 55
+
+subchapter:
+  level: TODO
+  first_heading: TODO
+  line: TODO
+---
 # Document Structure
 
 Table of Contents:

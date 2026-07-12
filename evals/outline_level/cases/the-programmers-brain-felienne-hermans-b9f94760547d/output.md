@@ -1,6 +1,24 @@
-<!-- chapter-level: TODO -->
-Replace TODO with H1-H6. Keep the outline below unchanged.
+---
+document:
+  title: "The Programmer's Brain"
+  level: H1
+  line: 23
 
+section:
+  level: H2
+  first_heading: "Part 1"
+  line: 428
+
+chapter:
+  level: H2
+  first_heading: "Decoding your confusion while coding"
+  line: 436
+
+subchapter:
+  level: H3
+  first_heading: "1.1 Different kinds of confusion in code"
+  line: 452
+---
 # Document Structure
 
 Table of Contents:

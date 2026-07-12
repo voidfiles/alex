@@ -1,6 +1,24 @@
-<!-- chapter-level: TODO -->
-Replace TODO with H1-H6. Keep the outline below unchanged.
+---
+document:
+  title: "NSCA's ESSENTIALS of PERSONAL TRAINING"
+  level: H1
+  line: 5
 
+section:
+  level: H1
+  first_heading: "Structure and Function of the Muscular, Nervous, and Skeletal Systems"
+  line: 574
+
+chapter:
+  level: H2
+  first_heading: "THE MUSCULAR SYSTEM"
+  line: 588
+
+subchapter:
+  level: H3
+  first_heading: "Myofibril"
+  line: 636
+---
 # Document Structure
 
 Table of Contents:

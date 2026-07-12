@@ -1,6 +1,24 @@
-<!-- chapter-level: TODO -->
-Replace TODO with H1-H6. Keep the outline below unchanged.
+---
+document:
+  title: "5/3/1: The Simplest and Most Effective Training System for Raw Strength (2nd Edition)"
+  level: H1
+  line: 1
 
+section:
+  level: TODO
+  first_heading: TODO
+  line: TODO
+
+chapter:
+  level: H3
+  first_heading: "THE ORIGIN OF 5/3/1"
+  line: 117
+
+subchapter:
+  level: H4
+  first_heading: TODO
+  line: TODO
+---
 # Document Structure
 
 Table of Contents:

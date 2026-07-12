@@ -1,6 +1,24 @@
-<!-- chapter-level: TODO -->
-Replace TODO with H1-H6. Keep the outline below unchanged.
+---
+document:
+  title: "Thinking, Fast and Slow"
+  level: H1
+  line: 1
 
+section:
+  level: H2
+  first_heading: "Part 1: Two Systems"
+  line: 147
+
+chapter:
+  level: H2
+  first_heading: "The Characters of the Story"
+  line: 155
+
+subchapter:
+  level: TODO
+  first_heading: TODO
+  line: TODO
+---
 # Document Structure
 
 Table of Contents:

@@ -1,6 +1,24 @@
-<!-- chapter-level: TODO -->
-Replace TODO with H1-H6. Keep the outline below unchanged.
+---
+document:
+  title: "9 How Much and What Type of Guidance is Optimal for Learning from Instruction?\\"
+  level: H1
+  line: 3
 
+section:
+  level: H2
+  first_heading: "Guidance and Discovery in Learning from Instruction"
+  line: 17
+
+chapter:
+  level: H3
+  first_heading: "1 Guidance Must Provide an Accurate and Complete Demonstration of How (Decisions and Actions) and When (Conditions) to Perform a Task or Solve a Class of Problems"
+  line: 49
+
+subchapter:
+  level: H4
+  first_heading: "Declarative and Procedural Knowledge"
+  line: 55
+---
 # Document Structure
 
 Table of Contents:

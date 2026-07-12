@@ -1,6 +1,24 @@
-<!-- chapter-level: TODO -->
-Replace TODO with H1-H6. Keep the outline below unchanged.
+---
+document:
+  title: "Muscle: Confessions of an Unlikely Bodybuilder"
+  level: H1
+  line: 1
 
+section:
+  level: TODO
+  first_heading: TODO
+  line: TODO
+
+chapter:
+  level: H1
+  first_heading: "1. The Genesis"
+  line: TODO
+
+subchapter:
+  level: TODO
+  first_heading: TODO
+  line: TODO
+---
 # Document Structure
 
 Table of Contents:

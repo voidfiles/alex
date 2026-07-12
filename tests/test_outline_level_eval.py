@@ -41,8 +41,24 @@ def _write_case(
     (case_dir / "input.md").write_text(outline, encoding="utf-8")
     retained_outline = outline if body is None else body
     (case_dir / "output.md").write_text(
-        f"<!-- chapter-level: {annotation} -->\n"
-        "Replace TODO with H1-H6. Keep the outline below unchanged.\n\n"
+        "---\n"
+        "document:\n"
+        '  title: "Title"\n'
+        "  level: TODO\n"
+        "  line: TODO\n\n"
+        "section:\n"
+        "  level: TODO\n"
+        "  first_heading: TODO\n"
+        "  line: TODO\n\n"
+        "chapter:\n"
+        f"  level: {annotation}\n"
+        "  first_heading: TODO\n"
+        "  line: TODO\n\n"
+        "subchapter:\n"
+        "  level: TODO\n"
+        "  first_heading: TODO\n"
+        "  line: TODO\n"
+        "---\n"
         f"{retained_outline}",
         encoding="utf-8",
     )
@@ -160,8 +176,24 @@ def test_evaluate_outline_level_rejects_input_and_output_changed_together(
     changed = "Changed (H2, line 1)"
     (case_dir / "input.md").write_text(changed, encoding="utf-8")
     (case_dir / "output.md").write_text(
-        "<!-- chapter-level: H2 -->\n"
-        "Replace TODO with H1-H6. Keep the outline below unchanged.\n\n"
+        "---\n"
+        "document:\n"
+        '  title: "Changed"\n'
+        "  level: H2\n"
+        "  line: 1\n\n"
+        "section:\n"
+        "  level: TODO\n"
+        "  first_heading: TODO\n"
+        "  line: TODO\n\n"
+        "chapter:\n"
+        "  level: H2\n"
+        "  first_heading: TODO\n"
+        "  line: TODO\n\n"
+        "subchapter:\n"
+        "  level: TODO\n"
+        "  first_heading: TODO\n"
+        "  line: TODO\n"
+        "---\n"
         f"{changed}",
         encoding="utf-8",
     )
@@ -248,7 +280,7 @@ def test_evaluate_outline_level_records_manifest_sha256(tmp_path: Path) -> None:
 @pytest.mark.parametrize(
     ("annotation", "body", "message"),
     [
-        ("H7", None, "first line"),
+        ("H7", None, "chapter.level"),
         ("H2", "Changed (H2, line 1)", "does not retain exact input"),
     ],
 )

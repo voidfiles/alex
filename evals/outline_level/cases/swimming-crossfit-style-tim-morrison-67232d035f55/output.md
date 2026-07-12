@@ -1,6 +1,24 @@
-<!-- chapter-level: TODO -->
-Replace TODO with H1-H6. Keep the outline below unchanged.
+---
+document:
+  title: "Swimming, CrossFit Style"
+  level: H2
+  line: 5
 
+section:
+  level: H3
+  first_heading: "Training"
+  line: 23
+
+chapter:
+  level: TODO
+  first_heading: "A - Exercise Swim Circuits"
+  line: 51
+
+subchapter:
+  level: TODO
+  first_heading: TODO
+  line: TODO
+---
 # Document Structure
 
 Table of Contents:

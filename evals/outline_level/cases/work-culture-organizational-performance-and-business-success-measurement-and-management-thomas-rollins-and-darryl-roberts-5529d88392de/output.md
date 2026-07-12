@@ -1,6 +1,24 @@
-<!-- chapter-level: TODO -->
-Replace TODO with H1-H6. Keep the outline below unchanged.
+---
+document:
+  title: "Work Culture, Organizational Performance, And Business Success"
+  level: H1
+  line: 24
 
+section:
+  level: TODO
+  first_heading: TODO
+  line: TODO
+
+chapter:
+  level: H1
+  first_heading: "CHAPTER 1: Introduction"
+  line: 171
+
+subchapter:
+  level: H2
+  first_heading: "WHAT IS WORK CULTURE?"
+  line: 197
+---
 # Document Structure
 
 Table of Contents:

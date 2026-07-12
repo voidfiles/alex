@@ -1,6 +1,24 @@
-<!-- chapter-level: TODO -->
-Replace TODO with H1-H6. Keep the outline below unchanged.
+---
+document:
+  title: "The Revised Self-Leadership Questionnaire: Testing a hierarchical factor structure for self-leadership"
+  level: H1
+  line: 5
 
+section:
+  level: H2
+  first_heading: "Self-leadership measurement"
+  line: 93
+
+chapter:
+  level: TODO
+  first_heading: TODO
+  line: TODO
+
+subchapter:
+  level: TODO
+  first_heading: TODO
+  line: TODO
+---
 # Document Structure
 
 Table of Contents:

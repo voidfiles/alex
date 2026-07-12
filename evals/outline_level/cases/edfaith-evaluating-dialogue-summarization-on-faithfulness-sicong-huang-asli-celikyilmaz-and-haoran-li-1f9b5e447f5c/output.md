@@ -1,6 +1,24 @@
-<!-- chapter-level: TODO -->
-Replace TODO with H1-H6. Keep the outline below unchanged.
+---
+document:
+  title: "ED-FAITH: Evaluating Dialogue Summarization on Faithfulness"
+  level: H1
+  line: 3
 
+section:
+  level: H2
+  first_heading: "Abstract"
+  line: 11
+
+chapter:
+  level: H3
+  first_heading: "2.1 Summarization Metrics"
+  line: 39
+
+subchapter:
+  level: TODO
+  first_heading: TODO
+  line: TODO
+---
 # Document Structure
 
 Table of Contents:

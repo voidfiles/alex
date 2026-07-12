@@ -1,6 +1,24 @@
-<!-- chapter-level: TODO -->
-Replace TODO with H1-H6. Keep the outline below unchanged.
+---
+document:
+  title: "PRIMAL LEADERSHIP"
+  level: H1
+  line: 3
 
+section:
+  level: H2
+  first_heading: "THE POWER OF EMOTIONAL INTELLIGENCE"
+  line: 89
+
+chapter:
+  level: H3
+  first_heading: "PRIMAL LEADERSHIP—3"
+  line: 93
+
+subchapter:
+  level: TODO
+  first_heading: TODO
+  line: TODO
+---
 # Document Structure
 
 Table of Contents:

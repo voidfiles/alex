@@ -1,6 +1,24 @@
-<!-- chapter-level: TODO -->
-Replace TODO with H1-H6. Keep the outline below unchanged.
+---
+document:
+  title: "High-Powered Plyometrics"
+  level: H1
+  line: 1
 
+section:
+  level: H1
+  first_heading: "CHAPTER 1"
+  line: 871
+
+chapter:
+  level: H2
+  first_heading: "THE IMPORTANCE OF PLYOMETRICS IN POWER DEVELOPMENT"
+  line: 876
+
+subchapter:
+  level: H3
+  first_heading: "Progressive Overload"
+  line: 938
+---
 # Document Structure
 
 Table of Contents:

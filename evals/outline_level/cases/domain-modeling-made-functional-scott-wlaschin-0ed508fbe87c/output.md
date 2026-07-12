@@ -1,6 +1,24 @@
-<!-- chapter-level: TODO -->
-Replace TODO with H1-H6. Keep the outline below unchanged.
+---
+document:
+  title: "Domain Modeling Made Functional"
+  level: H1
+  line: 3
 
+section:
+  level: H1
+  first_heading: "Part I"
+  line: 327
+
+chapter:
+  level: H3
+  first_heading: "Introducing Domain-Driven Design"
+  line: 333
+
+subchapter:
+  level: H4
+  first_heading: "The Importance of a Shared Model"
+  line: 349
+---
 # Document Structure
 
 Table of Contents:

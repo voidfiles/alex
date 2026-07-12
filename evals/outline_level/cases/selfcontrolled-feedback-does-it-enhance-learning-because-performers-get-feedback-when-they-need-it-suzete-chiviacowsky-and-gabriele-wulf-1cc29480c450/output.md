@@ -1,6 +1,24 @@
-<!-- chapter-level: TODO -->
-Replace TODO with H1-H6. Keep the outline below unchanged.
+---
+document:
+  title: "Self-Controlled Feedback: Does it Enhance Learning Because Performers Get Feedback When They Need It?"
+  level: H1
+  line: 21
 
+section:
+  level: H2
+  first_heading: "Method"
+  line: 72
+
+chapter:
+  level: H3
+  first_heading: "Participants"
+  line: 74
+
+subchapter:
+  level: TODO
+  first_heading: TODO
+  line: TODO
+---
 # Document Structure
 
 Table of Contents:

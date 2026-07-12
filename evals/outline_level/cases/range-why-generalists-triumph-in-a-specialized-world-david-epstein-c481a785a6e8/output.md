@@ -1,6 +1,24 @@
-<!-- chapter-level: TODO -->
-Replace TODO with H1-H6. Keep the outline below unchanged.
+---
+document:
+  title: "Range: Why Generalists Triumph in a Specialized World"
+  level: H1
+  line: 3
 
+section:
+  level: TODO
+  first_heading: TODO
+  line: TODO
+
+chapter:
+  level: H2
+  first_heading: "CHAPTER 1: THE CULT OF THE HEAD START"
+  line: 2594
+
+subchapter:
+  level: TODO
+  first_heading: TODO
+  line: TODO
+---
 # Document Structure
 
 Table of Contents:

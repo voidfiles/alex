@@ -1,6 +1,24 @@
-<!-- chapter-level: TODO -->
-Replace TODO with H1-H6. Keep the outline below unchanged.
+---
+document:
+  title: "Optimizing performance through intrinsic motivation and attention for learning: The OPTIMAL theory of motor learning"
+  level: H1
+  line: 3
 
+section:
+  level: H2
+  first_heading: "Need for a new perspective"
+  line: 33
+
+chapter:
+  level: H3
+  first_heading: "Motivation"
+  line: 53
+
+subchapter:
+  level: H4
+  first_heading: "Positive feedback"
+  line: 67
+---
 # Document Structure
 
 Table of Contents:

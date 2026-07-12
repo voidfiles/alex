@@ -1,6 +1,24 @@
-<!-- chapter-level: TODO -->
-Replace TODO with H1-H6. Keep the outline below unchanged.
+---
+document:
+  title: "The Sciences of the Artificial"
+  level: H1
+  line: 13
 
+section:
+  level: H1
+  first_heading: "1Understanding the Natural and the Artificial Worlds"
+  line: 146
+
+chapter:
+  level: H2
+  first_heading: "The Artificial"
+  line: 187
+
+subchapter:
+  level: H3
+  first_heading: "The Environment As Mold"
+  line: 210
+---
 # Document Structure
 
 Table of Contents:

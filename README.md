@@ -266,8 +266,9 @@ CI runs the same four steps on every push (`.github/workflows/ci.yml`).
 ### prepare-outline-level-eval
 
 Create a deterministic sample of raw outlines for manual chapter-level
-annotation. Each `output.md` starts with a `chapter-level` marker; replace
-`TODO` with `H1` through `H6` without changing the retained outline.
+annotation. Each `output.md` starts with nested frontmatter maps `document`,
+`section`, `chapter`, and `subchapter`; fill heading levels with `H1` through
+`H6`, leave unknown fields as `TODO`, and do not change the retained outline.
 
 ```bash
 alex prepare-outline-level-eval --asset-root ~/Documents/Alex3/assets --count 25

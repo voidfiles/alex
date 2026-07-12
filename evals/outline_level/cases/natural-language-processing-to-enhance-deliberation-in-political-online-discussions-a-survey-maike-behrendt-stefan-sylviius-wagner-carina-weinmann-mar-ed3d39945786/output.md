@@ -1,6 +1,24 @@
-<!-- chapter-level: TODO -->
-Replace TODO with H1-H6. Keep the outline below unchanged.
+---
+document:
+  title: "Natural Language Processing to Enhance Deliberation in Political Online Discussions: A Survey"
+  level: H1
+  line: 3
 
+section:
+  level: H2
+  first_heading: "1 INTRODUCTION"
+  line: 27
+
+chapter:
+  level: H3
+  first_heading: "2.1 Issues in Online Participation Processes"
+  line: 74
+
+subchapter:
+  level: TODO
+  first_heading: TODO
+  line: TODO
+---
 # Document Structure
 
 Table of Contents:

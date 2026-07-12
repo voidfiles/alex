@@ -1,6 +1,24 @@
-<!-- chapter-level: TODO -->
-Replace TODO with H1-H6. Keep the outline below unchanged.
+---
+document:
+  title: "Writing Quality Scale"
+  level: H1
+  line: 3
 
+section:
+  level: TODO
+  first_heading: TODO
+  line: TODO
+
+chapter:
+  level: H1
+  first_heading: "Chapter 1: Introduction"
+  line: 60
+
+subchapter:
+  level: H2
+  first_heading: "Using the WQS with the DASH17+ (Barnett et al., 2010)"
+  line: 76
+---
 # Document Structure
 
 Table of Contents:

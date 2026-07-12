@@ -1,6 +1,24 @@
-<!-- chapter-level: TODO -->
-Replace TODO with H1-H6. Keep the outline below unchanged.
+---
+document:
+  title: "CREATING THE “AMERICAN WAY” OF BUSINESS: EVIDENCE FROM WWII IN THE U.S."
+  level: H2
+  line: 5
 
+section:
+  level: TODO
+  first_heading: TODO
+  line: TODO
+
+chapter:
+  level: H3
+  first_heading: TODO
+  line: TODO
+
+subchapter:
+  level: TODO
+  first_heading: TODO
+  line: TODO
+---
 # Document Structure
 
 Table of Contents:

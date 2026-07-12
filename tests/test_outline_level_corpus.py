@@ -63,7 +63,26 @@ def test_prepare_outline_level_corpus_is_deterministic_and_spans_distribution(
         source_bytes = outlines[source.split("/", 1)[0]]
         assert (case_dir / "input.md").read_bytes() == source_bytes
         assert case["sha256"] == hashlib.sha256(source_bytes).hexdigest()
-        assert (case_dir / "output.md").read_bytes().endswith(source_bytes)
+        assert (case_dir / "output.md").read_bytes() == (
+            b"---\n"
+            b"document:\n"
+            b"  title: TODO\n"
+            b"  level: TODO\n"
+            b"  line: TODO\n\n"
+            b"section:\n"
+            b"  level: TODO\n"
+            b"  first_heading: TODO\n"
+            b"  line: TODO\n\n"
+            b"chapter:\n"
+            b"  level: TODO\n"
+            b"  first_heading: TODO\n"
+            b"  line: TODO\n\n"
+            b"subchapter:\n"
+            b"  level: TODO\n"
+            b"  first_heading: TODO\n"
+            b"  line: TODO\n"
+            b"---\n" + source_bytes
+        )
 
 
 def test_prepare_outline_level_corpus_rejects_existing_corpus(tmp_path: Path) -> None:

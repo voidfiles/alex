@@ -4,12 +4,16 @@ import json
 import re
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Final, Literal
+from typing import Literal
 
 from alex.lib.markdown_structure import infer_chapter_level
-from alex.lib.outline_level_corpus import (
-    INSTRUCTION_PREFIX,
+from alex.lib.outline_level_annotation import (
+    CHAPTER_LABELS,
+    ChapterLabel,
     OutlineLevelEvalError,
+    parse_outline_level_output,
+)
+from alex.lib.outline_level_corpus import (
     PreparedOutlineCorpus,
     load_trusted_outline_corpus,
     prepare_outline_level_corpus,
@@ -28,17 +32,7 @@ __all__ = [
     "validate_outline_level_run_id",
 ]
 
-type ChapterLabel = Literal["H1", "H2", "H3", "H4", "H5", "H6"]
 type CaseStatus = Literal["correct", "incorrect", "pending"]
-
-CHAPTER_LABELS: Final[tuple[ChapterLabel, ...]] = (
-    "H1",
-    "H2",
-    "H3",
-    "H4",
-    "H5",
-    "H6",
-)
 
 
 @dataclass(frozen=True, slots=True)
@@ -112,22 +106,15 @@ def _evaluate_case(case_dir: Path) -> OutlineLevelCaseResult:
     output_path = case_dir / "output.md"
     input_bytes = input_path.read_bytes()
     output_bytes = output_path.read_bytes()
-    first_line, separator, remainder = output_bytes.partition(b"\n")
-    match = re.fullmatch(rb"<!-- chapter-level: (TODO|H[1-6]) -->", first_line)
-    if not separator or match is None:
-        raise OutlineLevelEvalError(
-            output_path,
-            "malformed first line; expected <!-- chapter-level: TODO|H1-H6 -->",
-        )
-    if remainder != INSTRUCTION_PREFIX + input_bytes:
-        raise OutlineLevelEvalError(
-            output_path, "output body does not retain exact input"
-        )
-
-    raw_expected = match.group(1).decode("ascii")
+    annotation = parse_outline_level_output(
+        output_path=output_path,
+        output_bytes=output_bytes,
+        input_bytes=input_bytes,
+    )
+    raw_expected = annotation.chapter.level
     expected: ChapterLabel | None = None
     if raw_expected != "TODO":
-        expected = _chapter_label(int(raw_expected[1]))
+        expected = raw_expected
     predicted = _chapter_label(
         infer_chapter_level(headers=input_bytes.decode("utf-8"), markdown="")
     )
