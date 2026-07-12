@@ -151,3 +151,64 @@ def test_evaluate_outline_level_rejects_noncanonical_map_order(
     # When / Then
     with pytest.raises(OutlineLevelEvalError, match="expected document"):
         evaluate_outline_level(evals_dir=evals_dir, run_id="shape-run")
+
+
+def test_evaluate_outline_level_rejects_symlinked_manifest(tmp_path: Path) -> None:
+    # Given
+    evals_dir = tmp_path / "evals"
+    _write_case(
+        evals_dir,
+        case_id="linked-manifest",
+        outline="One (H1, line 1)",
+        annotation="H1",
+    )
+    manifest_path = evals_dir / "outline_level" / "manifest.json"
+    external_manifest = tmp_path / "external-manifest.json"
+    manifest_path.rename(external_manifest)
+    manifest_path.symlink_to(external_manifest)
+
+    # When / Then
+    with pytest.raises(OutlineLevelEvalError) as error:
+        evaluate_outline_level(evals_dir=evals_dir, run_id="manifest-run")
+    assert str(error.value) == f"{manifest_path}: manifest cannot be a symlink"
+
+
+def test_evaluate_outline_level_rejects_symlinked_output(tmp_path: Path) -> None:
+    # Given
+    evals_dir = tmp_path / "evals"
+    _write_case(
+        evals_dir,
+        case_id="linked-output",
+        outline="One (H1, line 1)",
+        annotation="H1",
+    )
+    output_path = evals_dir / "outline_level" / "cases" / "linked-output" / "output.md"
+    external_output = tmp_path / "external-output.md"
+    output_path.rename(external_output)
+    output_path.symlink_to(external_output)
+
+    # When / Then
+    with pytest.raises(OutlineLevelEvalError) as error:
+        evaluate_outline_level(evals_dir=evals_dir, run_id="output-run")
+    assert str(error.value) == f"{output_path}: output cannot be a symlink"
+
+
+def test_evaluate_outline_level_rejects_symlinked_runs_root(tmp_path: Path) -> None:
+    # Given
+    evals_dir = tmp_path / "evals"
+    _write_case(
+        evals_dir,
+        case_id="linked-runs",
+        outline="One (H1, line 1)",
+        annotation="H1",
+    )
+    external_runs = tmp_path / "external-runs"
+    external_runs.mkdir()
+    runs_root = evals_dir / "outline_level" / "runs"
+    runs_root.symlink_to(external_runs, target_is_directory=True)
+
+    # When / Then
+    with pytest.raises(OutlineLevelEvalError) as error:
+        evaluate_outline_level(evals_dir=evals_dir, run_id="linked-run")
+    assert str(error.value) == f"{runs_root}: runs directory cannot be a symlink"
+    assert not (external_runs / "linked-run" / "run.json").exists()

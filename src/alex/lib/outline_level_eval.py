@@ -70,7 +70,10 @@ def evaluate_outline_level(
     correct_count = sum(case.status == "correct" for case in annotated)
     accuracy = correct_count / len(annotated) if annotated else None
     pending_count = sum(case.status == "pending" for case in results)
-    run_dir = evals_dir / "outline_level" / "runs" / run_id
+    runs_root = evals_dir / "outline_level" / "runs"
+    if runs_root.is_symlink():
+        raise OutlineLevelEvalError(runs_root, "runs directory cannot be a symlink")
+    run_dir = runs_root / run_id
     if run_dir.exists():
         raise OutlineLevelEvalError(run_dir, "run already exists")
     run_dir.mkdir(parents=True)
@@ -105,6 +108,8 @@ def _evaluate_case(case_dir: Path) -> OutlineLevelCaseResult:
     input_path = case_dir / "input.md"
     output_path = case_dir / "output.md"
     input_bytes = input_path.read_bytes()
+    if output_path.is_symlink():
+        raise OutlineLevelEvalError(output_path, "output cannot be a symlink")
     output_bytes = output_path.read_bytes()
     annotation = parse_outline_level_output(
         output_path=output_path,

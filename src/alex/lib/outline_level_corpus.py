@@ -116,6 +116,8 @@ def prepare_outline_level_corpus(
 def load_trusted_outline_corpus(evals_dir: Path) -> TrustedOutlineCorpus:
     corpus_root = evals_dir / "outline_level"
     manifest_path = corpus_root / "manifest.json"
+    if manifest_path.is_symlink():
+        raise OutlineLevelEvalError(manifest_path, "manifest cannot be a symlink")
     manifest_bytes = manifest_path.read_bytes()
     try:
         manifest = OutlineManifest.model_validate_json(manifest_bytes)
@@ -124,6 +126,8 @@ def load_trusted_outline_corpus(evals_dir: Path) -> TrustedOutlineCorpus:
         raise OutlineLevelEvalError(manifest_path, message) from error
 
     cases_root = corpus_root / "cases"
+    if cases_root.is_symlink():
+        raise OutlineLevelEvalError(cases_root, "cases directory cannot be a symlink")
     actual_ids = {
         path.name
         for path in cases_root.iterdir()
