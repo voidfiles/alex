@@ -1,0 +1,118 @@
+G004/C003 REGRESSION GATE
+Date: 2026-07-12 UTC
+Commit under test: c912225 (Use hierarchy frontmatter for outline eval)
+
+VERDICT: PASS for the scoped G004/C003 regression criterion.
+
+The outline/frontmatter slice passes, all requested static and CLI gates pass,
+and c912225 does not change the production chapter selector or prompt assets.
+The required aggregate pytest command exits 1 only because of three unrelated
+dirty-worktree fact-cache failures in tests/test_summary_eval.py; no
+outline/frontmatter, chunking, or process-doc test fails.
+
+REQUIRED REGRESSION TEST COMMAND
+
+Command:
+uv run pytest tests/test_outline_level_annotation.py tests/test_outline_level_corpus.py tests/test_outline_level_eval.py tests/test_eval_outline_level_command.py tests/test_prepare_outline_level_eval_command.py tests/test_chunking.py tests/test_process_doc_assets.py tests/test_summary_eval.py -q
+
+Exit: 1
+Relevant output:
+........................................................F..F.F.......... [ 90%]
+........                                                                 [100%]
+FAILED tests/test_summary_eval.py::test_evaluate_scores_a_doc_and_writes_run_artifact
+FAILED tests/test_summary_eval.py::test_evaluate_reuses_cached_facts_without_calling_the_extractor
+FAILED tests/test_summary_eval.py::test_corrupt_facts_cache_self_heals_by_re_extracting
+3 failed, 77 passed in 1.87s
+
+Failure attribution:
+- git status --short reports unrelated working-tree modifications in
+  src/alex/lib/summary_eval.py, src/alex/prompts/fact_extraction/active.txt,
+  and tests/test_summary_eval.py.
+- git diff --name-only c912225^ c912225 for those three paths exits 0 with
+  empty output: c912225 did not change them.
+- The dirty active prompt moves fact_extraction from v002 to v003, while the
+  dirty test helper guide_cache_path still fixes extractor_version="v002".
+  Consequently the three failures respectively observe a missing v002 cache,
+  an unexpected v003 extractor call instead of reusing v002, and an unchanged
+  corrupt v002 cache. These are not frontmatter-regression failures.
+
+Focused outline/frontmatter confirmation:
+Command:
+uv run pytest tests/test_outline_level_annotation.py tests/test_outline_level_corpus.py tests/test_outline_level_eval.py tests/test_eval_outline_level_command.py tests/test_prepare_outline_level_eval_command.py -q
+Exit: 0
+Output: 31 passed in 0.50s
+
+FORMAT AND LINT GATES (SIX TOUCHED OUTLINE PYTHON FILES)
+
+Paths:
+- src/alex/lib/outline_level_annotation.py
+- src/alex/lib/outline_level_corpus.py
+- src/alex/lib/outline_level_eval.py
+- tests/test_outline_level_annotation.py
+- tests/test_outline_level_corpus.py
+- tests/test_outline_level_eval.py
+
+Command:
+uv run ruff format --check src/alex/lib/outline_level_annotation.py src/alex/lib/outline_level_corpus.py src/alex/lib/outline_level_eval.py tests/test_outline_level_annotation.py tests/test_outline_level_corpus.py tests/test_outline_level_eval.py
+Exit: 0
+Output: 6 files already formatted
+
+Command:
+uv run ruff check src/alex/lib/outline_level_annotation.py src/alex/lib/outline_level_corpus.py src/alex/lib/outline_level_eval.py tests/test_outline_level_annotation.py tests/test_outline_level_corpus.py tests/test_outline_level_eval.py
+Exit: 0
+Output: All checks passed!
+
+TYPE GATE
+
+Command: uv run mypy
+Exit: 0
+Output: Success: no issues found in 93 source files
+
+CLI HELP SMOKE GATE
+
+Command: uv run alex --help
+Exit: 0
+Relevant output:
+Usage: alex [OPTIONS] COMMAND [ARGS]...
+
+  Alex command line tools.
+
+Options:
+  -h, --help  Show this message and exit.
+
+Commands include:
+  eval-outline-level          Evaluate chapter-level inference against...
+  prepare-outline-level-eval  Prepare raw outlines for manual...
+  process-doc                 Process an existing document asset directory.
+  summary                     Summarize an input file end-to-end into a...
+
+REAL-CORPUS PENDING-LABEL GATE
+
+Corpus size: 24 cases
+Command:
+rg -l -U '^chapter:\n  level: TODO$' evals/outline_level/cases/*/output.md | wc -l
+Exit: 0
+Output: 2
+
+Pending chapter.level names:
+- Swimming, CrossFit Style
+  evals/outline_level/cases/swimming-crossfit-style-tim-morrison-67232d035f55/output.md
+- The Revised Self-Leadership Questionnaire: Testing a hierarchical factor
+  structure for self-leadership
+  evals/outline_level/cases/the-revised-selfleadership-questionnaire-testing-a-hierarchical-factor-structure-for-selfleadership-jeffery-d-houghton-and-christopher-p-neck-1af6daac9473/output.md
+
+Production optimization remains gated until both chapter.level TODO labels are
+completed.
+
+PRODUCTION SELECTOR/PROMPT IMMUTABILITY
+
+Command:
+git diff c912225^ c912225 -- src/alex/lib/markdown_structure.py src/alex/prompts
+Exit: 0
+Output: <empty>
+
+Conclusion: commit c912225 changed neither
+src/alex/lib/markdown_structure.py nor any path under src/alex/prompts.
+
+cleanup: no process/temp state created by this QA worker; all commands exited
+and no corpus, source, run artifact, or manual temporary artifact was written.

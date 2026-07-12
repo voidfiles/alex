@@ -1,0 +1,40 @@
+G004 post-implementation review-work report
+Date: 2026-07-12 UTC
+Commits reviewed: c912225, ff16085
+
+Overall verdict: PASS
+
+1. Goal and constraint verification: PASS (confidence 0.98)
+   - 24/24 canonical frontmatters preserve their exact input suffixes.
+   - 22 labels score; 2 remain pending; malformed inputs fail closed.
+   - Corpus stays within the user-requested 20-30 range.
+
+2. Hands-on CLI QA: PASS (confidence 0.99)
+   - Fresh CLI: accuracy 0.2727, 22 annotated, 2 pending, 24 cases.
+   - Fresh H7 probe: exit 1, precise output.md path, no invalid run artifact.
+   - QA run and temporary tree were removed.
+
+3. Code quality: PASS (confidence 0.96)
+   - No critical or major findings.
+   - Focused tests, Ruff format/check, and strict MyPy pass.
+   - Touched source modules remain below 250 pure LOC.
+
+4. Security: PASS after fix ff16085 (severity none)
+   - Initial review found symlinked manifest/output/runs paths were followed.
+   - RED: three tests failed with DID NOT RAISE.
+   - GREEN: symlinked manifest, cases root, output, and runs root are rejected.
+   - Root runtime matrix: all three real CLI probes changed from exit 0 to exit 1;
+     no external run.json was created; temporary tree removed.
+
+5. Context mining: PASS (high confidence)
+   - G004 is complete at schema-migration scope.
+   - Selector optimization remains a later story gated by two user labels.
+   - No missed migration requirement or blocker remains.
+
+Supporting evidence:
+- evals/outline_level/evidence/g004-c001-frontmatter-baseline.txt
+- evals/outline_level/evidence/g004-c002-frontmatter-boundary.txt
+- evals/outline_level/evidence/g004-c003-regression-gate.txt
+
+cleanup: all reviewer-created live run artifacts and temporary corpora were
+removed; no reviewer process, debugger, port, or environment override remains.
