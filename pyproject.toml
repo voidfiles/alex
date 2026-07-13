@@ -10,6 +10,7 @@ dependencies = [
     "marker-pdf>=1.10.2",
     "pydantic>=2.13.4",
     "pymupdf4llm>=1.27.2.3",
+    "pyyaml>=6.0",
 ]
 
 [project.scripts]
@@ -20,6 +21,7 @@ dev = [
     "mypy>=2.1.0",
     "pytest>=9.0.1",
     "ruff>=0.15.16",
+    "types-pyyaml>=6.0",
 ]
 
 [build-system]
