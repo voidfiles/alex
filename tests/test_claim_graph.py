@@ -226,14 +226,11 @@ def test_source_claims_per_section_sets_extraction_cap() -> None:
     )
 
     extraction_prompts = [
-        prompt
-        for prompt in completer.calls
-        if "source-grounded items" in prompt
+        prompt for prompt in completer.calls if "source-grounded items" in prompt
     ]
     assert extraction_prompts
     assert all(
-        "Extract up to 5 items per category" in prompt
-        for prompt in extraction_prompts
+        "Extract up to 5 items per category" in prompt for prompt in extraction_prompts
     )
 
 

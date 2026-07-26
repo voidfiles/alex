@@ -200,9 +200,7 @@ def build_claim_graph(
         extracted.append((section_index, section, items))
 
     graph_item_texts = [
-        text
-        for _, _, items in extracted
-        for text in source_graph_item_texts(items)
+        text for _, _, items in extracted for text in source_graph_item_texts(items)
     ]
     index = build_embedding_index(
         graph_item_texts,
@@ -565,11 +563,7 @@ def source_graph_items(payload: Any) -> SourceGraphItems:
 
 def source_graph_item_texts(items: SourceGraphItems) -> tuple[str, ...]:
     return (
-        *(
-            text
-            for item in items.claims
-            for text in (item.claim, item.evidence)
-        ),
+        *(text for item in items.claims for text in (item.claim, item.evidence)),
         *(
             text
             for item in items.concepts
@@ -785,8 +779,7 @@ def render_selected_subgraph(graph: ClaimGraph) -> str:
             1
             for edge in graph.edges
             if edge.source == section_node.id
-            and nodes_by_id[edge.target].type
-            in {"evidence", "concept", "key_passage"}
+            and nodes_by_id[edge.target].type in {"evidence", "concept", "key_passage"}
         )
         lines.extend(
             [
@@ -816,6 +809,41 @@ def graph_to_dict(graph: ClaimGraph) -> dict[str, Any]:
         "nodes": [asdict(node) for node in graph.nodes],
         "edges": [asdict(edge) for edge in graph.edges],
     }
+
+
+def graph_from_dict(payload: Mapping[str, Any]) -> ClaimGraph:
+    """Rebuild a ClaimGraph from graph_to_dict output. Raises on bad shapes."""
+    nodes = tuple(
+        GraphNode(
+            id=str(node["id"]),
+            type=str(node["type"]),
+            label=str(node["label"]),
+            source=str(node["source"]),
+            text=str(node.get("text", "")),
+            section_index=(
+                int(node["section_index"])
+                if node.get("section_index") is not None
+                else None
+            ),
+            score=float(node.get("score", 0.0)),
+            metadata={
+                str(key): str(value)
+                for key, value in dict(node.get("metadata") or {}).items()
+            },
+        )
+        for node in payload["nodes"]
+    )
+    edges = tuple(
+        GraphEdge(
+            source=str(edge["source"]),
+            target=str(edge["target"]),
+            type=str(edge["type"]),
+            weight=float(edge.get("weight", 1.0)),
+            evidence=str(edge.get("evidence", "")),
+        )
+        for edge in payload["edges"]
+    )
+    return ClaimGraph(doc_name=str(payload["doc_name"]), nodes=nodes, edges=edges)
 
 
 def write_graph_json(path: Path, graph: ClaimGraph) -> None:

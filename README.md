@@ -54,6 +54,7 @@ converter flags only apply to PDFs.
 
 ```bash
 alex process-doc assets/book_asset
+alex process-doc --reprocess-summary assets/book_asset
 ```
 
 Processes an existing asset directory (it must contain the original file,
@@ -65,6 +66,16 @@ claim/evidence graphs from raw chunks before chunk summarization, merges them
 into a document graph, and writes debug artifacts under `summary_graph/`. The
 final summary links to `summary_evidence.md`, a sidecar ledger that maps final
 claims back to selected evidence, verification status, and repair-pass records.
+Generated graph runs also write `summary_graph/manifest.json`, an additive run
+index with settings, prompt versions, environment caps, chunk and graph counts,
+stage artifact paths, and status/error metadata. It references existing files
+instead of copying generated summary bodies.
+
+Use `--reprocess-summary` to compare a previous generated summary against a
+fresh run. It moves existing `summary.md`, `chunk_summary.md`,
+`summary_evidence.md`, and `summary_graph/` into a timestamped
+`_summary_runs/` folder inside the asset before regenerating the summary
+artifacts.
 
 ### summary
 
@@ -80,8 +91,19 @@ generated `chunk_summary.md`, graph-enhanced `summary.md`, and debug
 artifacts under `summary_graph/`, including per-chunk graphs under
 `summary_graph/chunks/`, merged document graph artifacts,
 `evidence_records.json`, `summary_plan.json`, `summary_claims.json`, and
-`revision_passes.json`. Use `summary` for the stem-named one-command workflow,
-or `to-asset` followed by `process-doc` for the canonical-named pipeline.
+`revision_passes.json`, plus the additive `summary_graph/manifest.json` run
+index when graph artifacts are generated. Use `summary` for the stem-named
+one-command workflow, or `to-asset` followed by `process-doc` for the
+canonical-named pipeline. The public workflow remains:
+
+```bash
+alex summary INPUT OUTPUT_PATH
+```
+
+The generated summary wrapper navigation is stable. Links such as "Explore by
+Section" and evidence links are produced by the wrapper around the generated
+summary text, not by prompt candidates, and should remain available across
+summary prompt changes.
 
 Chunking is structure-first: documents split along their headers, and only
 oversized chapters (or documents with no usable structure) are split
@@ -115,7 +137,7 @@ require `ffmpeg` and `ffprobe` on `PATH`.
 ```bash
 just eval                                   # = alex eval-summary
 alex eval-summary --docs guide.md --prompt chunk_summary=v002
-alex eval-summary --judge-model anthropic/claude-sonnet-4-6
+alex eval-summary --judge-model anthropic/claude-sonnet-5
 alex eval-summary --run-id 20260619-graph             # graph-enhanced pipeline
 alex eval-summary --no-graph --run-id 20260619-nograph  # plain no-graph baseline
 ```
@@ -141,6 +163,24 @@ The claim caps that trade brevity for coverage are env-tunable for sweeps:
 `ALEX_GRAPH_MAX_CLAIMS` (document subgraph, default 48),
 `ALEX_CHUNK_GRAPH_MAX_CLAIMS` (per-chunk subgraph, default 12), and
 `ALEX_SOURCE_CLAIMS_PER_SECTION` (claims extracted per section, default 8).
+
+Live summary evals are local/manual gates, not CI. Use explicit run IDs when
+comparing candidates so the artifacts in `evals/runs/` are paired and
+inspectable:
+
+```bash
+alex eval-summary --docs how_to_take_smart_notes_sönke_ahrens.md --run-id sum-pipeline-probe-baseline
+alex eval-summary --docs how_to_take_smart_notes_sönke_ahrens.md --prompt final_summary=vNNN --prompt merged_summary=vNNN --run-id sum-pipeline-probe-candidate
+alex eval-summary --docs how_to_take_smart_notes_sönke_ahrens.md --prompt final_summary=vNNN --prompt merged_summary=vNNN --no-graph --run-id sum-pipeline-probe-candidate-nograph
+alex eval-summary --docs how_to_take_smart_notes_sönke_ahrens.md --prompt final_summary=vNNN --prompt merged_summary=vNNN --no-coverage-repair --run-id sum-pipeline-probe-candidate-norepair
+```
+
+Only run the full corpus after the probe passes. A prompt promotion gate should
+require mean score delta `>= +0.0200`, a majority of paired docs winning or
+tying, no paired-document faithfulness delta `< -0.0100`, and no newly failed
+eval document. If no LLM provider credentials are configured, record that
+preflight result, run deterministic tests instead, and leave `active.txt`
+unchanged.
 
 ### improve-prompt
 
@@ -222,12 +262,12 @@ model string works. Each role has an env override (see `src/alex/lib/llm.py`):
 | Role | Env var | Default |
 | --- | --- | --- |
 | Chunk summaries + compression | `ALEX_FAST_SUMMARY_MODEL` | `anthropic/claude-haiku-4-5` |
-| Final synthesis | `ALEX_FINAL_SUMMARY_MODEL` | `anthropic/claude-opus-4-8` |
-| Asset naming | `ALEX_NAMING_MODEL` | `anthropic/claude-sonnet-4-6` |
+| Final synthesis | `ALEX_FINAL_SUMMARY_MODEL` | `anthropic/claude-opus-5` |
+| Asset naming | `ALEX_NAMING_MODEL` | `anthropic/claude-sonnet-5` |
 | Semantic chunking embeddings | `ALEX_EMBEDDING_MODEL` | `openai/text-embedding-3-small` |
-| Eval judging | `ALEX_EVAL_JUDGE_MODEL` | `anthropic/claude-sonnet-4-6` |
-| Eval fact extraction | `ALEX_FACT_EXTRACTOR_MODEL` | `anthropic/claude-opus-4-8` |
-| Prompt critic | `ALEX_PROMPT_CRITIC_MODEL` | `anthropic/claude-opus-4-8` |
+| Eval judging | `ALEX_EVAL_JUDGE_MODEL` | `anthropic/claude-sonnet-5` |
+| Eval fact extraction | `ALEX_FACT_EXTRACTOR_MODEL` | `anthropic/claude-opus-5` |
+| Prompt critic | `ALEX_PROMPT_CRITIC_MODEL` | `anthropic/claude-opus-5` |
 | Audio transcription | `ALEX_TRANSCRIPTION_MODEL` | `whisper-1` |
 
 Example: `ALEX_FINAL_SUMMARY_MODEL=openai/gpt-5 alex process-doc assets/book_asset`.
@@ -262,6 +302,8 @@ just fmt        # autoformat + autofix
 ```
 
 CI runs the same four steps on every push (`.github/workflows/ci.yml`).
+Live `alex eval-summary` runs and prompt-promotion gates are local/manual
+checks and are not part of CI.
 
 ### prepare-outline-level-eval
 

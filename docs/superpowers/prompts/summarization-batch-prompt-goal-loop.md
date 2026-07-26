@@ -17,7 +17,7 @@ Do not change fact_extraction, fact_coverage_judge, claim_extraction,
 claim_verification, rubric_judge, or prompt_critic during this run.
 
 Models:
-Use two configurable critic models. Default critic A is anthropic/claude-opus-4-8.
+Use two configurable critic models. Default critic A is anthropic/claude-opus-5.
 Critic B must be supplied by env/flag, for example an OpenAI high-reasoning model
 when available. Use the highest practical critic token budget.
 
@@ -41,7 +41,7 @@ Method:
 
 Suggested command:
 uv run alex improve-prompts \
-  --critic-model-a anthropic/claude-opus-4-8 \
+  --critic-model-a anthropic/claude-opus-5 \
   --critic-model-b openai/gpt-5.5 \
   --critic-max-tokens 32000 \
   --min-delta 0.02

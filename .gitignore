@@ -10,9 +10,14 @@ dist/
 *.egg-info/
 evals/runs/
 evals/linage/
-
+evals/_compare_logs/
+evals/goal_logs/
 evals/claim_graph/
 evals/facts/
 evals/merged_summary/
 evals/reports/
+.claude
 evals/outline_level/runs/
+.omo/*
+plans/*
+evals/prompt_bundles/

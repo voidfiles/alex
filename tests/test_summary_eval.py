@@ -2,7 +2,7 @@ import hashlib
 import json
 import threading
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 
 import pytest
@@ -273,6 +273,49 @@ def test_evaluate_scores_a_doc_and_writes_run_artifact(tmp_path: Path) -> None:
     assert json.loads(cache_path.read_text(encoding="utf-8")) == {"facts": FACTS}
 
 
+def test_evaluate_writes_comparable_run_metadata(tmp_path: Path) -> None:
+    config = eval_config(tmp_path)
+    prompt_overrides = {
+        "chunk_summary": "v001",
+        "graph_guided_summary": "v001",
+        "merged_summary_repair": "v001",
+    }
+    config = replace(
+        config,
+        summary=replace(
+            config.summary,
+            prompt_overrides=prompt_overrides,
+            graph_enhanced=False,
+            coverage_repair=False,
+        ),
+    )
+
+    PipelineSummaryEvaluator(
+        config=config,
+        completer=ScriptedCompleter(responses=judge_responses()),
+        embedder=BagOfWordsEmbedder(),
+        doc_names=("guide.md",),
+    ).evaluate(
+        prompts=SummaryPrompts.load(overrides={"chunk_summary": "v001"}),
+        run_id="metadata-run",
+    )
+
+    artifact = json.loads(
+        (config.runs_dir / "metadata-run.json").read_text(encoding="utf-8")
+    )
+    assert artifact["run_id"] == "metadata-run"
+    assert artifact["selected_docs"] == ["guide.md"]
+    assert artifact["prompt_overrides"] == prompt_overrides
+    assert artifact["summary_pipeline"] == {
+        "graph_enhanced": False,
+        "chunk_graph_enhanced": True,
+        "coverage_repair": False,
+    }
+    assert artifact["prompt_versions"]["chunk_summary"] == "v001"
+    assert artifact["prompt_versions"]["graph_guided_summary"] == "v001"
+    assert artifact["prompt_versions"]["merged_summary_repair"] == "v001"
+
+
 def test_evaluate_streams_per_document_progress(tmp_path: Path) -> None:
     config = eval_config(tmp_path)
     lines: list[str] = []
@@ -327,12 +370,12 @@ def test_fact_cache_key_includes_doc_hash_model_and_extractor_version() -> None:
     path = fact_cache_path(
         facts_dir=Path("facts"),
         doc_text=GUIDE_MD,
-        extractor_model="anthropic/claude-sonnet-4-6",
+        extractor_model="anthropic/claude-sonnet-5",
         extractor_version="v003",
     )
 
     digest = hashlib.sha256(GUIDE_MD.encode("utf-8")).hexdigest()[:12]
-    assert path == Path(f"facts/{digest}.anthropic-claude-sonnet-4-6.v003.json")
+    assert path == Path(f"facts/{digest}.anthropic-claude-sonnet-5.v003.json")
 
 
 def test_corrupt_facts_cache_self_heals_by_re_extracting(tmp_path: Path) -> None:

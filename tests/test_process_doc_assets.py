@@ -137,7 +137,7 @@ def test_process_doc_asset_chunks_an_existing_asset_folder(tmp_path: Path) -> No
     final_calls = completer.final_calls()
     assert len(final_calls) == 1
     final_call = final_calls[0]
-    assert final_call.model == "anthropic/claude-opus-4-8"
+    assert final_call.model == "anthropic/claude-opus-5"
     assert final_call.max_tokens == 8_192
     assert "Foundations summary." in final_call.prompt
     assert "chunks/001_foundations.md" in final_call.prompt
@@ -217,7 +217,7 @@ def test_process_doc_asset_can_rerun_after_generated_files_exist(
         "- Rerunnable (H1, line 1, 5 lines)\n  - First (H2, line 3, 2 lines)\n",
         encoding="utf-8",
     )
-    completer = RecordingCompleter()
+    completer = RecordingCompleter(final_response="First synthesis.")
 
     first = process_doc_asset(
         ProcessDocAssetConfig(
@@ -227,21 +227,92 @@ def test_process_doc_asset_can_rerun_after_generated_files_exist(
         completer=completer,
         embedder=BagOfWordsEmbedder(),
     )
+    assert first.summary_path is not None
+    first_summary = first.summary_path.read_text(encoding="utf-8")
     (first.chunks_dir / "stale.md").write_text("stale", encoding="utf-8")
+    second_completer = RecordingCompleter(final_response="Second synthesis.")
 
     second = process_doc_asset(
         ProcessDocAssetConfig(
             asset_path=asset_dir,
             summary=SummarySettings(max_workers=1),
         ),
-        completer=completer,
+        completer=second_completer,
         embedder=BagOfWordsEmbedder(),
     )
 
     assert second.original_file == asset_dir / "rerunnable.pdf"
     assert tuple(path.name for path in second.chunk_paths) == ("001_first.md",)
     assert not (second.chunks_dir / "stale.md").exists()
+    assert second.summary_path is not None
+    assert second.summary_path == first.summary_path
+    assert second.summary_path.read_text(encoding="utf-8") == first_summary
+    assert second_completer.calls == []
+
+
+def test_process_doc_asset_reprocess_summary_archives_previous_artifacts(
+    tmp_path: Path,
+) -> None:
+    asset_dir = tmp_path / "reprocess"
+    asset_dir.mkdir()
+    (asset_dir / "reprocess.pdf").write_bytes(b"%PDF")
+    (asset_dir / "reprocess.md").write_text(
+        "# Reprocess\n\n## First\n\nBody.\n",
+        encoding="utf-8",
+    )
+    (asset_dir / "headers.md").write_text(
+        "- Reprocess (H1, line 1, 5 lines)\n  - First (H2, line 3, 2 lines)\n",
+        encoding="utf-8",
+    )
+    (asset_dir / "summary.md").write_text("Old summary.\n", encoding="utf-8")
+    (asset_dir / "chunk_summary.md").write_text(
+        "Old chunk summary.\n",
+        encoding="utf-8",
+    )
+    (asset_dir / "summary_evidence.md").write_text(
+        "Old evidence.\n",
+        encoding="utf-8",
+    )
+    old_graph = asset_dir / "summary_graph"
+    old_graph.mkdir()
+    (old_graph / "manifest.json").write_text('{"status": "old"}\n', encoding="utf-8")
+    completer = RecordingCompleter(
+        chunk_responses=["Fresh chunk summary."],
+        final_response="Fresh synthesis.",
+    )
+
+    result = process_doc_asset(
+        ProcessDocAssetConfig(
+            asset_path=asset_dir,
+            reprocess_summary=True,
+            summary=SummarySettings(max_workers=1),
+        ),
+        completer=completer,
+        embedder=BagOfWordsEmbedder(),
+    )
+
+    assert result.archived_summary_dir is not None
+    archived = result.archived_summary_dir
+    assert archived.parent == asset_dir / "_summary_runs"
+    assert (archived / "summary.md").read_text(encoding="utf-8") == "Old summary.\n"
+    assert (archived / "chunk_summary.md").read_text(encoding="utf-8") == (
+        "Old chunk summary.\n"
+    )
+    assert (archived / "summary_evidence.md").read_text(encoding="utf-8") == (
+        "Old evidence.\n"
+    )
+    assert (archived / "summary_graph" / "manifest.json").read_text(
+        encoding="utf-8"
+    ) == '{"status": "old"}\n'
+    assert result.summary_path == asset_dir / "summary.md"
+    assert result.summary_path.read_text(encoding="utf-8") != "Old summary.\n"
+    assert "Faithful Fresh synthesis." in result.summary_path.read_text(
+        encoding="utf-8"
+    )
+    assert result.graph_artifact_dir == asset_dir / "summary_graph"
+    assert (result.graph_artifact_dir / "manifest.json").is_file()
     assert len(completer.chunk_calls()) == 1
+    assert len(completer.final_calls()) == 1
 
 
 def test_process_doc_asset_handles_structureless_markdown(tmp_path: Path) -> None:

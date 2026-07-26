@@ -229,6 +229,11 @@ class EvalRun:
     doc_scores: tuple[DocScore, ...]
     mean_blended: float
     generated_summaries: tuple[GeneratedSummary, ...] = ()
+    selected_docs: tuple[str, ...] = ()
+    prompt_overrides: dict[str, str] = field(default_factory=dict)
+    graph_enhanced: bool = True
+    chunk_graph_enhanced: bool = True
+    coverage_repair: bool = True
 
 
 class SummaryEvaluator(Protocol):
@@ -355,6 +360,11 @@ class PipelineSummaryEvaluator:
             doc_scores=tuple(scores),
             mean_blended=mean_blended(scores),
             generated_summaries=tuple(summaries),
+            selected_docs=tuple(summary.doc_name for summary in summaries),
+            prompt_overrides=dict(self.config.summary.prompt_overrides),
+            graph_enhanced=self.config.summary.graph_enhanced,
+            chunk_graph_enhanced=self.config.summary.chunk_graph_enhanced,
+            coverage_repair=self.config.summary.coverage_repair,
         )
         write_run_artifact(run, runs_dir=self.config.runs_dir)
         return run
@@ -1191,7 +1201,14 @@ def write_run_artifact(run: EvalRun, *, runs_dir: Path) -> Path:
     artifact_path = runs_dir / f"{run.run_id}.json"
     payload = {
         "run_id": run.run_id,
+        "selected_docs": list(run.selected_docs),
+        "prompt_overrides": run.prompt_overrides,
         "prompt_versions": run.prompt_versions,
+        "summary_pipeline": {
+            "graph_enhanced": run.graph_enhanced,
+            "chunk_graph_enhanced": run.chunk_graph_enhanced,
+            "coverage_repair": run.coverage_repair,
+        },
         "judge_model": run.judge_model,
         "fact_extractor_model": run.fact_extractor_model,
         "summary_fast_model": run.summary_fast_model,

@@ -19,19 +19,31 @@ from alex.lib.llm import (
     complete_all,
     ordered_parallel_map,
     resolve_chunk_graph_max_claims,
+    resolve_claim_similarity_threshold,
+    resolve_embedding_model,
     resolve_eval_judge_model,
     resolve_fact_extractor_model,
     resolve_fast_summary_model,
     resolve_final_summary_model,
+    resolve_graph_cache_dir,
     resolve_graph_max_claims,
     resolve_source_claims_per_section,
     resolve_summary_max_workers,
 )
 from alex.lib.production_prompts import MergePrompts
 from alex.lib.prompt_templates import PromptTemplate, load_prompt
+from alex.lib.summary_manifest import (
+    SummaryFailedManifestContext,
+    SummaryManifestContext,
+    SummaryRunningManifestContext,
+    write_failed_summary_graph_manifest,
+    write_running_summary_graph_manifest,
+    write_summary_graph_manifest,
+)
 
 if TYPE_CHECKING:
     from alex.lib.claim_graph import ClaimGraph
+    from alex.lib.graph_cache import CachedDocumentGraphs
     from alex.lib.summary_eval import ClaimVerdict
 
 DEFAULT_CHUNK_SUMMARY_MAX_TOKENS = 20_000
@@ -113,6 +125,9 @@ class SummarySettings:
         default_factory=resolve_source_claims_per_section
     )
     graph_artifacts: bool = True
+    # Off unless ALEX_GRAPH_CACHE_DIR is set: reuse chunk claim graphs and the
+    # merged document graph across runs of the same doc + graph-build config.
+    graph_cache_dir: Path | None = field(default_factory=resolve_graph_cache_dir)
     evidence_ledger: bool = True
     verification_passes: int = 2
     max_context_tokens: int = DEFAULT_MAX_SUMMARY_CONTEXT_TOKENS
@@ -244,14 +259,41 @@ def summarize_doc_asset(
 
     chunk_graph_bundles: tuple[ChunkGraphBundle, ...] = ()
     selected_graph_by_chunk: dict[Path, str] = {}
+    graph_cache_key: str | None = None
+    cached_graphs: CachedDocumentGraphs | None = None
     if settings.graph_enhanced:
-        chunk_graph_bundles = build_chunk_graph_bundles(
-            settings=settings,
-            doc_name=markdown_path.name,
-            chunk_paths=chunk_paths,
-            completer=completer,
-            embedder=embedder,
+        if settings.graph_cache_dir is not None:
+            from alex.lib.graph_cache import load_graph_cache
+
+            graph_cache_key = document_graph_cache_key(
+                settings=settings,
+                doc_name=markdown_path.name,
+                chunk_paths=chunk_paths,
+            )
+            cached_graphs = load_graph_cache(
+                cache_dir=settings.graph_cache_dir,
+                key=graph_cache_key,
+            )
+        cached_bundles = (
+            chunk_graph_bundles_from_cache(
+                settings=settings,
+                chunk_paths=chunk_paths,
+                cached=cached_graphs,
+            )
+            if cached_graphs is not None
+            else None
         )
+        if cached_bundles is not None:
+            chunk_graph_bundles = cached_bundles
+        else:
+            cached_graphs = None
+            chunk_graph_bundles = build_chunk_graph_bundles(
+                settings=settings,
+                doc_name=markdown_path.name,
+                chunk_paths=chunk_paths,
+                completer=completer,
+                embedder=embedder,
+            )
         if settings.chunk_graph_enhanced:
             selected_graph_by_chunk = {
                 bundle.chunk_path: bundle.selected_markdown
@@ -314,6 +356,7 @@ def summarize_doc_asset(
         encoding="utf-8",
     )
     shutil.rmtree(chunk_summaries_dir)
+    last_completed_stage = "chunk_summary"
 
     final_summary_prompt = settings.prompts.final_summary.render(
         title=metadata.title,
@@ -348,55 +391,132 @@ def summarize_doc_asset(
         )
 
     source_markdown = markdown_path.read_text(encoding="utf-8")
-
-    def build_graph_summary_draft() -> GraphSummaryDraft:
-        document_graph = merged_document_graph(
-            doc_name=markdown_path.name,
-            chunk_graph_bundles=chunk_graph_bundles,
-            embedder=embedder,
+    graph_draft: GraphSummaryDraft | None = None
+    if settings.graph_artifacts:
+        if graph_artifact_dir.exists():
+            shutil.rmtree(graph_artifact_dir)
+        graph_artifact_dir.mkdir(parents=True)
+        write_running_summary_graph_manifest(
+            SummaryRunningManifestContext(
+                settings=settings,
+                asset_dir=asset_dir,
+                source_path=markdown_path,
+                output_path=summary_path,
+                chunk_paths=chunk_paths,
+                artifact_dir=graph_artifact_dir,
+                last_completed_stage=last_completed_stage,
+                graph_draft=graph_draft,
+                chunk_graph_bundles=chunk_graph_bundles,
+            )
         )
-        return graph_summary_draft(
+
+    try:
+
+        def build_graph_summary_draft() -> GraphSummaryDraft:
+            if cached_graphs is not None:
+                document_graph = cached_graphs.document_graph
+            else:
+                document_graph = merged_document_graph(
+                    doc_name=markdown_path.name,
+                    chunk_graph_bundles=chunk_graph_bundles,
+                    embedder=embedder,
+                )
+                if settings.graph_cache_dir is not None and graph_cache_key is not None:
+                    from alex.lib.graph_cache import (
+                        CachedChunkGraph,
+                        CachedDocumentGraphs,
+                        store_graph_cache,
+                    )
+
+                    store_graph_cache(
+                        cache_dir=settings.graph_cache_dir,
+                        key=graph_cache_key,
+                        graphs=CachedDocumentGraphs(
+                            document_graph=document_graph,
+                            chunk_graphs=tuple(
+                                CachedChunkGraph(
+                                    chunk_filename=bundle.chunk_path.name,
+                                    graph=bundle.graph,
+                                )
+                                for bundle in chunk_graph_bundles
+                            ),
+                        ),
+                    )
+            return graph_summary_draft(
+                settings=settings,
+                doc_name=markdown_path.name,
+                document_graph=document_graph,
+                completer=completer,
+            )
+
+        standard_final_summary, graph_draft_result = ordered_parallel_map(
+            (build_standard_final_summary, build_graph_summary_draft),
+            lambda task: task(),
+            max_workers=min(settings.max_workers, 2),
+        )
+        graph_draft = cast(GraphSummaryDraft, graph_draft_result)
+        last_completed_stage = "summary_drafts"
+        graph_summary = graph_enhanced_summary(
             settings=settings,
+            asset_dir=asset_dir,
             doc_name=markdown_path.name,
-            document_graph=document_graph,
+            doc_text=source_markdown,
+            standard_summary=cast(str, standard_final_summary),
+            graph_draft=graph_draft,
+            chunk_graph_bundles=chunk_graph_bundles,
             completer=completer,
         )
-
-    standard_final_summary, graph_draft_result = ordered_parallel_map(
-        (build_standard_final_summary, build_graph_summary_draft),
-        lambda task: task(),
-        max_workers=min(settings.max_workers, 2),
-    )
-    graph_draft = cast(GraphSummaryDraft, graph_draft_result)
-    graph_summary = graph_enhanced_summary(
-        settings=settings,
-        asset_dir=asset_dir,
-        doc_name=markdown_path.name,
-        doc_text=source_markdown,
-        standard_summary=cast(str, standard_final_summary),
-        graph_draft=graph_draft,
-        chunk_graph_bundles=chunk_graph_bundles,
-        completer=completer,
-    )
-    final_summary = graph_summary.final_summary
-    final_graph_artifact_dir = graph_summary.artifact_dir
-    summary_path.write_text(
-        summary_content(
-            title=metadata.title,
-            authors=authors,
-            markdown_filename=markdown_path.name,
-            final_summary=final_summary,
-            references=references,
-            evidence_ledger=(
-                "summary_evidence.md"
-                if settings.graph_enhanced
-                and settings.graph_artifacts
-                and settings.evidence_ledger
-                else None
+        last_completed_stage = "graph_summary"
+        final_summary = graph_summary.final_summary
+        final_graph_artifact_dir = graph_summary.artifact_dir
+        summary_path.write_text(
+            summary_content(
+                title=metadata.title,
+                authors=authors,
+                markdown_filename=markdown_path.name,
+                final_summary=final_summary,
+                references=references,
+                evidence_ledger=(
+                    "summary_evidence.md"
+                    if settings.graph_enhanced
+                    and settings.graph_artifacts
+                    and settings.evidence_ledger
+                    else None
+                ),
             ),
-        ),
-        encoding="utf-8",
-    )
+            encoding="utf-8",
+        )
+        last_completed_stage = "summary"
+    except (OSError, RuntimeError, ValueError) as error:
+        if settings.graph_artifacts:
+            write_failed_summary_graph_manifest(
+                SummaryFailedManifestContext(
+                    settings=settings,
+                    asset_dir=asset_dir,
+                    source_path=markdown_path,
+                    output_path=summary_path,
+                    chunk_paths=chunk_paths,
+                    artifact_dir=graph_artifact_dir,
+                    last_completed_stage=last_completed_stage,
+                    error=error,
+                    graph_draft=graph_draft,
+                    chunk_graph_bundles=chunk_graph_bundles,
+                )
+            )
+        raise
+    if final_graph_artifact_dir is not None:
+        write_summary_graph_manifest(
+            SummaryManifestContext(
+                settings=settings,
+                asset_dir=asset_dir,
+                source_path=markdown_path,
+                output_path=summary_path,
+                chunk_paths=chunk_paths,
+                graph_draft=graph_draft,
+                chunk_graph_bundles=chunk_graph_bundles,
+                artifact_dir=final_graph_artifact_dir,
+            )
+        )
     return SummaryOutput(
         chunk_summary_path=chunk_summary_path,
         summary_path=summary_path,
@@ -490,6 +610,75 @@ def build_chunk_graph_bundles(
         build_bundle,
         max_workers=settings.max_workers,
     )
+
+
+def document_graph_cache_key(
+    *,
+    settings: SummarySettings,
+    doc_name: str,
+    chunk_paths: Sequence[Path],
+) -> str:
+    """Content hash over everything that feeds claim-graph CONSTRUCTION.
+
+    Selection caps (graph_max_claims, chunk_graph_max_claims) are excluded on
+    purpose: they only drive select_claim_subgraph, which is deterministic and
+    recomputed from the cached full graphs on load.
+    """
+    from alex.lib.claim_graph import GraphPrompts
+    from alex.lib.graph_cache import graph_cache_key
+
+    graph_prompts = GraphPrompts.load(overrides=settings.prompt_overrides)
+    return graph_cache_key(
+        doc_name=doc_name,
+        chunks=tuple(
+            (chunk_path.name, chunk_path.read_text(encoding="utf-8"))
+            for chunk_path in chunk_paths
+        ),
+        extraction_prompt_version=graph_prompts.source_claim_extraction.version,
+        extraction_model=settings.fact_extractor_model,
+        source_claims_per_section=settings.source_claims_per_section,
+        extractor_max_tokens=settings.extractor_max_tokens,
+        embedding_model=resolve_embedding_model(),
+        similarity_threshold=resolve_claim_similarity_threshold(),
+    )
+
+
+def chunk_graph_bundles_from_cache(
+    *,
+    settings: SummarySettings,
+    chunk_paths: Sequence[Path],
+    cached: CachedDocumentGraphs,
+) -> tuple[ChunkGraphBundle, ...] | None:
+    """Rebuild chunk bundles from cached graphs; None when they don't line up."""
+    from alex.lib.claim_graph import (
+        GraphSettings,
+        render_selected_subgraph,
+        select_claim_subgraph,
+    )
+
+    if len(cached.chunk_graphs) != len(chunk_paths):
+        return None
+    if any(
+        entry.chunk_filename != chunk_path.name
+        for entry, chunk_path in zip(cached.chunk_graphs, chunk_paths, strict=True)
+    ):
+        return None
+    graph_settings = GraphSettings(
+        max_claims=settings.chunk_graph_max_claims,
+        source_claims_per_section=settings.source_claims_per_section,
+    )
+    bundles: list[ChunkGraphBundle] = []
+    for entry, chunk_path in zip(cached.chunk_graphs, chunk_paths, strict=True):
+        selected = select_claim_subgraph(entry.graph, settings=graph_settings)
+        bundles.append(
+            ChunkGraphBundle(
+                chunk_path=chunk_path,
+                graph=entry.graph,
+                selected=selected,
+                selected_markdown=render_selected_subgraph(selected),
+            )
+        )
+    return tuple(bundles)
 
 
 def merged_document_graph(
@@ -618,9 +807,7 @@ def graph_enhanced_summary(
     artifact_dir: Path | None = None
     if settings.graph_artifacts:
         artifact_dir = asset_dir / "summary_graph"
-        if artifact_dir.exists():
-            shutil.rmtree(artifact_dir)
-        artifact_dir.mkdir(parents=True)
+        artifact_dir.mkdir(parents=True, exist_ok=True)
         (artifact_dir / "standard_summary.md").write_text(
             standard_summary,
             encoding="utf-8",

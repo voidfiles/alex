@@ -8,7 +8,12 @@ from pathlib import Path
 import pytest
 
 from alex.lib.converters.to_markdown import MarkdownOutput, ToMarkdownConfig
-from alex.lib.summarize import SummarySettings, build_chunk_graph_bundles
+from alex.lib.document_sources import DocumentMetadata
+from alex.lib.summarize import (
+    SummarySettings,
+    build_chunk_graph_bundles,
+    summarize_doc_asset,
+)
 from alex.lib.summary_assets import (
     SummaryAssetConfig,
     SummaryAssetExistsError,
@@ -55,6 +60,78 @@ class SlowGraphCompleter:
         finally:
             with self.lock:
                 self.active -= 1
+
+
+class FailingFinalSummaryCompleter(RecordingCompleter):
+    def complete(self, *, prompt: str, model: str, max_tokens: int) -> str:
+        response = super().complete(prompt=prompt, model=model, max_tokens=max_tokens)
+        if "<section_summaries>" in prompt:
+            raise RuntimeError("final summary failed\nmodel returned \x00 control text")
+        return response
+
+
+class SensitiveFailingFinalSummaryCompleter(RecordingCompleter):
+    def __init__(self, *, failure_message: str) -> None:
+        super().__init__(
+            chunk_responses=["Chunk body should stay out."],
+            final_response="Generated summary body should stay out.",
+        )
+        self.failure_message = failure_message
+
+    def complete(self, *, prompt: str, model: str, max_tokens: int) -> str:
+        response = super().complete(prompt=prompt, model=model, max_tokens=max_tokens)
+        if "<section_summaries>" in prompt:
+            raise RuntimeError(self.failure_message)
+        return response
+
+
+class RunningManifestInspectingCompleter(RecordingCompleter):
+    def __init__(
+        self,
+        *,
+        graph_artifact_dir: Path,
+        fail_on_merge: bool = False,
+        chunk_responses: list[str] | None = None,
+        final_response: str = "Final synthesis.",
+    ) -> None:
+        super().__init__(
+            chunk_responses=chunk_responses,
+            final_response=final_response,
+        )
+        self.graph_artifact_dir = graph_artifact_dir
+        self.fail_on_merge = fail_on_merge
+        self.saw_running_manifest = False
+        self.running_status: str | None = None
+        self.running_last_completed_stage: str | None = None
+        self.running_artifacts: list[str] = []
+        self.files_present_at_running: list[str] = []
+        self.running_manifest_inode: int | None = None
+
+    def complete(self, *, prompt: str, model: str, max_tokens: int) -> str:
+        if "merging two independently generated summaries" in prompt:
+            manifest_path = self.graph_artifact_dir / "manifest.json"
+            assert manifest_path.is_file()
+            self.running_manifest_inode = manifest_path.stat().st_ino
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            self.saw_running_manifest = True
+            self.running_status = manifest["status"]
+            self.running_last_completed_stage = manifest["last_completed_stage"]
+            self.running_artifacts = list(manifest["artifacts"])
+            self.files_present_at_running = [
+                name
+                for name in (
+                    "standard_summary.md",
+                    "graph_summary.md",
+                    "merged_summary.md",
+                    "faithfulness_filtered_summary.md",
+                )
+                if (self.graph_artifact_dir / name).exists()
+            ]
+            if self.fail_on_merge:
+                raise RuntimeError(
+                    "graph merge failed\nmodel returned \x00 control text"
+                )
+        return super().complete(prompt=prompt, model=model, max_tokens=max_tokens)
 
 
 def test_process_markdown_summary_runs_the_full_pipeline(
@@ -158,6 +235,48 @@ def test_process_markdown_summary_runs_the_full_pipeline(
     assert (result.graph_artifact_dir / "summary_claims.json").is_file()
     assert (result.graph_artifact_dir / "claim_verification.json").is_file()
     assert (result.graph_artifact_dir / "revision_passes.json").is_file()
+    manifest_path = result.graph_artifact_dir / "manifest.json"
+    assert manifest_path.is_file()
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    assert manifest["schema_version"] == 1
+    assert manifest["status"] == "complete"
+    assert manifest["source_path"] == "deep-work.md"
+    assert manifest["output_path"] == "summary.md"
+    assert manifest["settings"] == {
+        "graph_enhanced": True,
+        "chunk_graph_enhanced": True,
+        "coverage_repair": True,
+        "graph_artifacts": True,
+        "evidence_ledger": True,
+        "force": False,
+    }
+    assert manifest["environment_caps"] == {
+        "ALEX_CHUNK_GRAPH_MAX_CLAIMS": 12,
+        "ALEX_GRAPH_MAX_CLAIMS": 48,
+        "ALEX_SOURCE_CLAIMS_PER_SECTION": 8,
+    }
+    assert manifest["chunks"] == {
+        "count": 1,
+        "artifacts": ["chunks/001_deep_work.md"],
+    }
+    assert manifest["graph"]["document_claim_count"] == 2
+    assert manifest["graph"]["document_edge_count"] >= 1
+    assert manifest["graph"]["selected_claim_count"] == 2
+    assert manifest["graph"]["selected_edge_count"] >= 1
+    assert manifest["prompt_versions"]["chunk_summary"].startswith("v")
+    assert manifest["prompt_versions"]["source_claim_extraction"].startswith("v")
+    assert manifest["prompt_versions"]["merged_summary"].startswith("v")
+    assert manifest["prompt_versions"]["claim_verification"].startswith("v")
+    assert manifest["stages"]["standard_summary"] == [
+        "summary_graph/standard_summary.md"
+    ]
+    assert manifest["stages"]["coverage_repair"] == [
+        "summary_graph/repaired_summary.md"
+    ]
+    assert "summary_graph/faithfulness_filtered_summary.md" in manifest["artifacts"]
+    manifest_text = json.dumps(manifest)
+    assert "Deep work synthesis." not in manifest_text
+    assert "Faithful Deep work synthesis." not in manifest_text
     source_blocks = json.loads(
         (result.graph_artifact_dir / "source_blocks.json").read_text(encoding="utf-8")
     )
@@ -273,6 +392,332 @@ def test_process_markdown_summary_skips_repair_when_coverage_repair_disabled(
     assert "Faithful Deep work synthesis." in result.summary_path.read_text(
         encoding="utf-8"
     )
+
+
+def test_process_markdown_summary_writes_failed_manifest_when_final_summary_fails(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "deep-work.md"
+    source.write_text("# Deep Work\n\nBy Cal Newport\n\nBody text.\n", encoding="utf-8")
+    completer = FailingFinalSummaryCompleter(
+        chunk_responses=["Chunk body should stay out."],
+        final_response="Generated summary body should stay out.",
+    )
+
+    with pytest.raises(RuntimeError, match="final summary failed"):
+        process_summary_asset(
+            SummaryAssetConfig(
+                source=source,
+                output_path=tmp_path / "summaries",
+                summary=SummarySettings(max_workers=1),
+            ),
+            completer=completer,
+            embedder=BagOfWordsEmbedder(),
+        )
+
+    asset_dir = tmp_path / "summaries" / "deep-work"
+    manifest_path = asset_dir / "summary_graph" / "manifest.json"
+    assert manifest_path.is_file()
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    assert manifest["status"] == "failed"
+    assert manifest["last_completed_stage"] == "chunk_summary"
+    assert manifest["error"] == {
+        "type": "RuntimeError",
+        "message": "final summary failed model returned control text",
+    }
+    assert manifest["source_path"] == "deep-work.md"
+    assert manifest["output_path"] == "summary.md"
+    assert manifest["chunks"] == {
+        "count": 1,
+        "artifacts": ["chunks/001_deep_work.md"],
+    }
+    assert manifest["graph"]["chunk_graph_count"] == 1
+    assert manifest["graph"]["document_claim_count"] == 0
+    assert manifest["artifacts"] == [
+        "chunk_summary.md",
+        "summary_graph/manifest.json",
+    ]
+    assert not (asset_dir / "summary.md").exists()
+    manifest_text = json.dumps(manifest)
+    assert "Generated summary body should stay out." not in manifest_text
+    assert "Chunk body should stay out." not in manifest_text
+    assert "\n" not in manifest["error"]["message"]
+    assert "\x00" not in manifest["error"]["message"]
+
+
+def test_process_markdown_summary_redacts_sensitive_failed_manifest_error(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "deep-work.md"
+    source.write_text("# Deep Work\n\nBy Cal Newport\n\nBody text.\n", encoding="utf-8")
+    sensitive_path = tmp_path / "secret" / "file.txt"
+    opt_path = "/opt/vendor/private.cfg"
+    etc_path = "/etc/alex/private.env"
+    windows_path = r"C:\Users\alex\secret\file.txt"
+    unix_path_with_spaces = "/tmp/secret dir/file name.txt"
+    windows_path_with_spaces = r"C:\Users\Alex\Secret Dir\file name.txt"
+    openai_key = "sk-proj-task15OpenAISecretToken1234567890"
+    anthropic_key = "sk-ant-task15AnthropicSecretToken1234567890"
+    gemini_key = "AIza" + "Task15GeminiSecretToken1234567890"
+    provider_token = "task15_" + ("ProviderSecretToken" * 3)
+    bearer_token = "task15BearerSecretToken.abc123"
+    completer = SensitiveFailingFinalSummaryCompleter(
+        failure_message=(
+            "provider call failed for "
+            f"{sensitive_path} {opt_path} {etc_path} {windows_path} "
+            f"{unix_path_with_spaces} {windows_path_with_spaces}\n"
+            f"openai={openai_key} anthropic={anthropic_key} "
+            f"gemini={gemini_key} provider_token={provider_token} "
+            f"Authorization: Bearer {bearer_token}\x00 retryable"
+        )
+    )
+
+    with pytest.raises(RuntimeError, match="provider call failed"):
+        process_summary_asset(
+            SummaryAssetConfig(
+                source=source,
+                output_path=tmp_path / "summaries",
+                summary=SummarySettings(max_workers=1),
+            ),
+            completer=completer,
+            embedder=BagOfWordsEmbedder(),
+        )
+
+    manifest_path = (
+        tmp_path / "summaries" / "deep-work" / "summary_graph" / "manifest.json"
+    )
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    error_message = manifest["error"]["message"]
+    assert manifest["error"]["type"] == "RuntimeError"
+    assert "provider call failed" in error_message
+    assert "retryable" in error_message
+    assert "[REDACTED_OPENAI_KEY]" in error_message
+    assert "[REDACTED_ANTHROPIC_KEY]" in error_message
+    assert "[REDACTED_GEMINI_KEY]" in error_message
+    assert "[REDACTED_PROVIDER_TOKEN]" in error_message
+    assert "[REDACTED_BEARER_TOKEN]" in error_message
+    assert "[REDACTED_LOCAL_PATH]" in error_message
+    assert openai_key not in error_message
+    assert anthropic_key not in error_message
+    assert gemini_key not in error_message
+    assert provider_token not in error_message
+    assert bearer_token not in error_message
+    assert sensitive_path.as_posix() not in error_message
+    assert opt_path not in error_message
+    assert etc_path not in error_message
+    assert windows_path not in error_message
+    assert unix_path_with_spaces not in error_message
+    assert windows_path_with_spaces not in error_message
+    assert "secret dir" not in error_message
+    assert "Secret Dir" not in error_message
+    assert "file name.txt" not in error_message
+    assert "\n" not in error_message
+    assert "\x00" not in error_message
+
+
+def test_process_markdown_summary_writes_running_manifest_before_graph_artifacts(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "deep-work.md"
+    source.write_text("# Deep Work\n\nBy Cal Newport\n\nBody text.\n", encoding="utf-8")
+    graph_artifact_dir = tmp_path / "summaries" / "deep-work" / "summary_graph"
+    completer = RunningManifestInspectingCompleter(
+        graph_artifact_dir=graph_artifact_dir,
+        chunk_responses=["Deep work chunk summary."],
+        final_response="Deep work synthesis.",
+    )
+
+    process_summary_asset(
+        SummaryAssetConfig(
+            source=source,
+            output_path=tmp_path / "summaries",
+            summary=SummarySettings(max_workers=1),
+        ),
+        completer=completer,
+        embedder=BagOfWordsEmbedder(),
+    )
+
+    assert completer.saw_running_manifest
+    assert completer.running_status == "running"
+    assert completer.running_last_completed_stage == "chunk_summary"
+    assert completer.running_artifacts == [
+        "chunk_summary.md",
+        "summary_graph/manifest.json",
+    ]
+    assert completer.files_present_at_running == []
+
+    final_manifest = json.loads(
+        (graph_artifact_dir / "manifest.json").read_text(encoding="utf-8")
+    )
+    assert final_manifest["status"] == "complete"
+    assert (graph_artifact_dir / "manifest.json").stat().st_ino == (
+        completer.running_manifest_inode
+    )
+
+
+def test_process_markdown_summary_writes_failed_manifest_after_running_manifest(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "deep-work.md"
+    source.write_text("# Deep Work\n\nBy Cal Newport\n\nBody text.\n", encoding="utf-8")
+    graph_artifact_dir = tmp_path / "summaries" / "deep-work" / "summary_graph"
+    completer = RunningManifestInspectingCompleter(
+        graph_artifact_dir=graph_artifact_dir,
+        fail_on_merge=True,
+        chunk_responses=["Deep work chunk summary."],
+        final_response="Deep work synthesis.",
+    )
+
+    with pytest.raises(RuntimeError, match="graph merge failed"):
+        process_summary_asset(
+            SummaryAssetConfig(
+                source=source,
+                output_path=tmp_path / "summaries",
+                summary=SummarySettings(max_workers=1),
+            ),
+            completer=completer,
+            embedder=BagOfWordsEmbedder(),
+        )
+
+    assert completer.saw_running_manifest
+    assert completer.running_status == "running"
+    manifest = json.loads(
+        (graph_artifact_dir / "manifest.json").read_text(encoding="utf-8")
+    )
+    assert manifest["status"] == "failed"
+    assert (graph_artifact_dir / "manifest.json").stat().st_ino == (
+        completer.running_manifest_inode
+    )
+    assert manifest["last_completed_stage"] == "summary_drafts"
+    assert manifest["error"] == {
+        "type": "RuntimeError",
+        "message": "graph merge failed model returned control text",
+    }
+    assert manifest["artifacts"] == [
+        "chunk_summary.md",
+        "summary_graph/manifest.json",
+    ]
+    assert "\n" not in manifest["error"]["message"]
+    assert "\x00" not in manifest["error"]["message"]
+
+
+def test_summarize_doc_asset_reuses_existing_summary_without_force(
+    tmp_path: Path,
+) -> None:
+    asset_dir = tmp_path / "asset"
+    chunks_dir = asset_dir / "chunks"
+    graph_dir = asset_dir / "summary_graph"
+    chunks_dir.mkdir(parents=True)
+    graph_dir.mkdir()
+    markdown_path = asset_dir / "asset.md"
+    markdown_path.write_text("# Asset\n\nImportant claims.\n", encoding="utf-8")
+    headers_path = asset_dir / "headers.md"
+    headers_path.write_text("- Asset (H1, line 1, 3 lines)\n", encoding="utf-8")
+    chunk_path = chunks_dir / "001_asset.md"
+    chunk_path.write_text("# Asset\n\nImportant claims.\n", encoding="utf-8")
+    summary_path = asset_dir / "summary.md"
+    summary_path.write_text("Existing summary.\n", encoding="utf-8")
+    chunk_summary_path = asset_dir / "chunk_summary.md"
+    chunk_summary_path.write_text("Existing chunk summary.\n", encoding="utf-8")
+    stale_graph_marker = graph_dir / "stale.txt"
+    stale_graph_marker.write_text("stale graph artifact\n", encoding="utf-8")
+    completer = RecordingCompleter(final_response="Fresh synthesis.")
+
+    result = summarize_doc_asset(
+        settings=SummarySettings(max_workers=1),
+        asset_dir=asset_dir,
+        metadata=DocumentMetadata(title="Asset"),
+        markdown_path=markdown_path,
+        headers_path=headers_path,
+        chunk_paths=(chunk_path,),
+        completer=completer,
+        embedder=BagOfWordsEmbedder(),
+    )
+
+    assert result.summary_path == summary_path
+    assert result.chunk_summary_path == chunk_summary_path
+    assert result.graph_artifact_dir == graph_dir
+    assert summary_path.read_text(encoding="utf-8") == "Existing summary.\n"
+    assert stale_graph_marker.read_text(encoding="utf-8") == "stale graph artifact\n"
+    assert completer.calls == []
+
+
+def test_process_markdown_summary_reuse_does_not_create_missing_manifest(
+    tmp_path: Path,
+) -> None:
+    asset_dir = tmp_path / "asset"
+    chunks_dir = asset_dir / "chunks"
+    graph_dir = asset_dir / "summary_graph"
+    chunks_dir.mkdir(parents=True)
+    graph_dir.mkdir()
+    markdown_path = asset_dir / "asset.md"
+    markdown_path.write_text("# Asset\n\nImportant claims.\n", encoding="utf-8")
+    headers_path = asset_dir / "headers.md"
+    headers_path.write_text("- Asset (H1, line 1, 3 lines)\n", encoding="utf-8")
+    chunk_path = chunks_dir / "001_asset.md"
+    chunk_path.write_text("# Asset\n\nImportant claims.\n", encoding="utf-8")
+    summary_path = asset_dir / "summary.md"
+    summary_path.write_text("Existing summary.\n", encoding="utf-8")
+    completer = RecordingCompleter(final_response="Fresh synthesis.")
+
+    result = summarize_doc_asset(
+        settings=SummarySettings(max_workers=1),
+        asset_dir=asset_dir,
+        metadata=DocumentMetadata(title="Asset"),
+        markdown_path=markdown_path,
+        headers_path=headers_path,
+        chunk_paths=(chunk_path,),
+        completer=completer,
+        embedder=BagOfWordsEmbedder(),
+    )
+
+    assert result.summary_path == summary_path
+    assert result.graph_artifact_dir == graph_dir
+    assert not (graph_dir / "manifest.json").exists()
+    assert completer.calls == []
+
+
+def test_summarize_doc_asset_force_rebuilds_existing_summary(
+    tmp_path: Path,
+) -> None:
+    asset_dir = tmp_path / "asset"
+    chunks_dir = asset_dir / "chunks"
+    graph_dir = asset_dir / "summary_graph"
+    chunks_dir.mkdir(parents=True)
+    graph_dir.mkdir()
+    markdown_path = asset_dir / "asset.md"
+    markdown_path.write_text("# Asset\n\nImportant claims.\n", encoding="utf-8")
+    headers_path = asset_dir / "headers.md"
+    headers_path.write_text("- Asset (H1, line 1, 3 lines)\n", encoding="utf-8")
+    chunk_path = chunks_dir / "001_asset.md"
+    chunk_path.write_text("# Asset\n\nImportant claims.\n", encoding="utf-8")
+    summary_path = asset_dir / "summary.md"
+    summary_path.write_text("Existing summary.\n", encoding="utf-8")
+    stale_graph_marker = graph_dir / "stale.txt"
+    stale_graph_marker.write_text("stale graph artifact\n", encoding="utf-8")
+    completer = RecordingCompleter(
+        chunk_responses=["Fresh chunk summary."],
+        final_response="Fresh synthesis.",
+    )
+
+    result = summarize_doc_asset(
+        settings=SummarySettings(max_workers=1, force=True),
+        asset_dir=asset_dir,
+        metadata=DocumentMetadata(title="Asset"),
+        markdown_path=markdown_path,
+        headers_path=headers_path,
+        chunk_paths=(chunk_path,),
+        completer=completer,
+        embedder=BagOfWordsEmbedder(),
+    )
+
+    assert result.summary_path == summary_path
+    assert result.chunk_summary_path == asset_dir / "chunk_summary.md"
+    assert result.graph_artifact_dir == graph_dir
+    assert "Faithful Fresh synthesis." in summary_path.read_text(encoding="utf-8")
+    assert not stale_graph_marker.exists()
+    assert len(completer.chunk_calls()) == 1
+    assert len(completer.final_calls()) == 1
 
 
 def test_chunk_graph_bundles_are_bounded_and_ordered(tmp_path: Path) -> None:

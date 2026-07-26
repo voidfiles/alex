@@ -30,15 +30,30 @@ def build_process_doc_command(
             path_type=Path,
         ),
     )
-    def command(asset_path: Path) -> None:
+    @click.option(
+        "--reprocess-summary",
+        is_flag=True,
+        help=(
+            "Archive existing summary artifacts under _summary_runs/ before "
+            "generating a fresh summary."
+        ),
+    )
+    def command(asset_path: Path, reprocess_summary: bool) -> None:
         """Process an existing document asset directory."""
         try:
-            result = processor(ProcessDocAssetConfig(asset_path=asset_path))
+            result = processor(
+                ProcessDocAssetConfig(
+                    asset_path=asset_path,
+                    reprocess_summary=reprocess_summary,
+                )
+            )
         except (OSError, RuntimeError, ValueError) as error:
             raise click.ClickException(str(error)) from error
 
         click.echo(f"Processed {result.asset_dir}")
         click.echo(f"Chunks: {len(result.chunk_paths)}")
+        if result.archived_summary_dir is not None:
+            click.echo(f"Archived summary: {result.archived_summary_dir.name}")
         if result.chunk_summary_path is not None:
             click.echo(f"Chunk summary: {result.chunk_summary_path.name}")
         if result.summary_path is not None:

@@ -1,7 +1,7 @@
 {
   "version": 1,
   "createdAt": "2026-07-11T18:33:12.754Z",
-  "updatedAt": "2026-07-12T19:16:47.171Z",
+  "updatedAt": "2026-07-12T20:43:13.078Z",
   "briefPath": ".omo/ulw-loop/outline-level-eval-20260711/brief.md",
   "goalsPath": ".omo/ulw-loop/outline-level-eval-20260711/goals.json",
   "ledgerPath": ".omo/ulw-loop/outline-level-eval-20260711/ledger.jsonl",
@@ -192,7 +192,7 @@
       "id": "G005",
       "title": "Optimize chapter selection against complete hierarchy gold",
       "objective": "After the two remaining evals/outline_level output frontmatters have chapter.level changed from TODO to H1-H6, run the complete 24-case exact-match baseline, diagnose every error class, iterate bounded chapter-selection candidates, and promote only the simplest best candidate that improves or preserves accuracy. Before promotion, explicitly protect or isolate the summary_eval fact-partitioning caller and verify process-doc/chunking behavior.",
-      "status": "in_progress",
+      "status": "blocked",
       "successCriteria": [
         {
           "id": "C001",
@@ -224,11 +224,14 @@
       ],
       "attempt": 1,
       "createdAt": "2026-07-12T19:15:02.840Z",
-      "updatedAt": "2026-07-12T19:16:47.171Z",
+      "updatedAt": "2026-07-12T20:43:13.078Z",
       "evidence": "G004 produced a valid 24-case nested-frontmatter corpus with 22 scoreable labels, 2 chapter.level TODO values, and baseline accuracy 0.272727; commits c912225 and ff16085 plus G004 evidence/review prove the eval boundary is ready.",
-      "startedAt": "2026-07-12T19:16:47.171Z"
+      "startedAt": "2026-07-12T19:16:47.171Z",
+      "steeringEvidence": "The user explicitly retired the final two chapter labels and all TODO placeholders; G005's complete-H1-H6 precondition is no longer an authorized target.",
+      "steeringRationale": "Stop the obsolete complete-gold story without guessing labels. A separately appended story will preserve the full 24-case surface, migrate to omission, and optimize every user-authored label.",
+      "steeringStatus": "blocked",
+      "blockedReason": "Stop the obsolete complete-gold story without guessing labels. A separately appended story will preserve the full 24-case surface, migrate to omission, and optimize every user-authored label."
     }
   ],
-  "codexObjective": "Complete the durable ulw-loop plan in .omo/ulw-loop/outline-level-eval-20260711/goals.json, including later accepted/appended stories, under the original brief constraints; use .omo/ulw-loop/outline-level-eval-20260711/ledger.jsonl as the audit trail.",
-  "activeGoalId": "G005"
+  "codexObjective": "Complete the durable ulw-loop plan in .omo/ulw-loop/outline-level-eval-20260711/goals.json, including later accepted/appended stories, under the original brief constraints; use .omo/ulw-loop/outline-level-eval-20260711/ledger.jsonl as the audit trail."
 }

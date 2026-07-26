@@ -27,7 +27,7 @@ from alex.lib.prompt_templates import (
 from alex.lib.summarize import SummaryPrompts
 from alex.lib.summary_eval import EvalConfig, EvalRun, Progress, SummaryEvaluator
 
-DEFAULT_BUNDLE_CRITIC_MODEL_A = "anthropic/claude-opus-4-8"
+DEFAULT_BUNDLE_CRITIC_MODEL_A = "anthropic/claude-opus-5"
 
 
 class PromptBundleImprovementError(ValueError):

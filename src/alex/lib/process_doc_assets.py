@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
+from datetime import UTC, datetime
 from pathlib import Path
 
 from alex.lib.asset_metadata import AssetMetadata
@@ -48,6 +49,7 @@ class ProcessDocAssetError(ValueError):
 class ProcessDocAssetConfig:
     asset_path: Path
     summarize: bool = True
+    reprocess_summary: bool = False
     summary: SummarySettings = field(default_factory=SummarySettings)
     chunking: ChunkSettings = field(default_factory=ChunkSettings)
 
@@ -66,6 +68,7 @@ class ProcessDocAssetOutput:
     chunk_summary_path: Path | None = None
     summary_path: Path | None = None
     graph_artifact_dir: Path | None = None
+    archived_summary_dir: Path | None = None
 
 
 def process_doc_asset(
@@ -79,6 +82,9 @@ def process_doc_asset(
     asset_dir = config.asset_path
     if not asset_dir.is_dir():
         raise ProcessDocAssetError(f"Asset path must be a directory: {asset_dir}")
+    archived_summary_dir: Path | None = None
+    if config.reprocess_summary:
+        archived_summary_dir = archive_summary_artifacts(asset_dir)
 
     headers_path = find_headers_extract(asset_dir)
     markdown_path = find_markdown_extract(asset_dir)
@@ -141,8 +147,11 @@ def process_doc_asset(
         else None,
     )
     if config.summarize:
+        summary_settings = config.summary
+        if config.reprocess_summary:
+            summary_settings = replace(summary_settings, force=True)
         summary_output = summarize_doc_asset(
-            settings=config.summary,
+            settings=summary_settings,
             asset_dir=asset_dir,
             metadata=metadata,
             markdown_path=markdown_path,
@@ -165,7 +174,40 @@ def process_doc_asset(
         chunk_summary_path=summary_output.chunk_summary_path,
         summary_path=summary_output.summary_path,
         graph_artifact_dir=summary_output.graph_artifact_dir,
+        archived_summary_dir=archived_summary_dir,
     )
+
+
+def archive_summary_artifacts(asset_dir: Path) -> Path | None:
+    artifacts = tuple(
+        path
+        for path in (
+            asset_dir / "summary.md",
+            asset_dir / "chunk_summary.md",
+            asset_dir / "summary_evidence.md",
+            asset_dir / "summary_graph",
+        )
+        if path.exists()
+    )
+    if not artifacts:
+        return None
+
+    archive_dir = next_summary_archive_dir(asset_dir)
+    archive_dir.mkdir(parents=True)
+    for artifact in artifacts:
+        artifact.rename(archive_dir / artifact.name)
+    return archive_dir
+
+
+def next_summary_archive_dir(asset_dir: Path) -> Path:
+    root = asset_dir / "_summary_runs"
+    stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
+    candidate = root / stamp
+    index = 2
+    while candidate.exists():
+        candidate = root / f"{stamp}-{index}"
+        index += 1
+    return candidate
 
 
 def find_headers_extract(asset_dir: Path) -> Path:

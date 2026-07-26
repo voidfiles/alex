@@ -56,9 +56,9 @@ def canned_run() -> EvalRun:
             "final_summary": "v001",
         },
         judge_model="anthropic/claude-haiku-4-5",
-        fact_extractor_model="anthropic/claude-sonnet-4-6",
+        fact_extractor_model="anthropic/claude-sonnet-5",
         summary_fast_model="anthropic/claude-haiku-4-5",
-        summary_final_model="anthropic/claude-opus-4-8",
+        summary_final_model="anthropic/claude-opus-5",
         doc_scores=(ok_score("a.md", 0.7), failed_score("b.md")),
         mean_blended=0.7,
     )

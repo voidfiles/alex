@@ -9,6 +9,7 @@ from alex.lib.prompt_templates import (
     in_source_checkout,
     list_versions,
     load_prompt,
+    next_version,
     writable_prompt_dir,
 )
 from alex.lib.summarize import SUMMARY_PROMPT_NAMES, SummarizationError, SummaryPrompts
@@ -79,6 +80,17 @@ def test_list_versions_orders_numerically(tmp_path: Path) -> None:
     (tmp_path / "greeting" / "notes.md").write_text("not a version", encoding="utf-8")
 
     assert list_versions("greeting", root=tmp_path) == ("v001", "v002", "v010")
+
+
+def test_next_version_counts_untracked_worktree_candidates(tmp_path: Path) -> None:
+    for version in ("v001", "v002", "v003"):
+        write_prompt_version(tmp_path, "greeting", version, "Hello.")
+    prompt_directory = tmp_path / "greeting"
+    (prompt_directory / "notes.md").write_text("not a version", encoding="utf-8")
+    (prompt_directory / "vnext.md").write_text("not numeric", encoding="utf-8")
+
+    assert list_versions("greeting", root=tmp_path) == ("v001", "v002", "v003")
+    assert next_version("greeting", root=tmp_path) == "v004"
 
 
 def test_list_versions_requires_at_least_one_version(tmp_path: Path) -> None:
@@ -188,6 +200,31 @@ def test_merged_summary_repair_pins_selected_subgraph_placeholder() -> None:
             selected_graph="wrong key",
             merged_summary="summary",
         )
+
+
+@pytest.mark.parametrize(
+    ("name", "version", "placeholders"),
+    [
+        (
+            "final_summary",
+            "v006",
+            frozenset(
+                {"title", "authors", "section_summaries", "chunk_reference_list"}
+            ),
+        ),
+        (
+            "merged_summary",
+            "v005",
+            frozenset({"document_name", "standard_summary", "graph_summary"}),
+        ),
+    ],
+)
+def test_synthesis_candidate_prompts_preserve_placeholders(
+    name: str, version: str, placeholders: frozenset[str]
+) -> None:
+    template = load_prompt(name, version=version)
+
+    assert template.placeholders() == placeholders
 
 
 def test_summary_prompts_load_accepts_known_overrides_only() -> None:
