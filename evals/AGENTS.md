@@ -57,6 +57,15 @@ evals/
   after that date are NOT coverage-comparable. Clean-key baseline runs:
   `evals/runs/exp-cleankey-baseline-{full-2,book-2,book-3}.json` (book n=3
   means: blended 0.7069, coverage 0.5299, faithfulness 0.9620).
+- Model defaults switched from Claude (haiku-4-5/sonnet-5/opus-5) to GPT-5.6
+  (luna/terra/sol) on 2026-08-01, including the eval judge and fact extractor.
+  Runs judged before and after that date are NOT comparable: answer keys re-key
+  on the extractor (sol vs opus-5) and the judge changed. The A/B evidence for
+  the swap lives in `evals/runs/gpt56-{base,cand}-*.json` (Claude judges both
+  arms; base-1/2 complete at 0.784/0.776, cand-1 complete at 0.792; base-3 and
+  cand-2/3 lost to API-credit exhaustion — the user accepted the partial
+  evidence). `gpt56-newstack-*` starts the new all-GPT baseline lineage; run a
+  full n=3 new-stack baseline before the next prompt-tuning campaign.
 - `evals/lineage/*.jsonl` is append-only audit history; do not rewrite it to
   make a result cleaner.
 - `evals/workflow_ideas/*.jsonl` is for logged-only ideas discovered during

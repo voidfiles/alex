@@ -78,7 +78,10 @@ class EvalJudgeError(EvalError):
 class EvalSettings:
     judge_model: str = field(default_factory=resolve_eval_judge_model)
     fact_extractor_model: str = field(default_factory=resolve_fact_extractor_model)
-    judge_max_tokens: int = 8_192
+    # Claim extraction on a book-length summary can exceed 8k completion tokens
+    # once the judge's thinking spend is counted; truncated JSON then fails the
+    # whole doc. 32k is far below sonnet-5/opus-5 output caps (128k).
+    judge_max_tokens: int = 32_768
     extractor_max_tokens: int = 8_192
     coverage_weight: float = 0.45
     faithfulness_weight: float = 0.35

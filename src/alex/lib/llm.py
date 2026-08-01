@@ -2,7 +2,7 @@
 
 All model choices live here. Each role (fast summaries, final synthesis,
 asset naming) has a default and an environment override, and any LiteLLM
-model string works: "anthropic/claude-opus-5", "openai/gpt-5",
+model string works: "openai/gpt-5.6-sol", "anthropic/claude-opus-5",
 "gemini/gemini-2.5-pro", and so on.
 """
 
@@ -18,15 +18,13 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Protocol, TypeGuard
 
-DEFAULT_FAST_SUMMARY_MODEL = "anthropic/claude-haiku-4-5"
-DEFAULT_FINAL_SUMMARY_MODEL = "anthropic/claude-opus-5"
-DEFAULT_ASSET_NAMING_MODEL = "anthropic/claude-sonnet-5"
-# Anthropic has no embeddings endpoint, so the embedding default needs a
-# non-Anthropic key. Swap providers via ALEX_EMBEDDING_MODEL.
+DEFAULT_FAST_SUMMARY_MODEL = "openai/gpt-5.6-luna"
+DEFAULT_FINAL_SUMMARY_MODEL = "openai/gpt-5.6-sol"
+DEFAULT_ASSET_NAMING_MODEL = "openai/gpt-5.6-terra"
 DEFAULT_EMBEDDING_MODEL = "openai/text-embedding-3-small"
-DEFAULT_EVAL_JUDGE_MODEL = "anthropic/claude-sonnet-5"
-DEFAULT_FACT_EXTRACTOR_MODEL = "anthropic/claude-opus-5"
-DEFAULT_PROMPT_CRITIC_MODEL = "anthropic/claude-opus-5"
+DEFAULT_EVAL_JUDGE_MODEL = "openai/gpt-5.6-terra"
+DEFAULT_FACT_EXTRACTOR_MODEL = "openai/gpt-5.6-sol"
+DEFAULT_PROMPT_CRITIC_MODEL = "openai/gpt-5.6-sol"
 DEFAULT_TRANSCRIPTION_MODEL = "whisper-1"
 # Cosine cutoff for linking similar claims in the claim graph. Tuned for
 # text-embedding-3-small (paraphrases land ~0.6-0.85, unrelated text ~0.1-0.4).

@@ -114,7 +114,9 @@ class SummarySettings:
     prompt_overrides: Mapping[str, str] = field(default_factory=dict)
     chunk_summary_max_tokens: int = DEFAULT_CHUNK_SUMMARY_MAX_TOKENS
     final_summary_max_tokens: int = DEFAULT_FINAL_SUMMARY_MAX_TOKENS
-    judge_max_tokens: int = 8_192
+    # Keep in sync with EvalSettings.judge_max_tokens: the graph faithfulness
+    # filter runs the same claim-extraction call and hits the same truncation.
+    judge_max_tokens: int = 32_768
     extractor_max_tokens: int = 8_192
     graph_enhanced: bool = True
     chunk_graph_enhanced: bool = True

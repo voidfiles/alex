@@ -112,7 +112,7 @@ def test_process_doc_asset_chunks_an_existing_asset_folder(tmp_path: Path) -> No
 
     chunk_calls = completer.chunk_calls()
     assert len(chunk_calls) == 2
-    assert {call.model for call in chunk_calls} == {"anthropic/claude-haiku-4-5"}
+    assert {call.model for call in chunk_calls} == {"openai/gpt-5.6-luna"}
     assert {call.max_tokens for call in chunk_calls} == {20_000}
     # graph_enhanced is on by default, so chunks summarize through the
     # graph-aware template that embeds the selected chunk subgraph.
@@ -137,7 +137,7 @@ def test_process_doc_asset_chunks_an_existing_asset_folder(tmp_path: Path) -> No
     final_calls = completer.final_calls()
     assert len(final_calls) == 1
     final_call = final_calls[0]
-    assert final_call.model == "anthropic/claude-opus-5"
+    assert final_call.model == "openai/gpt-5.6-sol"
     assert final_call.max_tokens == 8_192
     assert "Foundations summary." in final_call.prompt
     assert "chunks/001_foundations.md" in final_call.prompt
@@ -189,7 +189,7 @@ def test_process_doc_asset_recursively_compresses_large_chunk_summaries(
     assert len(completer.chunk_calls()) == 1
     compression_calls = completer.compression_calls()
     assert len(compression_calls) == 2
-    assert {call.model for call in compression_calls} == {"anthropic/claude-haiku-4-5"}
+    assert {call.model for call in compression_calls} == {"openai/gpt-5.6-luna"}
     assert all(
         "Consolidate them into a comprehensive summary" in call.prompt
         for call in compression_calls

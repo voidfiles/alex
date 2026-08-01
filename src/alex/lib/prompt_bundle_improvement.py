@@ -27,7 +27,7 @@ from alex.lib.prompt_templates import (
 from alex.lib.summarize import SummaryPrompts
 from alex.lib.summary_eval import EvalConfig, EvalRun, Progress, SummaryEvaluator
 
-DEFAULT_BUNDLE_CRITIC_MODEL_A = "anthropic/claude-opus-5"
+DEFAULT_BUNDLE_CRITIC_MODEL_A = "openai/gpt-5.6-sol"
 
 
 class PromptBundleImprovementError(ValueError):

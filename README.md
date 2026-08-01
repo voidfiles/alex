@@ -137,7 +137,7 @@ require `ffmpeg` and `ffprobe` on `PATH`.
 ```bash
 just eval                                   # = alex eval-summary
 alex eval-summary --docs guide.md --prompt chunk_summary=v002
-alex eval-summary --judge-model anthropic/claude-sonnet-5
+alex eval-summary --judge-model openai/gpt-5.6-terra
 alex eval-summary --run-id 20260619-graph             # graph-enhanced pipeline
 alex eval-summary --no-graph --run-id 20260619-nograph  # plain no-graph baseline
 ```
@@ -261,22 +261,21 @@ model string works. Each role has an env override (see `src/alex/lib/llm.py`):
 
 | Role | Env var | Default |
 | --- | --- | --- |
-| Chunk summaries + compression | `ALEX_FAST_SUMMARY_MODEL` | `anthropic/claude-haiku-4-5` |
-| Final synthesis | `ALEX_FINAL_SUMMARY_MODEL` | `anthropic/claude-opus-5` |
-| Asset naming | `ALEX_NAMING_MODEL` | `anthropic/claude-sonnet-5` |
+| Chunk summaries + compression | `ALEX_FAST_SUMMARY_MODEL` | `openai/gpt-5.6-luna` |
+| Final synthesis | `ALEX_FINAL_SUMMARY_MODEL` | `openai/gpt-5.6-sol` |
+| Asset naming | `ALEX_NAMING_MODEL` | `openai/gpt-5.6-terra` |
 | Semantic chunking embeddings | `ALEX_EMBEDDING_MODEL` | `openai/text-embedding-3-small` |
-| Eval judging | `ALEX_EVAL_JUDGE_MODEL` | `anthropic/claude-sonnet-5` |
-| Eval fact extraction | `ALEX_FACT_EXTRACTOR_MODEL` | `anthropic/claude-opus-5` |
-| Prompt critic | `ALEX_PROMPT_CRITIC_MODEL` | `anthropic/claude-opus-5` |
+| Eval judging | `ALEX_EVAL_JUDGE_MODEL` | `openai/gpt-5.6-terra` |
+| Eval fact extraction | `ALEX_FACT_EXTRACTOR_MODEL` | `openai/gpt-5.6-sol` |
+| Prompt critic | `ALEX_PROMPT_CRITIC_MODEL` | `openai/gpt-5.6-sol` |
 | Audio transcription | `ALEX_TRANSCRIPTION_MODEL` | `whisper-1` |
 
-Example: `ALEX_FINAL_SUMMARY_MODEL=openai/gpt-5 alex process-doc assets/book_asset`.
+Example: `ALEX_FINAL_SUMMARY_MODEL=anthropic/claude-opus-5 alex process-doc assets/book_asset`.
 
-Anthropic has no embeddings endpoint, so the embedding default needs an
-OpenAI key (or point `ALEX_EMBEDDING_MODEL` at another provider, e.g.
-`voyage/voyage-3.5-lite`). Embeddings power semantic chunking (only for
-oversized or structureless documents) and claim-graph similarity (claims are
-linked by embedding cosine similarity whenever a graph is built).
+Embeddings power semantic chunking (only for oversized or structureless
+documents) and claim-graph similarity (claims are linked by embedding cosine
+similarity whenever a graph is built). Point `ALEX_EMBEDDING_MODEL` at
+another provider (e.g. `voyage/voyage-3.5-lite`) to swap them.
 
 The claim graph links claims whose embeddings exceed a cosine threshold
 (`ALEX_CLAIM_SIMILARITY_THRESHOLD`, default `0.8`). Lower it to draw more
