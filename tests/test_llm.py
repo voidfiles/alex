@@ -12,6 +12,7 @@ import pytest
 import alex.lib.llm as llm
 from alex.lib.llm import (
     CHUNK_GRAPH_MAX_CLAIMS_ENV,
+    DEFAULT_ASSET_NAMING_MODEL,
     DEFAULT_CHUNK_GRAPH_MAX_CLAIMS,
     DEFAULT_EMBEDDING_MODEL,
     DEFAULT_FAST_SUMMARY_MODEL,
@@ -19,6 +20,12 @@ from alex.lib.llm import (
     DEFAULT_GRAPH_MAX_CLAIMS,
     DEFAULT_SOURCE_CLAIMS_PER_SECTION,
     DEFAULT_TRANSCRIPTION_MODEL,
+    DEFAULT_TRIAGE_ATOMIC_MODEL,
+    DEFAULT_TRIAGE_BATCH_SIZE,
+    DEFAULT_TRIAGE_CLUSTER_THRESHOLD,
+    DEFAULT_TRIAGE_DISTILL_MODEL,
+    DEFAULT_TRIAGE_LABEL_MODEL,
+    DEFAULT_TRIAGE_PROPOSAL_MODEL,
     EMBEDDING_MODEL_ENV,
     FAST_SUMMARY_MODEL_ENV,
     FINAL_SUMMARY_MODEL_ENV,
@@ -26,6 +33,12 @@ from alex.lib.llm import (
     SOURCE_CLAIMS_PER_SECTION_ENV,
     SUMMARY_MAX_WORKERS_ENV,
     TRANSCRIPTION_MODEL_ENV,
+    TRIAGE_ATOMIC_MODEL_ENV,
+    TRIAGE_BATCH_SIZE_ENV,
+    TRIAGE_CLUSTER_THRESHOLD_ENV,
+    TRIAGE_DISTILL_MODEL_ENV,
+    TRIAGE_LABEL_MODEL_ENV,
+    TRIAGE_PROPOSAL_MODEL_ENV,
     AudioTranscript,
     LiteLlmCompleter,
     LiteLlmEmbedder,
@@ -42,6 +55,12 @@ from alex.lib.llm import (
     resolve_source_claims_per_section,
     resolve_summary_max_workers,
     resolve_transcription_model,
+    resolve_triage_atomic_model,
+    resolve_triage_batch_size,
+    resolve_triage_cluster_threshold,
+    resolve_triage_distill_model,
+    resolve_triage_label_model,
+    resolve_triage_proposal_model,
 )
 
 
@@ -577,3 +596,45 @@ def test_litellm_transcriber_requires_ffmpeg_for_oversized_audio(
 
     with pytest.raises(LlmError, match="ffmpeg is required"):
         LiteLlmTranscriber().transcribe(audio_path=audio_path, model="whisper-1")
+
+
+def test_triage_models_default_per_role(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv(TRIAGE_LABEL_MODEL_ENV, raising=False)
+    monkeypatch.delenv(TRIAGE_PROPOSAL_MODEL_ENV, raising=False)
+    monkeypatch.delenv(TRIAGE_ATOMIC_MODEL_ENV, raising=False)
+    monkeypatch.delenv(TRIAGE_DISTILL_MODEL_ENV, raising=False)
+
+    assert DEFAULT_TRIAGE_LABEL_MODEL == DEFAULT_FAST_SUMMARY_MODEL
+    assert DEFAULT_TRIAGE_PROPOSAL_MODEL == DEFAULT_ASSET_NAMING_MODEL
+    assert DEFAULT_TRIAGE_ATOMIC_MODEL == DEFAULT_ASSET_NAMING_MODEL
+    assert DEFAULT_TRIAGE_DISTILL_MODEL == DEFAULT_FINAL_SUMMARY_MODEL
+
+
+def test_triage_models_can_be_swapped_via_environment(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv(TRIAGE_LABEL_MODEL_ENV, "gemini/gemini-2.5-flash")
+    monkeypatch.setenv(TRIAGE_PROPOSAL_MODEL_ENV, "openai/gpt-5")
+    monkeypatch.setenv(TRIAGE_ATOMIC_MODEL_ENV, "openai/gpt-5-mini")
+    monkeypatch.setenv(TRIAGE_DISTILL_MODEL_ENV, "anthropic/claude-opus-4-8")
+
+    assert resolve_triage_label_model() == "gemini/gemini-2.5-flash"
+    assert resolve_triage_proposal_model() == "openai/gpt-5"
+    assert resolve_triage_atomic_model() == "openai/gpt-5-mini"
+    assert resolve_triage_distill_model() == "anthropic/claude-opus-4-8"
+
+
+def test_triage_clustering_knobs_default_and_override(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv(TRIAGE_CLUSTER_THRESHOLD_ENV, raising=False)
+    monkeypatch.delenv(TRIAGE_BATCH_SIZE_ENV, raising=False)
+    assert DEFAULT_TRIAGE_CLUSTER_THRESHOLD == 0.45
+    assert DEFAULT_TRIAGE_BATCH_SIZE == 40
+    assert resolve_triage_cluster_threshold() == DEFAULT_TRIAGE_CLUSTER_THRESHOLD
+    assert resolve_triage_batch_size() == DEFAULT_TRIAGE_BATCH_SIZE
+
+    monkeypatch.setenv(TRIAGE_CLUSTER_THRESHOLD_ENV, "0.6")
+    monkeypatch.setenv(TRIAGE_BATCH_SIZE_ENV, "25")
+    assert resolve_triage_cluster_threshold() == 0.6
+    assert resolve_triage_batch_size() == 25

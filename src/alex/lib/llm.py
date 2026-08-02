@@ -124,6 +124,46 @@ def resolve_summary_max_workers() -> int:
     return value
 
 
+DEFAULT_TRIAGE_LABEL_MODEL = DEFAULT_FAST_SUMMARY_MODEL
+DEFAULT_TRIAGE_PROPOSAL_MODEL = DEFAULT_ASSET_NAMING_MODEL
+DEFAULT_TRIAGE_ATOMIC_MODEL = DEFAULT_ASSET_NAMING_MODEL
+DEFAULT_TRIAGE_DISTILL_MODEL = DEFAULT_FINAL_SUMMARY_MODEL
+DEFAULT_TRIAGE_CLUSTER_THRESHOLD = 0.45
+DEFAULT_TRIAGE_BATCH_SIZE = 40
+TRIAGE_LABEL_MODEL_ENV = "ALEX_TRIAGE_LABEL_MODEL"
+TRIAGE_PROPOSAL_MODEL_ENV = "ALEX_TRIAGE_PROPOSAL_MODEL"
+TRIAGE_ATOMIC_MODEL_ENV = "ALEX_TRIAGE_ATOMIC_MODEL"
+TRIAGE_DISTILL_MODEL_ENV = "ALEX_TRIAGE_DISTILL_MODEL"
+TRIAGE_CLUSTER_THRESHOLD_ENV = "ALEX_TRIAGE_CLUSTER_THRESHOLD"
+TRIAGE_BATCH_SIZE_ENV = "ALEX_TRIAGE_BATCH_SIZE"
+
+
+def resolve_triage_label_model() -> str:
+    return os.getenv(TRIAGE_LABEL_MODEL_ENV) or DEFAULT_TRIAGE_LABEL_MODEL
+
+
+def resolve_triage_proposal_model() -> str:
+    return os.getenv(TRIAGE_PROPOSAL_MODEL_ENV) or DEFAULT_TRIAGE_PROPOSAL_MODEL
+
+
+def resolve_triage_atomic_model() -> str:
+    return os.getenv(TRIAGE_ATOMIC_MODEL_ENV) or DEFAULT_TRIAGE_ATOMIC_MODEL
+
+
+def resolve_triage_distill_model() -> str:
+    return os.getenv(TRIAGE_DISTILL_MODEL_ENV) or DEFAULT_TRIAGE_DISTILL_MODEL
+
+
+def resolve_triage_cluster_threshold() -> float:
+    raw = os.getenv(TRIAGE_CLUSTER_THRESHOLD_ENV)
+    return float(raw) if raw else DEFAULT_TRIAGE_CLUSTER_THRESHOLD
+
+
+def resolve_triage_batch_size() -> int:
+    raw = os.getenv(TRIAGE_BATCH_SIZE_ENV)
+    return int(raw) if raw else DEFAULT_TRIAGE_BATCH_SIZE
+
+
 class LlmError(RuntimeError):
     pass
 
