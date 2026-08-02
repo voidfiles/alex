@@ -188,7 +188,7 @@ def guide_cache_path(config: EvalConfig) -> Path:
         facts_dir=config.facts_dir,
         doc_text=GUIDE_MD,
         extractor_model="test/extractor-1",
-        extractor_version="v002",
+        extractor_version="v003",
     )
 
 
