@@ -321,11 +321,14 @@ avoid drift.
 Following the existing role-default-plus-env-override pattern in
 lib/llm.py:
 
-- Cluster labeling: fast model (haiku default), `ALEX_TRIAGE_LABEL_MODEL`.
-- Triage proposals: sonnet default, `ALEX_TRIAGE_PROPOSAL_MODEL`.
-- Atomic-note drafting and chat: sonnet default,
+- Cluster labeling: `openai/gpt-5.6-luna` default,
+  `ALEX_TRIAGE_LABEL_MODEL`.
+- Triage proposals: `openai/gpt-5.6-terra` default,
+  `ALEX_TRIAGE_PROPOSAL_MODEL`.
+- Atomic-note drafting and chat: `openai/gpt-5.6-terra` default,
   `ALEX_TRIAGE_ATOMIC_MODEL`.
-- Rubric distillation: opus default, `ALEX_TRIAGE_DISTILL_MODEL`.
+- Rubric distillation: `openai/gpt-5.6-sol` default,
+  `ALEX_TRIAGE_DISTILL_MODEL`.
 - Embeddings: existing `ALEX_EMBEDDING_MODEL`.
 
 Prompts live in `src/alex/prompts/` as versioned markdown per repo

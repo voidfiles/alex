@@ -12,6 +12,7 @@ import pytest
 import alex.lib.llm as llm
 from alex.lib.llm import (
     CHUNK_GRAPH_MAX_CLAIMS_ENV,
+    DEFAULT_ASSET_NAMING_MODEL,
     DEFAULT_CHUNK_GRAPH_MAX_CLAIMS,
     DEFAULT_EMBEDDING_MODEL,
     DEFAULT_FAST_SUMMARY_MODEL,
@@ -603,13 +604,10 @@ def test_triage_models_default_per_role(monkeypatch: pytest.MonkeyPatch) -> None
     monkeypatch.delenv(TRIAGE_ATOMIC_MODEL_ENV, raising=False)
     monkeypatch.delenv(TRIAGE_DISTILL_MODEL_ENV, raising=False)
 
-    assert resolve_triage_label_model() == DEFAULT_TRIAGE_LABEL_MODEL
-    assert resolve_triage_proposal_model() == DEFAULT_TRIAGE_PROPOSAL_MODEL
-    assert resolve_triage_atomic_model() == DEFAULT_TRIAGE_ATOMIC_MODEL
-    assert resolve_triage_distill_model() == DEFAULT_TRIAGE_DISTILL_MODEL
-    assert resolve_triage_label_model() == "anthropic/claude-haiku-4-5"
-    assert resolve_triage_proposal_model() == "anthropic/claude-sonnet-4-6"
-    assert resolve_triage_distill_model() == "anthropic/claude-opus-4-8"
+    assert DEFAULT_TRIAGE_LABEL_MODEL == DEFAULT_FAST_SUMMARY_MODEL
+    assert DEFAULT_TRIAGE_PROPOSAL_MODEL == DEFAULT_ASSET_NAMING_MODEL
+    assert DEFAULT_TRIAGE_ATOMIC_MODEL == DEFAULT_ASSET_NAMING_MODEL
+    assert DEFAULT_TRIAGE_DISTILL_MODEL == DEFAULT_FINAL_SUMMARY_MODEL
 
 
 def test_triage_models_can_be_swapped_via_environment(

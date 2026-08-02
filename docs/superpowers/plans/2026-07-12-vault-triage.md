@@ -1,5 +1,13 @@
 # Vault Triage Tool Implementation Plan
 
+> **Historical status — do not execute wholesale.** This historical snapshot
+> is not an instruction file to execute wholesale. Tasks 1–9 were
+> implemented at commits `722c86d` through `47457c9` and are the only content
+> integrated by this milestone. Tasks 10–18 remain unimplemented. The old
+> Anthropic pins and agent/co-author directives are superseded by current
+> repository conventions. Continuation must be split into separately reviewed
+> milestones; do not run the remaining 11,000-line plan end-to-end.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Build `alex triage`, a batch-review pipeline plus Textual TUI that drains the Obsidian vault's ~3,000-note backlog into PARA with LLM-proposed filing decisions, human-corrected atomic notes, and a corrections ledger distilled into a versioned rubric so proposals improve over time.
