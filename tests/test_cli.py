@@ -29,6 +29,9 @@ def test_cli_help_lists_available_commands() -> None:
     assert "to-markdown" not in result.output
     assert "transcribe" in result.output
     assert "version" in result.output
+    assert "brain" in result.output
+    assert "brainstorm" in result.output
+    assert "lsd" in result.output
 
 
 def test_version_command_prints_package_version() -> None:

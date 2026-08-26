@@ -1,3 +1,4 @@
+import json
 import shutil
 import sys
 import threading
@@ -344,6 +345,49 @@ def test_litellm_embedder_makes_no_calls_for_empty_input(
     install_fake_litellm_embedding(monkeypatch, fail_embedding)
 
     assert LiteLlmEmbedder().embed(texts=[], model="openai/x") == ()
+
+
+def test_litellm_embedder_sends_openrouter_embeddings_to_its_native_endpoint(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured_requests: list[Any] = []
+
+    class FakeResponse:
+        def __enter__(self) -> "FakeResponse":
+            return self
+
+        def __exit__(self, *args: object) -> None:
+            pass
+
+        def read(self) -> bytes:
+            return b'{"data": [{"index": 0, "embedding": [0.1, 0.2]}]}'
+
+    def fake_urlopen(request: Any, *, timeout: float) -> FakeResponse:
+        captured_requests.append((request, timeout))
+        return FakeResponse()
+
+    monkeypatch.setenv("OPENROUTER_API_KEY", "test-openrouter-key")
+    monkeypatch.setattr(llm, "urlopen", fake_urlopen)
+
+    result = LiteLlmEmbedder(timeout_seconds=12.5).embed(
+        texts=["A document."],
+        model="openrouter/voyageai/voyage-4",
+        input_type="document",
+    )
+
+    assert result == ((0.1, 0.2),)
+    assert len(captured_requests) == 1
+    request, timeout = captured_requests[0]
+    assert request.full_url == "https://openrouter.ai/api/v1/embeddings"
+    assert request.get_method() == "POST"
+    assert request.get_header("Authorization") == "Bearer test-openrouter-key"
+    assert request.get_header("Content-type") == "application/json"
+    assert json.loads(request.data) == {
+        "input": ["A document."],
+        "input_type": "document",
+        "model": "voyageai/voyage-4",
+    }
+    assert timeout == 12.5
 
 
 def test_litellm_embedder_wraps_provider_errors(
