@@ -403,8 +403,7 @@ def test_to_asset_rejects_unsupported_file_types(tmp_path: Path) -> None:
     assert result.exit_code == 1
     assert (
         "Unsupported file type '.txt'. "
-        "Supported file types: .epub, .markdown, .md, .pdf"
-        in result.output
+        "Supported file types: .epub, .markdown, .md, .pdf" in result.output
     )
     assert converter_was_called is False
 

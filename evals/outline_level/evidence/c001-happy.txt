@@ -1,0 +1,33 @@
+PASS: real corpus preparation and unannotated baseline
+
+Command: uv run alex prepare-outline-level-eval --asset-root /home/alex/Documents/Alex3/assets --evals-dir evals --count 25
+Exit: 0
+Output: Prepared 25 cases in evals/outline_level
+
+Manifest/data verification:
+- manifest case count: 25
+- every input.md was byte-identical to its manifest source headers.md
+- every input.md SHA-256 matched manifest.json
+- every output.md began with <!-- chapter-level: TODO -->
+- every output.md retained its input.md outline byte-for-byte
+- outline entry-count range: 1..1947
+- outline byte-size range: 81..109563
+
+Command: uv run alex eval-outline-level --evals-dir evals --run-id baseline-unannotated
+Exit: 0
+Summary:
+- Accuracy: n/a (0 annotated)
+- Pending: 25
+- Run artifact: evals/outline_level/runs/baseline-unannotated/run.json
+
+Post-review integrity rerun:
+- eval-outline-level validated manifest schema, exact case set, and all input hashes
+- exit 0 with Accuracy: n/a (0 annotated), Pending: 25
+- run artifact: evals/outline_level/runs/post-integrity-unannotated-2/run.json
+- run.json records corpus_sha256 for reproducible comparisons
+
+Overwrite safety:
+Second prepare command exit: 1
+Error: evals/outline_level: eval corpus already exists
+
+Cleanup: no process, port, container, browser, or temporary QA artifact was created.

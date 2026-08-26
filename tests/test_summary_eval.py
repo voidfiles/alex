@@ -1,7 +1,8 @@
 import hashlib
 import json
-from collections.abc import Sequence
-from dataclasses import dataclass, field
+import threading
+import time
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 
 import pytest
@@ -32,6 +33,7 @@ from alex.lib.summary_eval import (
     strip_code_fence,
     verify_claims,
 )
+from helpers import BagOfWordsEmbedder
 
 GUIDE_MD = (
     "# Field Guide\n"
@@ -70,20 +72,10 @@ class ScriptedCompleter:
         raise AssertionError(f"Unexpected prompt: {prompt[:80]!r}")
 
 
-class NullEmbedder:
-    def embed(
-        self,
-        *,
-        texts: Sequence[str],
-        model: str,
-    ) -> tuple[tuple[float, ...], ...]:
-        raise AssertionError("small eval docs should never be embedded")
-
-
 def judge_responses() -> list[tuple[str, str]]:
     return [
         (
-            "source-grounded claims",
+            "source-grounded items",
             json.dumps(
                 {
                     "claims": [
@@ -95,11 +87,31 @@ def judge_responses() -> list[tuple[str, str]]:
                             "claim": "The guide explains owl diet.",
                             "evidence": "Owls eat voles.",
                         },
-                    ]
+                    ],
+                    "concepts": [
+                        {
+                            "concept": "Owl habitat",
+                            "definition": "Where owls live.",
+                            "evidence": "Owls live in cavities.",
+                        }
+                    ],
+                    "key_passages": [
+                        {
+                            "passage": "Owls live in cavities.",
+                            "why_it_matters": "It directly supports habitat coverage.",
+                        }
+                    ],
                 }
             ),
         ),
-        ("graph-guided abstractive summary", "The graph covers owl habitat and diet."),
+        (
+            "Use the selected summary graph as the only source of truth",
+            "The graph covers owl habitat and diet.",
+        ),
+        (
+            "revising a merged summary using a selected summary graph",
+            "The guide explains owl habitat and diet.",
+        ),
         (
             "merging two independently generated summaries",
             "The guide explains owl habitat and diet.",
@@ -187,13 +199,19 @@ def test_evaluate_scores_a_doc_and_writes_run_artifact(tmp_path: Path) -> None:
     run = PipelineSummaryEvaluator(
         config=config,
         completer=completer,
-        embedder=NullEmbedder(),
+        embedder=BagOfWordsEmbedder(),
     ).evaluate(prompts=SummaryPrompts.load(), run_id="testrun")
 
     assert set(run.prompt_versions) == {
         "chunk_summary",
+        "chunk_summary_with_graph",
         "compression_summary",
         "final_summary",
+        "source_claim_extraction",
+        "graph_guided_summary",
+        "merged_summary",
+        "merged_summary_repair",
+        "merged_summary_faithfulness_filter",
     }
     assert len(run.doc_scores) == 1
     score = run.doc_scores[0]
@@ -222,8 +240,14 @@ def test_evaluate_scores_a_doc_and_writes_run_artifact(tmp_path: Path) -> None:
     assert artifact["mean_blended"] == pytest.approx(0.6875)
     assert set(artifact["prompt_versions"]) == {
         "chunk_summary",
+        "chunk_summary_with_graph",
         "compression_summary",
         "final_summary",
+        "source_claim_extraction",
+        "graph_guided_summary",
+        "merged_summary",
+        "merged_summary_repair",
+        "merged_summary_faithfulness_filter",
     }
     assert artifact["judge_model"] == "test-judge"
     assert artifact["fact_extractor_model"] == "test/extractor-1"
@@ -236,9 +260,60 @@ def test_evaluate_scores_a_doc_and_writes_run_artifact(tmp_path: Path) -> None:
         "covered": False,
         "evidence": "missing coverage scope",
     }
+    chunk_graphs = artifact["docs"][0]["chunk_graphs"]
+    assert chunk_graphs is not None
+    assert chunk_graphs["artifact_dir"].endswith("testrun/graphs/guide")
+    assert chunk_graphs["chunk_graphs_markdown"].endswith("chunk_graphs.md")
+    assert chunk_graphs["chunks"]
+    chunk_graphs_markdown = Path(chunk_graphs["chunk_graphs_markdown"])
+    assert chunk_graphs_markdown.is_file()
+    assert "# Chunk Graphs" in chunk_graphs_markdown.read_text(encoding="utf-8")
 
     cache_path = guide_cache_path(config)
     assert json.loads(cache_path.read_text(encoding="utf-8")) == {"facts": FACTS}
+
+
+def test_evaluate_writes_comparable_run_metadata(tmp_path: Path) -> None:
+    config = eval_config(tmp_path)
+    prompt_overrides = {
+        "chunk_summary": "v001",
+        "graph_guided_summary": "v001",
+        "merged_summary_repair": "v001",
+    }
+    config = replace(
+        config,
+        summary=replace(
+            config.summary,
+            prompt_overrides=prompt_overrides,
+            graph_enhanced=False,
+            coverage_repair=False,
+        ),
+    )
+
+    PipelineSummaryEvaluator(
+        config=config,
+        completer=ScriptedCompleter(responses=judge_responses()),
+        embedder=BagOfWordsEmbedder(),
+        doc_names=("guide.md",),
+    ).evaluate(
+        prompts=SummaryPrompts.load(overrides={"chunk_summary": "v001"}),
+        run_id="metadata-run",
+    )
+
+    artifact = json.loads(
+        (config.runs_dir / "metadata-run.json").read_text(encoding="utf-8")
+    )
+    assert artifact["run_id"] == "metadata-run"
+    assert artifact["selected_docs"] == ["guide.md"]
+    assert artifact["prompt_overrides"] == prompt_overrides
+    assert artifact["summary_pipeline"] == {
+        "graph_enhanced": False,
+        "chunk_graph_enhanced": True,
+        "coverage_repair": False,
+    }
+    assert artifact["prompt_versions"]["chunk_summary"] == "v001"
+    assert artifact["prompt_versions"]["graph_guided_summary"] == "v001"
+    assert artifact["prompt_versions"]["merged_summary_repair"] == "v001"
 
 
 def test_evaluate_streams_per_document_progress(tmp_path: Path) -> None:
@@ -248,7 +323,7 @@ def test_evaluate_streams_per_document_progress(tmp_path: Path) -> None:
     PipelineSummaryEvaluator(
         config=config,
         completer=ScriptedCompleter(responses=judge_responses()),
-        embedder=NullEmbedder(),
+        embedder=BagOfWordsEmbedder(),
     ).evaluate(
         prompts=SummaryPrompts.load(),
         run_id="progress",
@@ -256,6 +331,7 @@ def test_evaluate_streams_per_document_progress(tmp_path: Path) -> None:
     )
 
     assert "scoring (1/1) guide.md" in lines
+    assert any("chunk graphs:" in line for line in lines)
     assert any(line.startswith("guide.md: blended=") for line in lines)
 
 
@@ -281,7 +357,7 @@ def test_evaluate_reuses_cached_facts_without_calling_the_extractor(
     run = PipelineSummaryEvaluator(
         config=config,
         completer=ScriptedCompleter(responses=responses),
-        embedder=NullEmbedder(),
+        embedder=BagOfWordsEmbedder(),
     ).evaluate(prompts=SummaryPrompts.load(), run_id="cached")
 
     score = run.doc_scores[0]
@@ -294,12 +370,12 @@ def test_fact_cache_key_includes_doc_hash_model_and_extractor_version() -> None:
     path = fact_cache_path(
         facts_dir=Path("facts"),
         doc_text=GUIDE_MD,
-        extractor_model="anthropic/claude-sonnet-4-6",
+        extractor_model="anthropic/claude-sonnet-5",
         extractor_version="v003",
     )
 
     digest = hashlib.sha256(GUIDE_MD.encode("utf-8")).hexdigest()[:12]
-    assert path == Path(f"facts/{digest}.anthropic-claude-sonnet-4-6.v003.json")
+    assert path == Path(f"facts/{digest}.anthropic-claude-sonnet-5.v003.json")
 
 
 def test_corrupt_facts_cache_self_heals_by_re_extracting(tmp_path: Path) -> None:
@@ -311,7 +387,7 @@ def test_corrupt_facts_cache_self_heals_by_re_extracting(tmp_path: Path) -> None
     run = PipelineSummaryEvaluator(
         config=config,
         completer=ScriptedCompleter(responses=judge_responses()),
-        embedder=NullEmbedder(),
+        embedder=BagOfWordsEmbedder(),
     ).evaluate(prompts=SummaryPrompts.load(), run_id="healed")
 
     assert run.doc_scores[0].error is None
@@ -325,7 +401,7 @@ def test_unreadable_corpus_doc_fails_only_that_doc(tmp_path: Path) -> None:
     run = PipelineSummaryEvaluator(
         config=config,
         completer=ScriptedCompleter(responses=judge_responses()),
-        embedder=NullEmbedder(),
+        embedder=BagOfWordsEmbedder(),
     ).evaluate(prompts=SummaryPrompts.load(), run_id="partial")
 
     by_name = {score.doc_name: score for score in run.doc_scores}
@@ -347,7 +423,7 @@ def test_evaluate_records_malformed_judge_output_as_failed_doc(
     run = PipelineSummaryEvaluator(
         config=config,
         completer=ScriptedCompleter(responses=responses),
-        embedder=NullEmbedder(),
+        embedder=BagOfWordsEmbedder(),
     ).evaluate(prompts=SummaryPrompts.load(), run_id="broken")
 
     score = run.doc_scores[0]
@@ -448,12 +524,32 @@ def test_claim_verdicts_require_supported_booleans() -> None:
     payload = {"verdicts": [{"supported": False, "evidence": "not in doc"}]}
 
     assert claim_verdicts(payload, claims=("Claim A.",))[0].supported is False
+    assert claim_verdicts(payload, claims=("Claim A.",))[0].status == "NOT_IN_SOURCE"
 
     with pytest.raises(EvalJudgeError, match="'supported' must be a boolean"):
         claim_verdicts(
             {"verdicts": [{"supported": "false", "evidence": "not in doc"}]},
             claims=("Claim A.",),
         )
+
+
+def test_claim_verdicts_accept_richer_status_payload() -> None:
+    payload = {
+        "verdicts": [
+            {
+                "supported": False,
+                "status": "CONTRADICTED",
+                "evidence": "Wrong direction.",
+                "issue_categories": ["number", "causality"],
+            }
+        ]
+    }
+
+    verdict = claim_verdicts(payload, claims=("Claim A.",))[0]
+
+    assert verdict.supported is False
+    assert verdict.status == "CONTRADICTED"
+    assert verdict.issue_categories == ("number", "causality")
 
 
 def test_judges_batch_large_fact_and_claim_lists() -> None:
@@ -513,6 +609,58 @@ def test_judges_batch_large_fact_and_claim_lists() -> None:
     assert len(fact_results) == 45
     assert len(claim_results) == 45
     assert len(completer.calls) == 10
+
+
+def test_fact_coverage_batches_are_bounded_and_ordered() -> None:
+    class SlowCoverageCompleter:
+        def __init__(self) -> None:
+            self.active = 0
+            self.max_active = 0
+            self.lock = threading.Lock()
+
+        def complete(self, *, prompt: str, model: str, max_tokens: int) -> str:
+            with self.lock:
+                self.active += 1
+                self.max_active = max(self.max_active, self.active)
+            try:
+                if "Fact 0." in prompt:
+                    time.sleep(0.05)
+                else:
+                    time.sleep(0.01)
+                return json.dumps(
+                    {
+                        "verdicts": [
+                            {"covered": True, "evidence": "covered"}
+                            for _ in range(numbered_item_count(prompt))
+                        ]
+                    }
+                )
+            finally:
+                with self.lock:
+                    self.active -= 1
+
+    def numbered_item_count(prompt: str) -> int:
+        return sum(
+            1 for line in prompt.splitlines() if line[:1].isdigit() and ". " in line[:5]
+        )
+
+    completer = SlowCoverageCompleter()
+    facts = tuple(f"Fact {index}." for index in range(25))
+
+    verdicts = judge_fact_coverage(
+        facts=facts,
+        summary="A summary.",
+        template=EvalPrompts.load().fact_coverage_judge,
+        completer=completer,
+        settings=EvalSettings(
+            judge_model="judge",
+            fact_extractor_model="extractor",
+            max_workers=2,
+        ),
+    )
+
+    assert tuple(verdict.fact for verdict in verdicts) == facts
+    assert completer.max_active <= 2
 
 
 def test_fact_sections_use_inferred_chapters_and_preamble() -> None:

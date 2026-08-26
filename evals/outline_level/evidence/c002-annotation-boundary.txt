@@ -1,0 +1,21 @@
+PASS: real CLI annotation boundary QA
+
+Help surfaces:
+- uv run alex --help: exit 0; listed eval-outline-level and prepare-outline-level-eval
+- uv run alex eval-outline-level --help: exit 0; showed eval options
+
+Valid plus pending temporary corpus:
+- command exit: 0
+- case-h2: predicted=H2 expected=H2 status=correct
+- case-todo: predicted=H1 expected=TODO status=pending
+- Accuracy: 1.0000 (1 annotated)
+- Pending: 1
+- parsed run.json: accuracy=1.0, annotated_count=1, pending_count=1
+
+Malformed annotation:
+- added one output.md beginning <!-- chapter-level: H7 -->
+- command exit: 1
+- Error: /tmp/alex-outline-level-qa/outline_level/cases/z-malformed-h7/output.md: malformed first line; expected <!-- chapter-level: TODO|H1-H6 -->
+- no failed stage-two run.json was written
+
+Cleanup: rm -rf /tmp/alex-outline-level-qa; verified the temporary tree no longer existed.

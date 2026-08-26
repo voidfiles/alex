@@ -1,0 +1,33 @@
+PASS: hypothesis-driven Python CLI runtime audit
+
+Environment:
+- Runtime: Python 3.12 via uv
+- Entry surface: uv run alex
+- No debugger, listener, port, background process, or environment override was used.
+
+H1: deterministic sampling could admit empty or unparsable outlines, causing the later evaluator to fail.
+- Distinguishing evidence: real manifest entry_count values and real baseline execution.
+- Observed: case_count=25, invalid_entry_counts=0; the baseline evaluated all 25 cases and wrote run.json.
+- Verdict: refuted for the prepared corpus; candidate loading filters on parse_toc_header_levels.
+
+H2: a malformed or altered output.md could be silently accepted and scored against the wrong gold label.
+- Distinguishing evidence: real CLI runs against invalid first-line annotation and altered body.
+- Observed: H7 exited 1 with the exact output.md path; altered-body coverage is green in the focused tests; no failed-run artifact was written.
+- Verdict: refuted; annotation and retained-outline validation fail loudly at the CLI boundary.
+
+H3: TODO annotations could be treated as incorrect labels or produce a misleading numeric accuracy.
+- Distinguishing evidence: parsed real baseline run artifact.
+- Observed: accuracy=null, annotated_count=0, pending_count=25, case_count=25, and every status was pending.
+- Verdict: refuted; incomplete manual work remains visible and excluded from accuracy.
+
+Post-review integrity findings:
+- unsafe run IDs are now rejected at both CLI and library boundaries
+- evaluation validates manifest schema, exact case directories, input hashes and sizes
+- each run records the manifest SHA-256
+- corpus creation stages writes and atomically renames only after success
+
+Silent-failure scan:
+- no broad/silent exception handlers, ignored subprocess return codes, debug statements, or background tasks in the changed source
+- command errors are converted to nonzero Click errors at the CLI boundary
+
+Cleanup: no debug artifacts were created outside this evidence file; the independent QA temporary tree was already removed and verified absent.

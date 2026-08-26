@@ -4,6 +4,7 @@ from pathlib import Path
 from click.testing import CliRunner
 
 from alex.commands.eval_merged_summary import build_eval_merged_summary_command
+from helpers import BagOfWordsEmbedder
 
 
 class MergedEvalCompleter:
@@ -12,7 +13,7 @@ class MergedEvalCompleter:
             return "Standard chunk summary."
         if "<section_summaries>" in prompt:
             return "Standard summary covers broad facts."
-        if "source-grounded claims" in prompt:
+        if "source-grounded items" in prompt:
             return json.dumps(
                 {
                     "claims": [
@@ -20,10 +21,23 @@ class MergedEvalCompleter:
                             "claim": "Graph summaries preserve provenance.",
                             "evidence": "Graph summaries cite claim nodes.",
                         }
-                    ]
+                    ],
+                    "concepts": [
+                        {
+                            "concept": "Provenance",
+                            "definition": "Traceable support in graph summaries.",
+                            "evidence": "Graph summaries cite claim nodes.",
+                        }
+                    ],
+                    "key_passages": [
+                        {
+                            "passage": "Graph summaries preserve provenance.",
+                            "why_it_matters": "It states the evaluated benefit.",
+                        }
+                    ],
                 }
             )
-        if "graph-guided abstractive summary" in prompt:
+        if "Use the selected summary graph as the only source of truth" in prompt:
             return "Graph summary preserves provenance."
         if "merging two independently generated summaries" in prompt:
             assert "Standard summary covers broad facts." in prompt
@@ -60,7 +74,7 @@ class MergedEvalCompleter:
                     ]
                 }
             )
-        if "judging the writing quality" in prompt:
+        if "writing quality" in prompt:
             return json.dumps(
                 {
                     "coherence": 5,
@@ -93,7 +107,9 @@ def test_eval_merged_summary_writes_artifacts_and_scores(tmp_path: Path) -> None
     write_doc(corpus_dir / "graph.md")
 
     result = CliRunner().invoke(
-        build_eval_merged_summary_command(lambda: MergedEvalCompleter()),
+        build_eval_merged_summary_command(
+            lambda: MergedEvalCompleter(), lambda: BagOfWordsEmbedder()
+        ),
         [
             "--evals-dir",
             str(evals_dir),
@@ -150,7 +166,9 @@ def test_eval_merged_summary_records_failed_docs_and_continues(
     write_doc(corpus_dir / "graph.md")
 
     result = CliRunner().invoke(
-        build_eval_merged_summary_command(lambda: FailingMergedEvalCompleter()),
+        build_eval_merged_summary_command(
+            lambda: FailingMergedEvalCompleter(), lambda: BagOfWordsEmbedder()
+        ),
         ["--evals-dir", str(evals_dir), "--run-id", "partial"],
     )
 

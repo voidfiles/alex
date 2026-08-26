@@ -19,7 +19,7 @@ from alex.lib.claim_graph import (
     select_claim_subgraph,
     write_graph_json,
 )
-from alex.lib.llm import Completer, LiteLlmCompleter
+from alex.lib.llm import Completer, Embedder, LiteLlmCompleter, LiteLlmEmbedder
 from alex.lib.summary_eval import (
     DocScore,
     EvalConfig,
@@ -59,6 +59,7 @@ class GraphEvalRun:
 
 
 CompleterFactory = Callable[[], Completer]
+EmbedderFactory = Callable[[], Embedder]
 
 
 def new_run_id() -> str:
@@ -67,6 +68,7 @@ def new_run_id() -> str:
 
 def build_eval_claim_graph_command(
     completer_factory: CompleterFactory = LiteLlmCompleter,
+    embedder_factory: EmbedderFactory = LiteLlmEmbedder,
 ) -> click.Command:
     @click.command("eval-claim-graph")
     @click.option(
@@ -129,6 +131,7 @@ def build_eval_claim_graph_command(
                 graph_settings=GraphSettings(max_claims=max_claims),
                 run_id=run_id or new_run_id(),
                 completer=completer_factory(),
+                embedder=embedder_factory(),
                 progress=click.echo,
             )
         except (OSError, RuntimeError, ValueError) as error:
@@ -146,6 +149,7 @@ def evaluate_claim_graph(
     graph_settings: GraphSettings,
     run_id: str,
     completer: Completer,
+    embedder: Embedder,
     progress: Progress = no_progress,
 ) -> GraphEvalRun:
     docs = corpus_docs(config.corpus_dir, doc_names)
@@ -165,6 +169,7 @@ def evaluate_claim_graph(
                 config=config,
                 graph_settings=graph_settings,
                 completer=completer,
+                embedder=embedder,
             )
         except (OSError, RuntimeError, ValueError) as error:
             result = failed_graph_doc_result(
@@ -206,12 +211,14 @@ def evaluate_claim_graph_doc(
     config: EvalConfig,
     graph_settings: GraphSettings,
     completer: Completer,
+    embedder: Embedder,
 ) -> GraphDocResult:
     doc_text = doc_path.read_text(encoding="utf-8")
     graph = build_claim_graph(
         source=document_graph_source(doc_name=doc_path.name, doc_text=doc_text),
         prompts=graph_prompts,
         completer=completer,
+        embedder=embedder,
         eval_settings=config.settings,
     )
     selected = select_claim_subgraph(graph, settings=graph_settings)

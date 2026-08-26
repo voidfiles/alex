@@ -1,0 +1,127 @@
+PASS: G004/C002 CLI frontmatter and retained-outline boundary
+
+Isolation setup
+---------------
+Command:
+  mktemp -d /tmp/alex-g004-c002-frontmatter.XXXXXX
+Stdout:
+  /tmp/alex-g004-c002-frontmatter.unQtHt
+Stderr: <empty>
+Exit code: 0
+
+Commands:
+  mkdir "/tmp/alex-g004-c002-frontmatter.unQtHt/evals"
+  cp -a evals/outline_level "/tmp/alex-g004-c002-frontmatter.unQtHt/evals/outline_level"
+  rm -rf "/tmp/alex-g004-c002-frontmatter.unQtHt/evals/outline_level/runs"
+Observed:
+  copied_cases=24
+  copied_runs_present=no
+Exit code: 0
+
+1. Valid canonical nested frontmatter scores; copied TODO remains pending
+-----------------------------------------------------------------------
+Command:
+  uv run alex eval-outline-level --evals-dir /tmp/alex-g004-c002-frontmatter.unQtHt/evals --run-id valid-nested
+Stdout:
+  mr-america-the-tragic-history-of-a-bodybuilding-icon-john-d-fair-4d18edfeca42: predicted=H1 expected=H2 status=incorrect
+  muscle-confessions-of-an-unlikely-bodybuilder-samuel-wilson-fussell-8d9a6e3de665: predicted=H1 expected=H1 status=correct
+  creating-the-american-way-of-business-evidence-from-wwii-in-the-us-michela-giorcelli-96b1783a50a7: predicted=H2 expected=H3 status=incorrect
+  the-revised-selfleadership-questionnaire-testing-a-hierarchical-factor-structure-for-selfleadership-jeffery-d-houghton-and-christopher-p-neck-1af6daac9473: predicted=H1 expected=TODO status=pending
+  selfcontrolled-feedback-does-it-enhance-learning-because-performers-get-feedback-when-they-need-it-suzete-chiviacowsky-and-gabriele-wulf-1cc29480c450: predicted=H2 expected=H3 status=incorrect
+  edfaith-evaluating-dialogue-summarization-on-faithfulness-sicong-huang-asli-celikyilmaz-and-haoran-li-1f9b5e447f5c: predicted=H2 expected=H3 status=incorrect
+  structuring-competency-based-courses-through-skill-trees-hildo-bijl-3fc2c5017399: predicted=H2 expected=H2 status=correct
+  natural-language-processing-to-enhance-deliberation-in-political-online-discussions-a-survey-maike-behrendt-stefan-sylviius-wagner-carina-weinmann-mar-ed3d39945786: predicted=H2 expected=H3 status=incorrect
+  how-much-and-what-type-of-guidance-is-optimal-for-learning-from-instruction-richard-e-clark-5871eb14698d: predicted=H1 expected=H3 status=incorrect
+  topicaware-contrastive-learning-for-abstractive-dialogue-summarization-junpeng-liu-yanyan-zou-hainan-zhang-hongshen-chen-zhuoye-ding-caixia-yuan-and-x-bf15423fcf98: predicted=H2 expected=H3 status=incorrect
+  cliff-contrastive-learning-for-improving-faithfulness-and-factuality-in-abstractive-summarization-shuyang-cao-and-lu-wang-dc91db4f24ce: predicted=H2 expected=H2 status=correct
+  swimming-crossfit-style-tim-morrison-67232d035f55: predicted=H2 expected=TODO status=pending
+  optimizing-performance-through-intrinsic-motivation-and-attention-for-learning-the-optimal-theory-of-motor-learning-gabriele-wulf-and-rebecca-lewthwaite-1e46c6685cce: predicted=H2 expected=H3 status=incorrect
+  range-why-generalists-triumph-in-a-specialized-world-david-epstein-c481a785a6e8: predicted=H1 expected=H2 status=incorrect
+  531-the-simplest-and-most-effective-training-system-for-raw-strength-jim-wendler-4a9497e30a95: predicted=H3 expected=H3 status=correct
+  writing-quality-scale-wqs-he-version-administration-and-scoring-guide-stuart-n-and-barnett-al-f6e6b770e88d: predicted=H1 expected=H1 status=correct
+  thinking-fast-and-slow-daniel-kahneman-d1077f6071dc: predicted=H1 expected=H2 status=incorrect
+  highpowered-plyometrics-james-c-radcliffe-ccd486313de9: predicted=H1 expected=H2 status=incorrect
+  the-sciences-of-the-artificial-herbert-a-simon-f8d4a0ad8168: predicted=H1 expected=H2 status=incorrect
+  primal-leadership-unleashing-the-power-of-emotional-intelligence-daniel-goleman-richard-boyatzis-and-annie-mckee-892840db5712: predicted=H1 expected=H3 status=incorrect
+  domain-modeling-made-functional-scott-wlaschin-0ed508fbe87c: predicted=H1 expected=H3 status=incorrect
+  work-culture-organizational-performance-and-business-success-measurement-and-management-thomas-rollins-and-darryl-roberts-5529d88392de: predicted=H1 expected=H1 status=correct
+  the-programmers-brain-felienne-hermans-b9f94760547d: predicted=H1 expected=H2 status=incorrect
+  nscas-essentials-of-personal-training-brad-j-schoenfeld-and-ronald-l-snarr-303466f1188e: predicted=H1 expected=H2 status=incorrect
+  Accuracy: 0.2727 (22 annotated)
+  Pending: 2
+  Run artifact: /tmp/alex-g004-c002-frontmatter.unQtHt/evals/outline_level/runs/valid-nested/run.json
+Stderr: <empty>
+Exit code: 0
+Artifact check:
+  run.json present=yes
+  {"accuracy":0.2727272727272727,"annotated_count":22,"pending_count":2}
+Result: canonical nested frontmatter was scored (22 annotated); the real copied
+TODO case swimming-crossfit-style-tim-morrison-67232d035f55 was reported pending.
+
+Mutation target for all remaining scenarios:
+  /tmp/alex-g004-c002-frontmatter.unQtHt/evals/outline_level/cases/highpowered-plyometrics-james-c-radcliffe-ccd486313de9/output.md
+A pristine copy was saved as:
+  /tmp/alex-g004-c002-frontmatter.unQtHt/fresh-output.md
+
+2. H7 chapter.level is rejected without a run artifact
+--------------------------------------------------------
+Mutation command:
+  perl -0pi -e 's/(chapter:\n  level: )H2/${1}H7/' /tmp/alex-g004-c002-frontmatter.unQtHt/evals/outline_level/cases/highpowered-plyometrics-james-c-radcliffe-ccd486313de9/output.md
+Observed mutation:
+    level: H7
+Command:
+  uv run alex eval-outline-level --evals-dir /tmp/alex-g004-c002-frontmatter.unQtHt/evals --run-id h7-chapter
+Stdout: <empty>
+Stderr:
+  Error: /tmp/alex-g004-c002-frontmatter.unQtHt/evals/outline_level/cases/highpowered-plyometrics-james-c-radcliffe-ccd486313de9/output.md: chapter.level must be TODO or H1-H6
+Exit code: 1
+Artifact check:
+  /tmp/alex-g004-c002-frontmatter.unQtHt/evals/outline_level/runs/h7-chapter absent=yes
+
+3. Noncanonical map order is rejected without a run artifact
+-------------------------------------------------------------
+Fresh restore command:
+  cp /tmp/alex-g004-c002-frontmatter.unQtHt/fresh-output.md /tmp/alex-g004-c002-frontmatter.unQtHt/evals/outline_level/cases/highpowered-plyometrics-james-c-radcliffe-ccd486313de9/output.md
+Restore exact: yes
+Mutation command:
+  perl -0pi -e 's/^document:$/chapter:/m' /tmp/alex-g004-c002-frontmatter.unQtHt/evals/outline_level/cases/highpowered-plyometrics-james-c-radcliffe-ccd486313de9/output.md
+Observed line 2:
+  chapter:
+Command:
+  uv run alex eval-outline-level --evals-dir /tmp/alex-g004-c002-frontmatter.unQtHt/evals --run-id noncanonical-map
+Stdout: <empty>
+Stderr:
+  Error: /tmp/alex-g004-c002-frontmatter.unQtHt/evals/outline_level/cases/highpowered-plyometrics-james-c-radcliffe-ccd486313de9/output.md: expected document:, found 'chapter:'
+Exit code: 1
+Artifact check:
+  /tmp/alex-g004-c002-frontmatter.unQtHt/evals/outline_level/runs/noncanonical-map absent=yes
+
+4. Changed retained outline is rejected without a run artifact
+---------------------------------------------------------------
+Fresh restore command:
+  cp /tmp/alex-g004-c002-frontmatter.unQtHt/fresh-output.md /tmp/alex-g004-c002-frontmatter.unQtHt/evals/outline_level/cases/highpowered-plyometrics-james-c-radcliffe-ccd486313de9/output.md
+Restore exact: yes
+Mutation command:
+  perl -0pi -e 's/# Document Structure/# Changed Document Structure/' /tmp/alex-g004-c002-frontmatter.unQtHt/evals/outline_level/cases/highpowered-plyometrics-james-c-radcliffe-ccd486313de9/output.md
+Observed changed body line:
+  # Changed Document Structure
+Command:
+  uv run alex eval-outline-level --evals-dir /tmp/alex-g004-c002-frontmatter.unQtHt/evals --run-id changed-outline
+Stdout: <empty>
+Stderr:
+  Error: /tmp/alex-g004-c002-frontmatter.unQtHt/evals/outline_level/cases/highpowered-plyometrics-james-c-radcliffe-ccd486313de9/output.md: output body does not retain exact input
+Exit code: 1
+Artifact check:
+  /tmp/alex-g004-c002-frontmatter.unQtHt/evals/outline_level/runs/changed-outline absent=yes
+Final fresh restore exact: yes
+
+Cleanup
+-------
+Command:
+  rm -rf /tmp/alex-g004-c002-frontmatter.unQtHt
+Observed:
+  TEMP_TREE_ABSENT: yes
+  TEMP_JOBS_REMAINING: 0
+Exit code: 0
+
+cleanup: removed /tmp/alex-g004-c002-frontmatter.unQtHt; no temp process/artifact remains

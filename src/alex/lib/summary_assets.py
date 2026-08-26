@@ -72,6 +72,8 @@ def process_summary_asset(
     completer: Completer | None = None,
     embedder: Embedder | None = None,
 ) -> SummaryAssetOutput:
+    resolved_completer = completer or LiteLlmCompleter()
+    resolved_embedder = embedder or LiteLlmEmbedder()
     source_format = summary_source_format_for(config.source)
     asset_dir = config.output_path / config.source.stem
 
@@ -95,7 +97,7 @@ def process_summary_asset(
         markdown_filename=content.full_markdown.name,
         headers=headers,
         settings=config.chunking,
-        embedder=embedder or LiteLlmEmbedder(),
+        embedder=resolved_embedder,
     )
 
     metadata_path = asset_dir / "metadata.json"
@@ -114,7 +116,8 @@ def process_summary_asset(
         markdown_path=content.full_markdown,
         headers_path=headers_path,
         chunk_paths=chunking_result.chunk_paths,
-        completer=completer or LiteLlmCompleter(),
+        completer=resolved_completer,
+        embedder=resolved_embedder,
     )
 
     return SummaryAssetOutput(

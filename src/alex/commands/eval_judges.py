@@ -103,12 +103,9 @@ def build_eval_judges_command(
 
         click.echo(f"Cases: {result.case_count}")
         click.echo(
-            "Coverage: "
-            f"{result.coverage_correct}/{result.coverage_total} correct"
+            f"Coverage: {result.coverage_correct}/{result.coverage_total} correct"
         )
-        click.echo(
-            f"Support: {result.support_correct}/{result.support_total} correct"
-        )
+        click.echo(f"Support: {result.support_correct}/{result.support_total} correct")
         click.echo(f"Combined accuracy: {result.accuracy():.3f}")
         for failure in result.failures:
             click.echo(f"FAIL {failure}")

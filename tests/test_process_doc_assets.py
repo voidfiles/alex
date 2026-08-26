@@ -10,7 +10,7 @@ from alex.lib.process_doc_assets import (
     process_doc_asset,
 )
 from alex.lib.summarize import SummarySettings
-from helpers import RecordingCompleter
+from helpers import BagOfWordsEmbedder, RecordingCompleter
 
 
 def test_process_doc_asset_chunks_an_existing_asset_folder(tmp_path: Path) -> None:
@@ -67,6 +67,7 @@ def test_process_doc_asset_chunks_an_existing_asset_folder(tmp_path: Path) -> No
             summary=SummarySettings(max_workers=1),
         ),
         completer=completer,
+        embedder=BagOfWordsEmbedder(),
     )
 
     assert result.asset_dir == asset_dir
@@ -111,13 +112,16 @@ def test_process_doc_asset_chunks_an_existing_asset_folder(tmp_path: Path) -> No
 
     chunk_calls = completer.chunk_calls()
     assert len(chunk_calls) == 2
-    assert {call.model for call in chunk_calls} == {"anthropic/claude-haiku-4-5"}
+    assert {call.model for call in chunk_calls} == {"openai/gpt-5.6-luna"}
     assert {call.max_tokens for call in chunk_calls} == {20_000}
-    assert "<document_metadata>" in chunk_calls[0].prompt
+    # graph_enhanced is on by default, so chunks summarize through the
+    # graph-aware template that embeds the selected chunk subgraph.
     assert "Title: Systems Book" in chunk_calls[0].prompt
     assert "Authors: Dana Example" in chunk_calls[0].prompt
-    assert "<document_structure>" in chunk_calls[0].prompt
+    assert "Document outline:" in chunk_calls[0].prompt
     assert "- Systems Book (H1, line 1, 14 lines)" in chunk_calls[0].prompt
+    assert "<selected_chunk_graph>" in chunk_calls[0].prompt
+    assert "<section_content>" in chunk_calls[0].prompt
     assert "Foundations body." in chunk_calls[0].prompt
     assert completer.compression_calls() == []
 
@@ -133,7 +137,7 @@ def test_process_doc_asset_chunks_an_existing_asset_folder(tmp_path: Path) -> No
     final_calls = completer.final_calls()
     assert len(final_calls) == 1
     final_call = final_calls[0]
-    assert final_call.model == "anthropic/claude-opus-4-8"
+    assert final_call.model == "openai/gpt-5.6-sol"
     assert final_call.max_tokens == 8_192
     assert "Foundations summary." in final_call.prompt
     assert "chunks/001_foundations.md" in final_call.prompt
@@ -179,12 +183,13 @@ def test_process_doc_asset_recursively_compresses_large_chunk_summaries(
             summary=SummarySettings(max_context_tokens=50, max_workers=1),
         ),
         completer=completer,
+        embedder=BagOfWordsEmbedder(),
     )
 
     assert len(completer.chunk_calls()) == 1
     compression_calls = completer.compression_calls()
     assert len(compression_calls) == 2
-    assert {call.model for call in compression_calls} == {"anthropic/claude-haiku-4-5"}
+    assert {call.model for call in compression_calls} == {"openai/gpt-5.6-luna"}
     assert all(
         "Consolidate them into a comprehensive summary" in call.prompt
         for call in compression_calls
@@ -212,7 +217,7 @@ def test_process_doc_asset_can_rerun_after_generated_files_exist(
         "- Rerunnable (H1, line 1, 5 lines)\n  - First (H2, line 3, 2 lines)\n",
         encoding="utf-8",
     )
-    completer = RecordingCompleter()
+    completer = RecordingCompleter(final_response="First synthesis.")
 
     first = process_doc_asset(
         ProcessDocAssetConfig(
@@ -220,21 +225,94 @@ def test_process_doc_asset_can_rerun_after_generated_files_exist(
             summary=SummarySettings(max_workers=1),
         ),
         completer=completer,
+        embedder=BagOfWordsEmbedder(),
     )
+    assert first.summary_path is not None
+    first_summary = first.summary_path.read_text(encoding="utf-8")
     (first.chunks_dir / "stale.md").write_text("stale", encoding="utf-8")
+    second_completer = RecordingCompleter(final_response="Second synthesis.")
 
     second = process_doc_asset(
         ProcessDocAssetConfig(
             asset_path=asset_dir,
             summary=SummarySettings(max_workers=1),
         ),
-        completer=completer,
+        completer=second_completer,
+        embedder=BagOfWordsEmbedder(),
     )
 
     assert second.original_file == asset_dir / "rerunnable.pdf"
     assert tuple(path.name for path in second.chunk_paths) == ("001_first.md",)
     assert not (second.chunks_dir / "stale.md").exists()
+    assert second.summary_path is not None
+    assert second.summary_path == first.summary_path
+    assert second.summary_path.read_text(encoding="utf-8") == first_summary
+    assert second_completer.calls == []
+
+
+def test_process_doc_asset_reprocess_summary_archives_previous_artifacts(
+    tmp_path: Path,
+) -> None:
+    asset_dir = tmp_path / "reprocess"
+    asset_dir.mkdir()
+    (asset_dir / "reprocess.pdf").write_bytes(b"%PDF")
+    (asset_dir / "reprocess.md").write_text(
+        "# Reprocess\n\n## First\n\nBody.\n",
+        encoding="utf-8",
+    )
+    (asset_dir / "headers.md").write_text(
+        "- Reprocess (H1, line 1, 5 lines)\n  - First (H2, line 3, 2 lines)\n",
+        encoding="utf-8",
+    )
+    (asset_dir / "summary.md").write_text("Old summary.\n", encoding="utf-8")
+    (asset_dir / "chunk_summary.md").write_text(
+        "Old chunk summary.\n",
+        encoding="utf-8",
+    )
+    (asset_dir / "summary_evidence.md").write_text(
+        "Old evidence.\n",
+        encoding="utf-8",
+    )
+    old_graph = asset_dir / "summary_graph"
+    old_graph.mkdir()
+    (old_graph / "manifest.json").write_text('{"status": "old"}\n', encoding="utf-8")
+    completer = RecordingCompleter(
+        chunk_responses=["Fresh chunk summary."],
+        final_response="Fresh synthesis.",
+    )
+
+    result = process_doc_asset(
+        ProcessDocAssetConfig(
+            asset_path=asset_dir,
+            reprocess_summary=True,
+            summary=SummarySettings(max_workers=1),
+        ),
+        completer=completer,
+        embedder=BagOfWordsEmbedder(),
+    )
+
+    assert result.archived_summary_dir is not None
+    archived = result.archived_summary_dir
+    assert archived.parent == asset_dir / "_summary_runs"
+    assert (archived / "summary.md").read_text(encoding="utf-8") == "Old summary.\n"
+    assert (archived / "chunk_summary.md").read_text(encoding="utf-8") == (
+        "Old chunk summary.\n"
+    )
+    assert (archived / "summary_evidence.md").read_text(encoding="utf-8") == (
+        "Old evidence.\n"
+    )
+    assert (archived / "summary_graph" / "manifest.json").read_text(
+        encoding="utf-8"
+    ) == '{"status": "old"}\n'
+    assert result.summary_path == asset_dir / "summary.md"
+    assert result.summary_path.read_text(encoding="utf-8") != "Old summary.\n"
+    assert "Faithful Fresh synthesis." in result.summary_path.read_text(
+        encoding="utf-8"
+    )
+    assert result.graph_artifact_dir == asset_dir / "summary_graph"
+    assert (result.graph_artifact_dir / "manifest.json").is_file()
     assert len(completer.chunk_calls()) == 1
+    assert len(completer.final_calls()) == 1
 
 
 def test_process_doc_asset_handles_structureless_markdown(tmp_path: Path) -> None:
@@ -259,6 +337,7 @@ def test_process_doc_asset_handles_structureless_markdown(tmp_path: Path) -> Non
             summary=SummarySettings(max_workers=1),
         ),
         completer=completer,
+        embedder=BagOfWordsEmbedder(),
     )
 
     assert result.chapter_level_path is None

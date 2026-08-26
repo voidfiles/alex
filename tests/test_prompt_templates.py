@@ -9,6 +9,7 @@ from alex.lib.prompt_templates import (
     in_source_checkout,
     list_versions,
     load_prompt,
+    next_version,
     writable_prompt_dir,
 )
 from alex.lib.summarize import SUMMARY_PROMPT_NAMES, SummarizationError, SummaryPrompts
@@ -81,6 +82,17 @@ def test_list_versions_orders_numerically(tmp_path: Path) -> None:
     assert list_versions("greeting", root=tmp_path) == ("v001", "v002", "v010")
 
 
+def test_next_version_counts_untracked_worktree_candidates(tmp_path: Path) -> None:
+    for version in ("v001", "v002", "v003"):
+        write_prompt_version(tmp_path, "greeting", version, "Hello.")
+    prompt_directory = tmp_path / "greeting"
+    (prompt_directory / "notes.md").write_text("not a version", encoding="utf-8")
+    (prompt_directory / "vnext.md").write_text("not numeric", encoding="utf-8")
+
+    assert list_versions("greeting", root=tmp_path) == ("v001", "v002", "v003")
+    assert next_version("greeting", root=tmp_path) == "v004"
+
+
 def test_list_versions_requires_at_least_one_version(tmp_path: Path) -> None:
     (tmp_path / "empty").mkdir()
 
@@ -142,10 +154,9 @@ def test_in_source_checkout_distinguishes_repo_from_site_packages(
     assert not in_source_checkout(installed)
 
 
-def test_packaged_summary_prompts_ship_v001_as_active() -> None:
+def test_packaged_summary_prompts_ship_active_versions() -> None:
     for name in SUMMARY_PROMPT_NAMES:
-        assert active_version(name) == "v001"
-        assert "v001" in list_versions(name)
+        assert active_version(name) in list_versions(name)
 
 
 def test_summary_prompts_load_uses_active_versions() -> None:
@@ -163,6 +174,57 @@ def test_summary_prompts_load_uses_active_versions() -> None:
     assert prompts.final_summary.placeholders() == frozenset(
         {"title", "authors", "section_summaries", "chunk_reference_list"}
     )
+
+
+def test_source_claim_extraction_active_exposes_max_claims_knob() -> None:
+    template = load_prompt("source_claim_extraction")
+
+    assert template.version == "v005"
+    assert "max_claims" in template.placeholders()
+    assert "Extract up to {{max_claims}} items per category" in template.text
+    assert "concepts" in template.text
+    assert "key_passages" in template.text
+
+
+def test_merged_summary_repair_pins_selected_subgraph_placeholder() -> None:
+    template = load_prompt("merged_summary_repair")
+
+    assert template.placeholders() == frozenset(
+        {"document_name", "selected_subgraph", "merged_summary"}
+    )
+    # Passing the wrong key (selected_graph) fails because selected_subgraph is
+    # then missing, so the repair call can never silently render an empty graph.
+    with pytest.raises(PromptTemplateError, match=r"missing values.*selected_subgraph"):
+        template.render(
+            document_name="doc.md",
+            selected_graph="wrong key",
+            merged_summary="summary",
+        )
+
+
+@pytest.mark.parametrize(
+    ("name", "version", "placeholders"),
+    [
+        (
+            "final_summary",
+            "v006",
+            frozenset(
+                {"title", "authors", "section_summaries", "chunk_reference_list"}
+            ),
+        ),
+        (
+            "merged_summary",
+            "v005",
+            frozenset({"document_name", "standard_summary", "graph_summary"}),
+        ),
+    ],
+)
+def test_synthesis_candidate_prompts_preserve_placeholders(
+    name: str, version: str, placeholders: frozenset[str]
+) -> None:
+    template = load_prompt(name, version=version)
+
+    assert template.placeholders() == placeholders
 
 
 def test_summary_prompts_load_accepts_known_overrides_only() -> None:

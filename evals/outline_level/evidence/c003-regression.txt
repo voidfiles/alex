@@ -1,0 +1,25 @@
+PASS: targeted and repository regression gates
+
+Targeted command:
+uv run pytest tests/test_outline_level_eval.py tests/test_prepare_outline_level_eval_command.py tests/test_eval_outline_level_command.py tests/test_cli.py tests/test_chunking.py -q
+Exit: 0
+Output before integrity hardening: 35 passed in 2.35s
+
+Post-review focused command added corpus/manifest/path boundary tests.
+Output: 51 passed in 14.22s
+
+Static gates:
+- uv run ruff check: exit 0, All checks passed
+- uv run ruff format --check: exit 0, 91 files already formatted
+- uv run mypy: exit 0, Success: no issues found in 91 source files
+
+Path containment manual QA:
+- run ID ../escape exited 1 with `unsafe run ID`
+- no evaluator execution or outside-run artifact was permitted
+
+Full pytest observation:
+- 280 passed, 3 failed
+- all three failures are pre-existing summary fact-cache expectations in tests/test_summary_eval.py caused by the dirty worktree's active fact_extraction v003 versus tests expecting v002 cache paths
+- no outline-level, CLI, markdown-structure, or chunking regression failed
+
+Cleanup: pytest temporary directories are runner-managed; no process, port, container, browser, or manual temporary artifact remained.
