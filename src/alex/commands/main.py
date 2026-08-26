@@ -1,5 +1,7 @@
 import click
 
+from alex.commands.brain import brain
+from alex.commands.collisions import brainstorm, lsd
 from alex.commands.dump_env import dump_env
 from alex.commands.eval_claim_graph import eval_claim_graph
 from alex.commands.eval_judges import eval_judges
@@ -37,3 +39,6 @@ main.add_command(improve_prompt_command)
 main.add_command(pdf_samples)
 main.add_command(dump_env)
 main.add_command(version)
+main.add_command(brain)
+main.add_command(brainstorm)
+main.add_command(lsd)

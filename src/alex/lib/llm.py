@@ -8,6 +8,7 @@ model string works: "anthropic/claude-opus-4-8", "openai/gpt-5",
 
 from __future__ import annotations
 
+import json
 import os
 import shutil
 import subprocess
@@ -17,6 +18,8 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Protocol, TypeGuard
+from urllib.error import HTTPError, URLError
+from urllib.request import Request, urlopen
 
 DEFAULT_FAST_SUMMARY_MODEL = "anthropic/claude-haiku-4-5"
 DEFAULT_FINAL_SUMMARY_MODEL = "anthropic/claude-opus-4-8"
@@ -24,6 +27,8 @@ DEFAULT_ASSET_NAMING_MODEL = "anthropic/claude-sonnet-4-6"
 # Anthropic has no embeddings endpoint, so the embedding default needs a
 # non-Anthropic key. Swap providers via ALEX_EMBEDDING_MODEL.
 DEFAULT_EMBEDDING_MODEL = "openai/text-embedding-3-small"
+DEFAULT_BRAIN_EMBEDDING_MODEL = "ollama/nomic-embed-text"
+DEFAULT_BRAINSTORM_MODEL = "anthropic/claude-sonnet-4-6"
 DEFAULT_EVAL_JUDGE_MODEL = "anthropic/claude-sonnet-4-6"
 DEFAULT_FACT_EXTRACTOR_MODEL = "anthropic/claude-opus-4-8"
 DEFAULT_PROMPT_CRITIC_MODEL = "anthropic/claude-opus-4-8"
@@ -32,6 +37,9 @@ FAST_SUMMARY_MODEL_ENV = "ALEX_FAST_SUMMARY_MODEL"
 FINAL_SUMMARY_MODEL_ENV = "ALEX_FINAL_SUMMARY_MODEL"
 ASSET_NAMING_MODEL_ENV = "ALEX_NAMING_MODEL"
 EMBEDDING_MODEL_ENV = "ALEX_EMBEDDING_MODEL"
+BRAIN_EMBEDDING_MODEL_ENV = "ALEX_BRAIN_EMBEDDING_MODEL"
+BRAINSTORM_MODEL_ENV = "ALEX_BRAINSTORM_MODEL"
+BRAIN_JUDGE_MODEL_ENV = "ALEX_BRAIN_JUDGE_MODEL"
 EVAL_JUDGE_MODEL_ENV = "ALEX_EVAL_JUDGE_MODEL"
 FACT_EXTRACTOR_MODEL_ENV = "ALEX_FACT_EXTRACTOR_MODEL"
 PROMPT_CRITIC_MODEL_ENV = "ALEX_PROMPT_CRITIC_MODEL"
@@ -40,6 +48,8 @@ DEFAULT_LLM_TIMEOUT_SECONDS = 900.0
 DEFAULT_LLM_RETRIES = 6
 EMBEDDING_BATCH_SIZE = 96
 EMBEDDING_BATCH_MAX_TOKENS = 250_000
+OPENROUTER_EMBEDDINGS_API_URL = "https://openrouter.ai/api/v1/embeddings"
+OPENROUTER_API_KEY_ENV = "OPENROUTER_API_KEY"
 MAX_TRANSCRIPTION_FILE_BYTES = 24_000_000
 TRANSCRIPTION_AUDIO_BITRATE = 32_000
 
@@ -58,6 +68,18 @@ def resolve_asset_naming_model() -> str:
 
 def resolve_embedding_model() -> str:
     return os.getenv(EMBEDDING_MODEL_ENV) or DEFAULT_EMBEDDING_MODEL
+
+
+def resolve_brain_embedding_model() -> str:
+    return os.getenv(BRAIN_EMBEDDING_MODEL_ENV) or DEFAULT_BRAIN_EMBEDDING_MODEL
+
+
+def resolve_brainstorm_model() -> str:
+    return os.getenv(BRAINSTORM_MODEL_ENV) or DEFAULT_BRAINSTORM_MODEL
+
+
+def resolve_brain_judge_model() -> str:
+    return os.getenv(BRAIN_JUDGE_MODEL_ENV) or resolve_brainstorm_model()
 
 
 def resolve_eval_judge_model() -> str:
@@ -110,6 +132,7 @@ class Completer(Protocol):
 class LiteLlmCompleter:
     timeout_seconds: float = DEFAULT_LLM_TIMEOUT_SECONDS
     num_retries: int = DEFAULT_LLM_RETRIES
+    reasoning_effort: str | None = None
 
     def complete(self, *, prompt: str, model: str, max_tokens: int) -> str:
         # Imported lazily: litellm drags in a large dependency tree and the
@@ -117,14 +140,17 @@ class LiteLlmCompleter:
         import litellm
 
         litellm.suppress_debug_info = True
+        request: dict[str, object] = {
+            "model": model,
+            "messages": [{"role": "user", "content": prompt}],
+            "max_tokens": max_tokens,
+            "timeout": self.timeout_seconds,
+            "num_retries": self.num_retries,
+        }
+        if self.reasoning_effort is not None:
+            request["reasoning_effort"] = self.reasoning_effort
         try:
-            response = litellm.completion(
-                model=model,
-                messages=[{"role": "user", "content": prompt}],
-                max_tokens=max_tokens,
-                timeout=self.timeout_seconds,
-                num_retries=self.num_retries,
-            )
+            response = litellm.completion(**request)
         except Exception as error:
             raise LlmError(f"LLM request failed for model {model}: {error}") from error
 
@@ -403,9 +429,12 @@ class LiteLlmEmbedder:
         *,
         texts: Sequence[str],
         model: str,
+        input_type: str | None = None,
     ) -> tuple[tuple[float, ...], ...]:
         if not texts:
             return ()
+        if model.startswith("openrouter/"):
+            return self._embed_openrouter(texts, model, input_type)
         # Imported lazily: litellm drags in a large dependency tree and the
         # CLI only needs it once a command actually calls a model.
         import litellm
@@ -414,18 +443,61 @@ class LiteLlmEmbedder:
         vectors: list[tuple[float, ...]] = []
         for batch in embedding_batches(texts=texts, model=model):
             try:
-                response = litellm.embedding(
-                    model=model,
-                    input=batch,
-                    timeout=self.timeout_seconds,
-                    num_retries=self.num_retries,
-                )
+                request: dict[str, object] = {
+                    "model": model,
+                    "input": batch,
+                    "timeout": self.timeout_seconds,
+                    "num_retries": self.num_retries,
+                }
+                if input_type is not None:
+                    request["input_type"] = input_type
+                response = litellm.embedding(**request)  # type: ignore[call-overload]
             except Exception as error:
                 raise LlmError(
                     f"Embedding request failed for model {model}: {error}"
                 ) from error
             vectors.extend(
                 parse_embedding_response(response, model=model, expected=len(batch))
+            )
+        return tuple(vectors)
+
+    def _embed_openrouter(
+        self,
+        texts: Sequence[str],
+        model: str,
+        input_type: str | None,
+    ) -> tuple[tuple[float, ...], ...]:
+        api_key = os.getenv(OPENROUTER_API_KEY_ENV)
+        if not api_key:
+            raise LlmError(
+                f"{OPENROUTER_API_KEY_ENV} is required for OpenRouter embeddings."
+            )
+        vectors: list[tuple[float, ...]] = []
+        for batch in embedding_batches(texts=texts, model=model):
+            request_body: dict[str, object] = {
+                "input": list(batch),
+                "model": model.removeprefix("openrouter/"),
+            }
+            if input_type is not None:
+                request_body["input_type"] = input_type
+            request = Request(
+                OPENROUTER_EMBEDDINGS_API_URL,
+                data=json.dumps(request_body).encode(),
+                headers={
+                    "Authorization": f"Bearer {api_key}",
+                    "Content-Type": "application/json",
+                },
+                method="POST",
+            )
+            try:
+                with urlopen(request, timeout=self.timeout_seconds) as response:
+                    payload = json.loads(response.read())
+            except (HTTPError, URLError, OSError, ValueError) as error:
+                raise LlmError(
+                    f"OpenRouter embedding request failed for model {model}: {error}"
+                ) from error
+            vectors.extend(
+                parse_embedding_response(payload, model=model, expected=len(batch))
             )
         return tuple(vectors)
 
@@ -477,7 +549,8 @@ def parse_embedding_response(
     expected: int,
 ) -> tuple[tuple[float, ...], ...]:
     try:
-        items = sorted(response.data, key=lambda item: int(item["index"]))
+        data = response["data"] if isinstance(response, Mapping) else response.data
+        items = sorted(data, key=lambda item: int(item["index"]))
         vectors = tuple(
             tuple(float(value) for value in item["embedding"]) for item in items
         )

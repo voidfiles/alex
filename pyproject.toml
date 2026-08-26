@@ -10,6 +10,7 @@ dependencies = [
     "marker-pdf>=1.10.2",
     "pydantic>=2.13.4",
     "pymupdf4llm>=1.27.2.3",
+    "sqlite-vec==0.1.9",
 ]
 
 [project.scripts]
