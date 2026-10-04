@@ -1,0 +1,52 @@
+@prefix book: <urn:alex:ontology:book:> .
+@prefix prov: <http://www.w3.org/ns/prov#> .
+@prefix oa: <http://www.w3.org/ns/oa#> .
+@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+book: a owl:Ontology ; rdfs:label "Book application ontology"@en ;
+    owl:versionInfo "v001" .
+
+book:termPurpose a owl:AnnotationProperty ; rdfs:label "term purpose"@en ;
+    rdfs:comment "The intended modeling use of an application term."@en ;
+    book:termPurpose "annotation" .
+
+book:Claim a owl:Class ; rdfs:subClassOf prov:Entity ;
+    rdfs:label "Claim"@en ;
+    rdfs:comment "A source-attributed proposition represented by extraction; its representation does not certify its truth."@en ;
+    book:termPurpose "assertion and provenance" .
+book:Interpretation a owl:Class ; rdfs:subClassOf book:Claim ;
+    rdfs:label "Interpretation"@en ;
+    rdfs:comment "A proposition produced by interpreting supplied evidence."@en ;
+    book:termPurpose "interpretive assertion" .
+book:Argument a owl:Class ; rdfs:subClassOf prov:Entity ;
+    rdfs:label "Argument"@en ;
+    rdfs:comment "A source-supported grouping of claims and their argumentative connections."@en ;
+    book:termPurpose "argument description" .
+book:epistemicStatus a owl:ObjectProperty ;
+    rdfs:domain book:Claim ; rdfs:range skos:Concept ;
+    rdfs:label "epistemic status"@en ;
+    rdfs:comment "The origin or status of a represented proposition, not its objective truth."@en ;
+    book:termPurpose "classification" .
+book:extractionConfidence a owl:DatatypeProperty ;
+    rdfs:domain oa:Annotation ; rdfs:range xsd:decimal ;
+    rdfs:label "extraction confidence"@en ;
+    rdfs:comment "An estimate from zero to one of accurately extracting an annotation's body, not confidence in its truth."@en ;
+    book:termPurpose "annotation quality" .
+book:interprets a owl:ObjectProperty ;
+    rdfs:domain book:Interpretation ; rdfs:range book:Claim ;
+    rdfs:label "interprets"@en ;
+    rdfs:comment "Identifies the claim interpreted by an interpretation."@en ;
+    book:termPurpose "interpretation" .
+book:supports a owl:ObjectProperty ;
+    rdfs:domain book:Claim ; rdfs:range book:Claim ;
+    rdfs:label "supports"@en ;
+    rdfs:comment "A source-supported argumentative support relationship between represented claims."@en ;
+    book:termPurpose "argument description" .
+book:contradicts a owl:ObjectProperty ;
+    rdfs:domain book:Claim ; rdfs:range book:Claim ;
+    rdfs:label "contradicts"@en ;
+    rdfs:comment "A source-supported argumentative conflict, not an automatically inferred logical contradiction."@en ;
+    book:termPurpose "argument description" .

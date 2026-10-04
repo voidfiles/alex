@@ -25,6 +25,8 @@ def test_cli_help_lists_available_commands() -> None:
     assert "process-doc" in result.output
     assert "process-vault" in result.output
     assert "summary" in result.output
+    assert "ontology" in result.output
+    assert "ontology-export" in result.output
     assert "to-asset" in result.output
     assert "to-markdown" not in result.output
     assert "transcribe" in result.output
@@ -51,7 +53,7 @@ def test_cli_help_does_not_import_pdf_converter_dependencies() -> None:
         original_import = builtins.__import__
 
         def rejecting_import(name, *args, **kwargs):
-            blocked_prefixes = ("pymupdf4llm", "marker", "litellm")
+            blocked_prefixes = ("pymupdf4llm", "marker", "litellm", "rdflib")
             if name.startswith(blocked_prefixes):
                 raise RuntimeError(f"{name} should not be imported for help")
             return original_import(name, *args, **kwargs)

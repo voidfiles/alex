@@ -110,6 +110,221 @@ oversized chapters (or documents with no usable structure) are split
 semantically with embeddings at topic boundaries. Small documents never
 call the embedding model.
 
+### ontology
+
+```bash
+alex ontology book.md --dry-run
+alex ontology book.md
+alex ontology book.md artifacts/book.ontology.json --model openai/gpt-6.1-sol
+```
+
+Extracts an experimental ontology directly from a Markdown file, defaulting to
+`INPUT_STEM.ontology.json` beside the input. It uses the original source text
+and discovers its vocabulary: classes and instances with definitions and
+aliases, reusable relation types with optional domain/range classes, and
+relationship assertions including `subclass_of`, `instance_of`, and `part_of`.
+Domain/range lists describe alternative candidate classes, rather than OWL
+intersection constraints. The artifact is a versioned JSON document (schema 2).
+
+Each relationship records its own `logic`: `subject_quantifier` (`all`, `some`,
+`individual`, or `unspecified`), `object_quantifier` (`some`, `only`, `value`,
+or `unspecified`), `polarity`, `strength` (`categorical`, `typical`, `possible`,
+or `conditional`), an optional `condition`, and a source-supported `rationale`.
+Subject and target scopes are independent. `only` restricts the types of targets
+without asserting their existence. Missing scope stays `unspecified`; source
+tendencies and possibilities retain their qualifications. Quantifiers are part
+of relationship identity, so merging preserves differences in logical strength.
+
+The command tries the whole document in one model call. If it does not fit,
+it packs large contiguous passages near the input limit, preferring paragraph
+boundaries. Later calls receive the accumulated vocabulary so the model can
+reuse concepts and relation types. Local merging normalizes identical labels
+and respects reused IDs; no separate model synthesis call is required. Semantic
+deduplication of differently named concepts depends on the model reusing IDs.
+
+Token limits come from LiteLLM's model metadata. The input budget subtracts
+the response reservation (up to 32,768 tokens by default) and a 2,048-token
+safety margin from the model input limit. Full rendered prompts, including
+the vocabulary, are counted with LiteLLM's tokenizer. Override the supported
+limit with `--context-window` or `ALEX_ONTOLOGY_CONTEXT_WINDOW` when necessary;
+unknown models require an explicit limit. `--max-output-tokens` and
+`--safety-margin` adjust the reservations. `--reasoning-effort` is passed to
+the model when set. `--dry-run` counts initial passes without calling an LLM
+or writing files; multi-pass estimates can grow with the shared vocabulary.
+
+Every extracted item must carry exact source quotes. The command validates
+the JSON contract, references, evidence substrings, class/instance distinctions,
+and subclass cycles before publishing the artifact. Evidence records include
+one-based inclusive line numbers and zero-based character offsets with an
+exclusive end. The artifact also records the source SHA-256, model, prompt
+version and hash, token budget, and each pass's source range and input count.
+These checks support review; they do not establish semantic correctness or
+complete coverage. A large input fitting in one call can still produce an
+incomplete ontology because the output is bounded.
+
+If a model normalizes whitespace (such as a nonbreaking space or line wrap),
+the quote is aligned back to the original source span with every word and
+punctuation character preserved. The stored `quote` always contains the exact
+original substring; `match_mode` and `model_quote` record any whitespace repair.
+Changed words or punctuation are rejected.
+
+Use `--force` to replace an existing JSON artifact. A failed run does not
+replace an existing artifact. Run `ontology` on a book's extracted Markdown
+to experiment alongside its summary; this command is independent of `summary`.
+
+The extraction and normalization choices draw on the
+[source-grounded triple extraction workflow](https://arxiv.org/html/2509.00140v2),
+the [refinement framework](https://arxiv.org/pdf/2201.05910), and
+[OntoMiner's concepts, aliases, and relations](https://files.eric.ed.gov/fulltext/ED558457.pdf).
+[Evontree](https://arxiv.org/html/2510.26683v2) motivates consistency checks;
+its model-knowledge extraction and fine-tuning workflow is separate from this
+document extraction experiment.
+
+#### Standard vocabulary enrichment
+
+Use `--enrich` to add an optional, independently versioned `enrichment` section
+to the existing schema-2 JSON. All existing concept, relation, evidence, and
+logical-quantifier fields retain their meanings. The original extraction mode
+and existing JSON files continue to work with the updated reader.
+
+```bash
+alex ontology book.md ontology.json --enrich --max-output-tokens 65536
+alex ontology book.md ontology.json --enrich --metadata metadata.json \
+  --vocabulary vocabulary.json --requirements requirements.json
+```
+
+Enrichment reuses Schema.org, Dublin Core, PROV-O, Web Annotation, SKOS, and
+OWL-Time through a bounded offline catalog. The model proposes entity typings,
+themes, source metadata, and temporal references in the same source passes.
+Code assigns final IDs, maps exact evidence, records actual extraction activity
+times, and generates document parts and normalized text representations.
+Interpretation generation is disabled; unsupported facts and page numbers are
+omitted. Confidence, when supplied with a basis, describes extraction fidelity.
+
+The enriched extraction prompt embeds a compact vocabulary profile with definitions
+for people, organizations, books, articles, podcasts, places, events, equipment,
+datasets, actions, learning resources, defined terms, and controlled topics. It
+selects standard types during extraction and exposes them directly on concept
+records, with source-grounded alignment records retained for provenance:
+
+```json
+{
+  "id": "person-id",
+  "type": ["schema:Person"],
+  "name": "Rob Gray",
+  "label": "Rob Gray",
+  "kind": "instance"
+}
+```
+
+This example omits definitions, aliases, and evidence for brevity. `type` is an
+array because an entity may have multiple supported types. `name` mirrors its
+source-grounded label (`schema:name`). The primary book record also receives a
+`title` property from book metadata (`dcterms:title`); a title is not a separate
+concept. These fields are optional in the persisted schema, so older artifacts
+still load. Only approved typings appear in `type`; proposals remain in the
+alignment records.
+
+`kind` retains the logical class/individual distinction used by quantifiers and
+OWL export. A formal class uses `type: ["owl:Class"]`; it can propose a standard
+superclass without becoming an individual of that type. Defined terms and SKOS
+topics are individuals when they represent terms or classifications themselves.
+An individual with no supported semantic category uses `owl:NamedIndividual`;
+the extractor does not guess a more specific type. Legacy extraction omits these
+optional native fields.
+
+`--metadata` accepts a `title` string, `creator` and `identifier` lists, `language`,
+`issued`, and `created`. Language and dates are strings. Explicit metadata
+overrides frontmatter; source-extracted values fill remaining fields. Copyright
+does not establish publication. `--requirements` accepts `purpose`, `boundaries`,
+`competency_questions`, and `assumptions`.
+
+Curated domain vocabulary can provide shared topic identities across books:
+
+```json
+{
+  "schema_version": 1,
+  "terms": [{
+    "key": "topics:motor-learning",
+    "iri": "urn:alex:topics:motor-learning",
+    "kind": "concept",
+    "definition": "The acquisition or adaptation of movement skills through practice.",
+    "operations": ["exact_match"],
+    "roles": ["topic", "instance"],
+    "automatic": true
+  }]
+}
+```
+
+`automatic: true` authorizes source-supported use of a curated term; omit it to
+retain model mappings as proposals. Established infrastructure types can be
+accepted through catalog rules. Matching labels alone never merges books or
+asserts `owl:sameAs` or OWL equivalence. Specialized source concepts retain
+their definitions. `--application-iri` sets the shared application namespace;
+instance identifiers stay source-scoped. `--response-dir` optionally archives
+original responses and request hashes for review or recovery.
+
+Enriched evidence quotes must be unambiguous; copied prefix/suffix context can
+locate repeated text. Existing raw Markdown coordinates are preserved. Standard
+annotation selectors address a separately hashed normalized text representation,
+with its normalization version and exact selected substring retained.
+
+Older program versions that reject unknown fields require an updated reader
+for enriched JSON. The original schema-2 fields are preserved, and updated
+readers still reject unrecognized fields outside the known extension and optional
+native `type`, `name`, and `title` concept fields.
+
+### ontology-export
+
+```bash
+alex ontology-export assets/book/ontology.json
+alex ontology-export assets/book/ontology.json assets/book/ontology.owl
+alex ontology-export assets/book/ontology.json assets/book/ontology.jsonld
+alex ontology-export assets/book/ontology.json assets/book/ontology.ttl \
+  --bundle assets/book/ontology-bundle
+```
+
+Converts schema 2 JSON to standard OWL/RDF programmatically, with no model call.
+The default is `INPUT_STEM.ttl` (Turtle); `.owl` and `.rdf` select RDF/XML.
+`.jsonld` selects JSON-LD using an embedded context, without remote context
+resolution. All formats serialize the same graph and undergo a graph-equivalence
+round-trip check. Enriched input defaults to the standard book/provenance
+projection; `--profile legacy` explicitly selects the original projection.
+The standard projection uses SHACL without inference or remote ontology imports.
+`--report REPORT.md` writes the requested A-H scope, ontology, evidence, and
+validation report with application and instance Turtle files. `--bundle DIR`
+writes those artifacts plus a completion manifest of file hashes. Structural
+validation does not establish source truth or full semantic consistency.
+Concepts become OWL classes or named individuals, with labels, definitions,
+aliases, source quotes, and evidence coordinates preserved. Ontology identity
+defaults to a stable source-hash URN; set `--base-iri` to use your own absolute
+IRI. Use `--force` to replace an export. Serialization is parsed back and checked
+for graph equivalence before the file is published.
+
+Categorical positive taxonomy and membership become `rdfs:subClassOf` and
+`rdf:type`. Supported ordinary-property assertions become OWL object properties
+and restrictions:
+
+| Subject scope | Target scope | OWL reading |
+| --- | --- | --- |
+| `all` | `some` | Every source member has at least one target-class successor. |
+| `all` | `only` | Every source member's successors belong to the target class; existence is unspecified. |
+| `some` | `some` / `only` | An anonymous source witness has the specified restriction; the source class is not universally restricted. |
+| `individual` | `value` | A named individual relates to a particular named individual. |
+| `all` / `some` / `individual` | `value` | The property has a specified named-individual value within the subject scope. |
+
+Negative ordinary restrictions use class complements; negative named-individual
+property assertions use `owl:NegativePropertyAssertion`. Negative membership
+uses a complement class. Negative taxonomy remains an annotation because
+negated subsumption and class disjointness need distinct representations.
+Typical, possible, conditional, and unresolved claims retain their logic,
+descriptions, and evidence as annotations. Candidate domain/range lists also
+remain annotations. These choices follow the
+[OWL 2 quantifier and annotation semantics](https://www.w3.org/TR/owl2-primer/).
+Export checks validate syntax and structural mappings; a domain expert or
+reasoner can provide further semantic review. Older JSON artifacts need
+regeneration to add explicit logic before this exporter can consume them.
+
 ### quotes
 
 ```bash
@@ -342,6 +557,7 @@ model string works. Each role has an env override (see `src/alex/lib/llm.py`):
 | Chunk summaries + compression | `ALEX_FAST_SUMMARY_MODEL` | `openai/gpt-6-luna` |
 | Pull-quote extraction | `ALEX_QUOTE_MODEL` | `openai/gpt-6-luna` |
 | Final synthesis | `ALEX_FINAL_SUMMARY_MODEL` | `openai/gpt-6.1-sol` |
+| Ontology extraction | `ALEX_ONTOLOGY_MODEL` | `openai/gpt-6.1-sol` |
 | Asset naming | `ALEX_NAMING_MODEL` | `openai/gpt-5.6-terra` |
 | Semantic chunking embeddings | `ALEX_EMBEDDING_MODEL` | `openai/text-embedding-3-small` |
 | Eval judging | `ALEX_EVAL_JUDGE_MODEL` | `openai/gpt-5.6-terra` |

@@ -1,0 +1,38 @@
+@prefix book: <urn:alex:ontology:book:> .
+@prefix shape: <urn:alex:ontology:book-shapes:> .
+@prefix sh: <http://www.w3.org/ns/shacl#> .
+@prefix prov: <http://www.w3.org/ns/prov#> .
+@prefix oa: <http://www.w3.org/ns/oa#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+shape:Claim a sh:NodeShape ; sh:targetClass book:Claim ;
+    sh:property [ sh:path prov:wasDerivedFrom ; sh:minCount 1 ; sh:nodeKind sh:IRI ] ;
+    sh:property [ sh:path prov:wasGeneratedBy ; sh:minCount 1 ; sh:class prov:Activity ] ;
+    sh:property [ sh:path book:epistemicStatus ; sh:minCount 1 ; sh:maxCount 1 ] ;
+    sh:property [ sh:path rdf:subject ; sh:minCount 1 ; sh:maxCount 1 ] ;
+    sh:property [ sh:path rdf:predicate ; sh:minCount 1 ; sh:maxCount 1 ; sh:nodeKind sh:IRI ] ;
+    sh:property [ sh:path rdf:object ; sh:minCount 1 ; sh:maxCount 1 ] .
+
+shape:Annotation a sh:NodeShape ; sh:targetClass oa:Annotation ;
+    sh:property [ sh:path oa:hasBody ; sh:minCount 1 ; sh:maxCount 1 ] ;
+    sh:property [ sh:path oa:hasTarget ; sh:minCount 1 ; sh:maxCount 1 ; sh:class oa:SpecificResource ] ;
+    sh:property [ sh:path book:extractionConfidence ; sh:maxCount 1 ; sh:datatype xsd:decimal ; sh:minInclusive 0 ; sh:maxInclusive 1 ] .
+
+shape:Activity a sh:NodeShape ; sh:targetClass prov:Activity ;
+    sh:property [ sh:path prov:used ; sh:minCount 1 ] ;
+    sh:property [ sh:path prov:wasAssociatedWith ; sh:minCount 1 ; sh:class prov:SoftwareAgent ] ;
+    sh:property [ sh:path prov:startedAtTime ; sh:minCount 1 ; sh:maxCount 1 ; sh:datatype xsd:dateTime ] ;
+    sh:property [ sh:path prov:endedAtTime ; sh:minCount 1 ; sh:maxCount 1 ; sh:datatype xsd:dateTime ] .
+
+shape:Quote a sh:NodeShape ; sh:targetClass oa:TextQuoteSelector ;
+    sh:property [ sh:path oa:exact ; sh:minCount 1 ; sh:maxCount 1 ; sh:minLength 1 ] .
+
+shape:Position a sh:NodeShape ; sh:targetClass oa:TextPositionSelector ;
+    sh:property [ sh:path oa:start ; sh:minCount 1 ; sh:maxCount 1 ; sh:datatype xsd:integer ; sh:minInclusive 0 ] ;
+    sh:property [ sh:path oa:end ; sh:minCount 1 ; sh:maxCount 1 ; sh:datatype xsd:integer ; sh:minInclusive 1 ] .
+
+shape:CustomDefinition a sh:NodeShape ; sh:targetSubjectsOf book:termPurpose ;
+    sh:property [ sh:path rdfs:label ; sh:minCount 1 ] ;
+    sh:property [ sh:path rdfs:comment ; sh:minCount 1 ] .

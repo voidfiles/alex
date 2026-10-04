@@ -25,6 +25,7 @@ from urllib.request import Request, urlopen
 DEFAULT_FAST_SUMMARY_MODEL = "openai/gpt-6-luna"
 DEFAULT_QUOTE_MODEL = DEFAULT_FAST_SUMMARY_MODEL
 DEFAULT_FINAL_SUMMARY_MODEL = "openai/gpt-6.1-sol"
+DEFAULT_ONTOLOGY_MODEL = "openai/gpt-6.1-sol"
 DEFAULT_ASSET_NAMING_MODEL = "openai/gpt-5.6-terra"
 DEFAULT_EMBEDDING_MODEL = "openai/text-embedding-3-small"
 DEFAULT_BRAIN_EMBEDDING_MODEL = "ollama/nomic-embed-text"
@@ -45,6 +46,7 @@ DEFAULT_SOURCE_CLAIMS_PER_SECTION = 8
 FAST_SUMMARY_MODEL_ENV = "ALEX_FAST_SUMMARY_MODEL"
 QUOTE_MODEL_ENV = "ALEX_QUOTE_MODEL"
 FINAL_SUMMARY_MODEL_ENV = "ALEX_FINAL_SUMMARY_MODEL"
+ONTOLOGY_MODEL_ENV = "ALEX_ONTOLOGY_MODEL"
 ASSET_NAMING_MODEL_ENV = "ALEX_NAMING_MODEL"
 EMBEDDING_MODEL_ENV = "ALEX_EMBEDDING_MODEL"
 BRAIN_EMBEDDING_MODEL_ENV = "ALEX_BRAIN_EMBEDDING_MODEL"
@@ -80,6 +82,10 @@ def resolve_quote_model() -> str:
 
 def resolve_final_summary_model() -> str:
     return os.getenv(FINAL_SUMMARY_MODEL_ENV) or DEFAULT_FINAL_SUMMARY_MODEL
+
+
+def resolve_ontology_model() -> str:
+    return os.getenv(ONTOLOGY_MODEL_ENV) or DEFAULT_ONTOLOGY_MODEL
 
 
 def resolve_asset_naming_model() -> str:
@@ -239,6 +245,50 @@ class Completer(Protocol):
         model: str,
         max_tokens: int,
     ) -> str: ...
+
+
+@dataclass(frozen=True)
+class ModelTokenLimits:
+    input_tokens: int | None = None
+    output_tokens: int | None = None
+
+
+def model_token_limits(model: str) -> ModelTokenLimits:
+    """Read provider limits lazily; unknown models need an explicit input budget."""
+    try:
+        import litellm
+
+        litellm_api: Any = litellm
+        info = litellm_api.get_model_info(model=model)
+    except Exception:
+        return ModelTokenLimits()
+    return ModelTokenLimits(
+        input_tokens=_optional_int(_model_info_field(info, "max_input_tokens")),
+        output_tokens=_optional_int(_model_info_field(info, "max_output_tokens")),
+    )
+
+
+class TokenCounter(Protocol):
+    def count(self, *, prompt: str, model: str) -> int: ...
+
+
+@dataclass(frozen=True)
+class LiteLlmTokenCounter:
+    def count(self, *, prompt: str, model: str) -> int:
+        try:
+            import litellm
+
+            litellm_api: Any = litellm
+            count = litellm_api.token_counter(
+                model=model, messages=[{"role": "user", "content": prompt}]
+            )
+        except Exception as error:
+            raise LlmError(
+                f"Cannot count input tokens for model {model}: {error}"
+            ) from error
+        if isinstance(count, bool) or not isinstance(count, int) or count < 0:
+            raise LlmError(f"Cannot count input tokens for model {model}.")
+        return count
 
 
 @dataclass(frozen=True)

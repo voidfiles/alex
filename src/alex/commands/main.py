@@ -12,6 +12,8 @@ from alex.commands.eval_report import eval_report
 from alex.commands.eval_summary import eval_summary
 from alex.commands.improve_prompt import improve_prompt_command
 from alex.commands.improve_prompts import improve_prompts_command
+from alex.commands.ontology import ontology
+from alex.commands.ontology_export import ontology_export
 from alex.commands.pdf_samples import pdf_samples
 from alex.commands.prepare_outline_level_eval import prepare_outline_level_eval
 from alex.commands.process_doc import process_doc
@@ -34,7 +36,9 @@ main.add_command(to_asset)
 main.add_command(process_doc)
 main.add_command(process_vault)
 main.add_command(summary)
+main.add_command(ontology)
 main.add_command(quotes)
+main.add_command(ontology_export)
 main.add_command(transcribe)
 main.add_command(eval_summary)
 main.add_command(eval_quotes)
