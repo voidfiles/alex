@@ -2,7 +2,7 @@
 
 All model choices live here. Each role (fast summaries, final synthesis,
 asset naming) has a default and an environment override, and any LiteLLM
-model string works: "openai/gpt-5.6-sol", "anthropic/claude-opus-5",
+model string works: "openai/gpt-6.1-sol", "anthropic/claude-opus-5",
 "gemini/gemini-2.5-pro", and so on.
 """
 
@@ -22,14 +22,14 @@ from typing import Any, Protocol, TypeGuard
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
-DEFAULT_FAST_SUMMARY_MODEL = "openai/gpt-5.6-luna"
-DEFAULT_FINAL_SUMMARY_MODEL = "openai/gpt-5.6-sol"
+DEFAULT_FAST_SUMMARY_MODEL = "openai/gpt-6-luna"
+DEFAULT_FINAL_SUMMARY_MODEL = "openai/gpt-6.1-sol"
 DEFAULT_ASSET_NAMING_MODEL = "openai/gpt-5.6-terra"
 DEFAULT_EMBEDDING_MODEL = "openai/text-embedding-3-small"
 DEFAULT_BRAIN_EMBEDDING_MODEL = "ollama/nomic-embed-text"
 DEFAULT_BRAINSTORM_MODEL = "anthropic/claude-sonnet-4-6"
 DEFAULT_EVAL_JUDGE_MODEL = "openai/gpt-5.6-terra"
-DEFAULT_FACT_EXTRACTOR_MODEL = "openai/gpt-5.6-sol"
+DEFAULT_FACT_EXTRACTOR_MODEL = "openai/gpt-6.1-sol"
 DEFAULT_PROMPT_CRITIC_MODEL = "openai/gpt-5.6-sol"
 DEFAULT_TRANSCRIPTION_MODEL = "whisper-1"
 # Cosine cutoff for linking similar claims in the claim graph. Tuned for
