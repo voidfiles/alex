@@ -261,12 +261,12 @@ model string works. Each role has an env override (see `src/alex/lib/llm.py`):
 
 | Role | Env var | Default |
 | --- | --- | --- |
-| Chunk summaries + compression | `ALEX_FAST_SUMMARY_MODEL` | `openai/gpt-5.6-luna` |
-| Final synthesis | `ALEX_FINAL_SUMMARY_MODEL` | `openai/gpt-5.6-sol` |
+| Chunk summaries + compression | `ALEX_FAST_SUMMARY_MODEL` | `openai/gpt-6-luna` |
+| Final synthesis | `ALEX_FINAL_SUMMARY_MODEL` | `openai/gpt-6.1-sol` |
 | Asset naming | `ALEX_NAMING_MODEL` | `openai/gpt-5.6-terra` |
 | Semantic chunking embeddings | `ALEX_EMBEDDING_MODEL` | `openai/text-embedding-3-small` |
 | Eval judging | `ALEX_EVAL_JUDGE_MODEL` | `openai/gpt-5.6-terra` |
-| Eval fact extraction | `ALEX_FACT_EXTRACTOR_MODEL` | `openai/gpt-5.6-sol` |
+| Eval fact extraction | `ALEX_FACT_EXTRACTOR_MODEL` | `openai/gpt-6.1-sol` |
 | Prompt critic | `ALEX_PROMPT_CRITIC_MODEL` | `openai/gpt-5.6-sol` |
 | Audio transcription | `ALEX_TRANSCRIPTION_MODEL` | `whisper-1` |
 
