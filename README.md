@@ -110,6 +110,30 @@ oversized chapters (or documents with no usable structure) are split
 semantically with embeddings at topic boundaries. Small documents never
 call the embedding model.
 
+### quotes
+
+```bash
+alex quotes article.md                         # up to three ranked pull quotes
+alex quotes article.md --count 1 -o quote.md
+cat article.md | alex quotes - --count 2 --json
+alex quotes article.md --prompt-version v001   # compare a historical prompt
+```
+
+Accepts a Markdown file or `-` for stdin and writes selected quotes as Markdown
+blockquotes to stdout. `--json` adds exact source spans and model/prompt
+provenance; `-o/--output` writes either format to a file. The default model is
+`openai/gpt-6-luna`, with overrides through `ALEX_QUOTE_MODEL` or `--model`.
+`--reasoning-effort` is opt-in for models that support it.
+
+The whole document is rendered to readable text before selection. Links keep
+their visible text, and Markdown emphasis is removed. Every returned segment
+must occur in that rendered source with identical words, case, and punctuation.
+Whitespace may reflow; the output recovers the original source substring.
+Multiple segments display omissions as `[...]`. Overlapping, invented, or
+rewritten quotes fail validation. JSON offsets are zero-based characters into
+`alex.lib.quotes.markdown_to_text(source_markdown)`, with exclusive ends;
+the artifact stores hashes of both the Markdown and rendered text.
+
 ### transcribe
 
 ```bash
@@ -153,6 +177,38 @@ progress and errors go to stderr. A credentialed manual smoke run should use a
 small fixture vault and `--limit 1`, inspect the returned provenance and cost,
 then repeat with `--resume RUN_ID` after an interrupted run. Live provider runs
 are deliberately outside CI.
+
+### eval-quotes
+
+```bash
+alex eval-quotes --split dev --prompt-version v001 --repeats 3
+alex eval-quotes --split test --prompt-version v001 --output /tmp/quotes-test.json
+```
+
+Runs the real quote extractor on the
+[50 source/quote pairs](evals/quote_extraction/simonwillison/README.md).
+The default requests one quote on the 10 development cases. Use development
+cases to tune new immutable `quote_extraction/vNNN.md` versions; reserve the
+40 test cases for a final comparison. The reference quote and editorial
+metadata are withheld from the model.
+
+The primary score is F1 over the source-word positions selected by the model
+and the reference, with precision, recall, exact span agreement, nonempty
+selection rate, and source validity reported separately. Editorial insertions
+and ellipses in the reference are excluded from source matching. Valid alternate
+quotes can score zero agreement. Selecting the entire article loses precision;
+failed extractions remain in the denominator with F1 zero. There is no LLM judge.
+
+`--repeats` retains independent generations to measure variation. Request
+settings, prompt text/hash, source hashes, raw responses, errors, token usage,
+and provider-reported cost are saved under `evals/runs/quote_extraction/`.
+`--output` sets an explicit artifact path; existing artifacts are preserved.
+`--max-cost` defaults to a US$5 estimated request ceiling, checked before any
+model calls. These live benchmarks are local/manual and outside CI.
+
+The first [benchmark and prompt-iteration report](evals/quote_extraction/RESULTS.md)
+retains `v001`: development gains from the revised prompts did not survive the
+repeated test comparison.
 
 ### eval-summary
 
@@ -284,6 +340,7 @@ model string works. Each role has an env override (see `src/alex/lib/llm.py`):
 | Role | Env var | Default |
 | --- | --- | --- |
 | Chunk summaries + compression | `ALEX_FAST_SUMMARY_MODEL` | `openai/gpt-6-luna` |
+| Pull-quote extraction | `ALEX_QUOTE_MODEL` | `openai/gpt-6-luna` |
 | Final synthesis | `ALEX_FINAL_SUMMARY_MODEL` | `openai/gpt-6.1-sol` |
 | Asset naming | `ALEX_NAMING_MODEL` | `openai/gpt-5.6-terra` |
 | Semantic chunking embeddings | `ALEX_EMBEDDING_MODEL` | `openai/text-embedding-3-small` |

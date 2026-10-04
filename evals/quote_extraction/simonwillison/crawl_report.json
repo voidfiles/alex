@@ -1,0 +1,98 @@
+{
+  "schema_version": 1,
+  "started_at": "2026-10-04T16:45:29.014617+00:00",
+  "completed_at": "2026-10-04T16:45:47.743766+00:00",
+  "target_count": 50,
+  "accepted_count": 50,
+  "discovered_count": 150,
+  "attempted_count": 123,
+  "rejected_count": 73,
+  "source_word_counts": {
+    "min": 182,
+    "median": 1309.5,
+    "max": 11226,
+    "total": 100428
+  },
+  "selection": "newest-first eligible source items, without duplicate sources",
+  "split_counts": {
+    "test": 40,
+    "dev": 10
+  },
+  "archive_pages": [
+    {
+      "url": "https://simonwillison.net/quotations/",
+      "fetched_at": "2026-10-04T16:34:16.242011+00:00",
+      "quote_count": 30
+    },
+    {
+      "url": "https://simonwillison.net/quotations/?page=2",
+      "fetched_at": "2026-10-04T16:34:34.077174+00:00",
+      "quote_count": 30
+    },
+    {
+      "url": "https://simonwillison.net/quotations/?page=3",
+      "fetched_at": "2026-10-04T16:34:59.921614+00:00",
+      "quote_count": 30
+    },
+    {
+      "url": "https://simonwillison.net/quotations/?page=4",
+      "fetched_at": "2026-10-04T16:35:24.404223+00:00",
+      "quote_count": 30
+    },
+    {
+      "url": "https://simonwillison.net/quotations/?page=5",
+      "fetched_at": "2026-10-04T16:41:44.718772+00:00",
+      "quote_count": 30
+    }
+  ],
+  "source_hosts": {
+    "blog.cryptographyengineering.com": 2,
+    "www.anthropic.com": 2,
+    "daringfireball.net": 5,
+    "mustafa-suleyman.ai": 1,
+    "seldo.com": 1,
+    "calif.io": 1,
+    "zachkehs.com": 1,
+    "www.pcgamer.com": 1,
+    "pauldix.com": 1,
+    "www.dbreunig.com": 1,
+    "github.com": 1,
+    "interconnected.org": 2,
+    "jeremymorrell.dev": 1,
+    "blog.florianherrengt.com": 1,
+    "www.abc.net.au": 1,
+    "yegge.ai": 1,
+    "www.schneier.com": 1,
+    "blog.pypi.org": 1,
+    "github.blog": 1,
+    "blog.jonudell.net": 1,
+    "www.hyperdimensional.co": 1,
+    "macwright.com": 1,
+    "www.mcsweeneys.net": 1,
+    "ladybird.org": 1,
+    "lucumr.pocoo.org": 1,
+    "jvns.ca": 1,
+    "www.jamesshore.com": 1,
+    "moq.dev": 1,
+    "blog.andymasley.com": 1,
+    "blog.mozilla.org": 1,
+    "nial.se": 1,
+    "aphyr.com": 1,
+    "bcantrill.dtrace.org": 1,
+    "gilest.org": 1,
+    "www.greptile.com": 1,
+    "fidget-spinner.github.io": 1,
+    "www.better-simple.com": 1,
+    "www.newyorker.com": 1,
+    "jazzband.co": 1,
+    "craigmod.com": 1,
+    "blog.lmorchard.com": 1,
+    "piechowski.io": 1,
+    "www.ben-evans.com": 1
+  },
+  "seed_status": {
+    "https://simonwillison.net/2026/Oct/1/matthew-green/": "included",
+    "https://simonwillison.net/2026/Sep/29/anthropic-frontier-red-team/": "included",
+    "https://simonwillison.net/2026/Sep/28/joedaroo/": "disallowed by source robots.txt"
+  }
+}

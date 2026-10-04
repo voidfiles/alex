@@ -1,0 +1,75 @@
+{
+  "selected_at": "2026-10-04T17:52:27.669851+00:00",
+  "baseline_version": "v001",
+  "selected_version": "v005",
+  "test_set_already_used": true,
+  "rationale": "One final simpler selection rubric, developed from dev cases only after v003 failed repeated test confirmation. Selected before testing v005. This follow-up test is exploratory, not a fresh held-out confirmation.",
+  "dataset_sha256": "42dda5ed1406b2d4774690a0b7b0effb87bd54a68dba454aa9652c9787c0729a",
+  "model": "openai/gpt-6-luna",
+  "scorer_version": "source-span-f1/v1",
+  "development_summary": {
+    "case_count": 10,
+    "generation_count": 30,
+    "error_count": 0,
+    "span_f1": 0.25382392858608704,
+    "span_precision": 0.2098527348605791,
+    "span_recall": 0.34591478696741856,
+    "exact_span_match": 0.0,
+    "source_valid": 1.0,
+    "nonempty": 1.0,
+    "actual_cost_usd": 0.01425052,
+    "input_tokens": 131853,
+    "output_tokens": 17942
+  },
+  "comparison": {
+    "mean_f1_delta": 0.03191485356090288,
+    "wins": 3,
+    "ties": 5,
+    "losses": 2,
+    "newly_failed": [],
+    "source_validity_regressions": [],
+    "passes_gate": true,
+    "paired_cases": [
+      {
+        "id": "2026-09-14-laurie-voss",
+        "delta": -0.4791111111111111
+      },
+      {
+        "id": "2026-08-21-matt-webb",
+        "delta": 0.7266187050359711
+      },
+      {
+        "id": "2026-08-10-openclaw",
+        "delta": 0.1875
+      },
+      {
+        "id": "2026-08-04-steve-yegge",
+        "delta": 0.0
+      },
+      {
+        "id": "2026-07-29-matthew-green",
+        "delta": 0.0
+      },
+      {
+        "id": "2026-05-16-julia-evans",
+        "delta": -0.2207060084246767
+      },
+      {
+        "id": "2026-05-05-john-gruber",
+        "delta": 0.0
+      },
+      {
+        "id": "2026-05-04-andy-masley",
+        "delta": 0.0
+      },
+      {
+        "id": "2026-03-17-tim-schilling",
+        "delta": 0.10484695010884543
+      },
+      {
+        "id": "2026-03-06-ally-piechowski",
+        "delta": 0.0
+      }
+    ]
+  }
+}

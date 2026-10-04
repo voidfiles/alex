@@ -1,0 +1,15 @@
+{
+  "status": "passed",
+  "case_count": 50,
+  "checks": [
+    "all 50 saved cases: count, uniqueness, checksums, quote formatting, source alignment, splits",
+    "all 50 reference quotes exactly match complete quotation blocks in cached archive HTML",
+    "source matching handles typography, emphasis, and links",
+    "editorial insertions are explicitly excluded from source matching",
+    "changed numbers are rejected",
+    "out-of-order segments are rejected",
+    "changed source text is rejected even after file, JSONL, and checksum are updated"
+  ],
+  "validated_at": "2026-10-04T16:52:41.305448+00:00",
+  "examples_sha256": "42dda5ed1406b2d4774690a0b7b0effb87bd54a68dba454aa9652c9787c0729a"
+}

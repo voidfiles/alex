@@ -7,6 +7,7 @@ from alex.commands.eval_claim_graph import eval_claim_graph
 from alex.commands.eval_judges import eval_judges
 from alex.commands.eval_merged_summary import eval_merged_summary
 from alex.commands.eval_outline_level import eval_outline_level
+from alex.commands.eval_quotes import eval_quotes
 from alex.commands.eval_report import eval_report
 from alex.commands.eval_summary import eval_summary
 from alex.commands.improve_prompt import improve_prompt_command
@@ -15,6 +16,7 @@ from alex.commands.pdf_samples import pdf_samples
 from alex.commands.prepare_outline_level_eval import prepare_outline_level_eval
 from alex.commands.process_doc import process_doc
 from alex.commands.process_vault import process_vault
+from alex.commands.quotes import quotes
 from alex.commands.summary import summary
 from alex.commands.to_asset import to_asset
 from alex.commands.transcribe import transcribe
@@ -32,8 +34,10 @@ main.add_command(to_asset)
 main.add_command(process_doc)
 main.add_command(process_vault)
 main.add_command(summary)
+main.add_command(quotes)
 main.add_command(transcribe)
 main.add_command(eval_summary)
+main.add_command(eval_quotes)
 main.add_command(eval_claim_graph)
 main.add_command(eval_merged_summary)
 main.add_command(eval_outline_level)

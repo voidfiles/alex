@@ -23,6 +23,7 @@ from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
 DEFAULT_FAST_SUMMARY_MODEL = "openai/gpt-6-luna"
+DEFAULT_QUOTE_MODEL = DEFAULT_FAST_SUMMARY_MODEL
 DEFAULT_FINAL_SUMMARY_MODEL = "openai/gpt-6.1-sol"
 DEFAULT_ASSET_NAMING_MODEL = "openai/gpt-5.6-terra"
 DEFAULT_EMBEDDING_MODEL = "openai/text-embedding-3-small"
@@ -42,6 +43,7 @@ DEFAULT_GRAPH_MAX_CLAIMS = 48
 DEFAULT_CHUNK_GRAPH_MAX_CLAIMS = 12
 DEFAULT_SOURCE_CLAIMS_PER_SECTION = 8
 FAST_SUMMARY_MODEL_ENV = "ALEX_FAST_SUMMARY_MODEL"
+QUOTE_MODEL_ENV = "ALEX_QUOTE_MODEL"
 FINAL_SUMMARY_MODEL_ENV = "ALEX_FINAL_SUMMARY_MODEL"
 ASSET_NAMING_MODEL_ENV = "ALEX_NAMING_MODEL"
 EMBEDDING_MODEL_ENV = "ALEX_EMBEDDING_MODEL"
@@ -70,6 +72,10 @@ TRANSCRIPTION_AUDIO_BITRATE = 32_000
 
 def resolve_fast_summary_model() -> str:
     return os.getenv(FAST_SUMMARY_MODEL_ENV) or DEFAULT_FAST_SUMMARY_MODEL
+
+
+def resolve_quote_model() -> str:
+    return os.getenv(QUOTE_MODEL_ENV) or DEFAULT_QUOTE_MODEL
 
 
 def resolve_final_summary_model() -> str:
@@ -265,10 +271,17 @@ class LiteLlmCompleter:
         request: dict[str, object] = {
             "model": model,
             "messages": messages,
-            "max_tokens": max_tokens,
             "timeout": self.timeout_seconds,
             "num_retries": self.num_retries,
         }
+        # OpenAI's GPT-6 chat models reject the legacy Chat Completions
+        # ``max_tokens`` field and require ``max_completion_tokens``.
+        token_limit_parameter = (
+            "max_completion_tokens"
+            if model.casefold().startswith("openai/gpt-6")
+            else "max_tokens"
+        )
+        request[token_limit_parameter] = max_tokens
         if self.reasoning_effort is not None:
             request["reasoning_effort"] = self.reasoning_effort
         if self.temperature is not None:

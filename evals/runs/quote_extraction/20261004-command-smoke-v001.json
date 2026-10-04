@@ -1,0 +1,42 @@
+{
+  "source_sha256": "13c48959c4e680b3fc4c11358dcb2f98bc869c2e9f0c131ee828fa89af745671",
+  "source_text_sha256": "f9b9bc602cb0a773bcb70ae612c81f10dc621b048b266b6901725f66f2738721",
+  "model": "openai/gpt-6-luna",
+  "prompt_version": "v001",
+  "prompt_sha256": "81772296aa947fb9d229859d705a972e0afab6a0174685667d8d2a008c7af3df",
+  "quotes": [
+    {
+      "text": "But ALSO because knowing where the galactic centre is surprisingly grounding? I wake up every few months to an email in my inbox from someone who is having a tough time in life, or is losing a loved one, or similar, and somehow they have discovered Galactic Compass and they tell me how they sit outside at night with a cigarette and gaze at the arrow and it gives them a place of comfort and infinity.\n\nI know what they mean. The Earth spins; it turns around the Sun; and so, at first, the supermassive black hole of the galaxy appears to slowly whirl around us, above and under the horizon, round and round. But then your perspective flips, and we are the ones moving, and the centre of the galaxy becomes a fixed point, our rock",
+      "segments": [
+        {
+          "text": "But ALSO because knowing where the galactic centre is surprisingly grounding? I wake up every few months to an email in my inbox from someone who is having a tough time in life, or is losing a loved one, or similar, and somehow they have discovered Galactic Compass and they tell me how they sit outside at night with a cigarette and gaze at the arrow and it gives them a place of comfort and infinity.\n\nI know what they mean. The Earth spins; it turns around the Sun; and so, at first, the supermassive black hole of the galaxy appears to slowly whirl around us, above and under the horizon, round and round. But then your perspective flips, and we are the ones moving, and the centre of the galaxy becomes a fixed point, our rock",
+          "char_start": 692,
+          "char_end": 1423
+        }
+      ]
+    },
+    {
+      "text": "After I released version 1.0, I figured I would have to do the rotations myself. So I sat down with ChatGPT and I didn’t get it to write the code, but I got it to educate me. With a patient, interactive tutor, I was able to finally do what I hadn’t by reading books and asking mathematician friends – I learnt how to use quaternions just enough to make the app work.\n\nSo learning doesn’t stop just because I outsource a bunch of thinking to AI. It pushes me to learn more. I like that as an outcome.",
+      "segments": [
+        {
+          "text": "After I released version 1.0, I figured I would have to do the rotations myself. So I sat down with ChatGPT and I didn’t get it to write the code, but I got it to educate me. With a patient, interactive tutor, I was able to finally do what I hadn’t by reading books and asking mathematician friends – I learnt how to use quaternions just enough to make the app work.\n\nSo learning doesn’t stop just because I outsource a bunch of thinking to AI. It pushes me to learn more. I like that as an outcome.",
+          "char_start": 3006,
+          "char_end": 3505
+        }
+      ]
+    },
+    {
+      "text": "I added a specific interaction that I’m intrigued by: you can hold down on the compass around to “drag” it around. It remains about 75cm away in phone reference frame, then drops into world frame when you release. I like how fluid it feels. My phone starts to feel like a glove that can reach into the virtual.",
+      "segments": [
+        {
+          "text": "I added a specific interaction that I’m intrigued by: you can hold down on the compass around to “drag” it around. It remains about 75cm away in phone reference frame, then drops into world frame when you release. I like how fluid it feels. My phone starts to feel like a glove that can reach into the virtual.",
+          "char_start": 2000,
+          "char_end": 2310
+        }
+      ]
+    }
+  ],
+  "schema_version": 1,
+  "offset_target": "markdown_to_text(source_markdown)",
+  "system_prompt_sha256": "d5d6f55b5119465344e602383825cfe59c70f66882de8a3a7e3ca7efb57b59b5"
+}

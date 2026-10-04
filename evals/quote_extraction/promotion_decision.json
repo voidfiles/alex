@@ -1,0 +1,41 @@
+{
+  "decided_at": "2026-10-04T17:56:20.929378+00:00",
+  "active_version": "v001",
+  "promoted": false,
+  "candidate_versions": [
+    "v002",
+    "v003",
+    "v004",
+    "v005"
+  ],
+  "reason": "No revised prompt passed both the repeated development gate and the repeated test comparison. v003 and v005 improved development agreement but regressed on test agreement. Retain the baseline.",
+  "evidence": "benchmark_summary.json",
+  "test_comparisons": {
+    "v003": {
+      "mean_f1_delta": -0.023655664200864394,
+      "wins": 11,
+      "ties": 20,
+      "losses": 9,
+      "newly_failed": [],
+      "source_validity_regressions": [],
+      "passes_gate": false,
+      "paired_document_bootstrap_95_percent_interval": [
+        -0.12248881934624593,
+        0.06879754429392952
+      ]
+    },
+    "v005": {
+      "mean_f1_delta": -0.014182478486519722,
+      "wins": 10,
+      "ties": 19,
+      "losses": 11,
+      "newly_failed": [],
+      "source_validity_regressions": [],
+      "passes_gate": false,
+      "paired_document_bootstrap_95_percent_interval": [
+        -0.1281743939556232,
+        0.09759891011744574
+      ]
+    }
+  }
+}

@@ -1,0 +1,787 @@
+{
+  "created_at": "2026-10-04T17:56:20.921884+00:00",
+  "active_version": "v001",
+  "model": "openai/gpt-6-luna",
+  "scorer_version": "source-span-f1/v1",
+  "dataset_sha256": "42dda5ed1406b2d4774690a0b7b0effb87bd54a68dba454aa9652c9787c0729a",
+  "renderer_version": "4.2.0",
+  "development": {
+    "v001": {
+      "path": "evals/runs/quote_extraction/20261004-v001-dev-r3-fixed.json",
+      "sha256": "67f683fa24aef564671bb3dd5d86adece1d71eca72c1a30df73744303c67c769",
+      "prompt_sha256": "81772296aa947fb9d229859d705a972e0afab6a0174685667d8d2a008c7af3df",
+      "extraction": {
+        "model": "openai/gpt-6-luna",
+        "count": 1,
+        "prompt_version": "v001",
+        "max_output_tokens": 8192,
+        "reasoning_effort": null
+      },
+      "summary": {
+        "case_count": 10,
+        "generation_count": 30,
+        "error_count": 0,
+        "span_f1": 0.22190907502518414,
+        "span_precision": 0.21574618251211888,
+        "span_recall": 0.25854636591478697,
+        "exact_span_match": 0.03333333333333333,
+        "source_valid": 1.0,
+        "nonempty": 1.0,
+        "actual_cost_usd": 0.00972563,
+        "input_tokens": 126963,
+        "output_tokens": 9109
+      }
+    },
+    "v002": {
+      "path": "evals/runs/quote_extraction/20261004-v002-dev-r3.json",
+      "sha256": "27107851b0f3ce74f8beeeae5c0b27c7c47ed05dc1fcdfa95041b9b0c2a71c06",
+      "prompt_sha256": "95cfc4f8224ee17b496cb32c3f5db4157c46a71ffd8113a3f880f7e5405239db",
+      "extraction": {
+        "model": "openai/gpt-6-luna",
+        "count": 1,
+        "prompt_version": "v002",
+        "max_output_tokens": 8192,
+        "reasoning_effort": null
+      },
+      "summary": {
+        "case_count": 10,
+        "generation_count": 30,
+        "error_count": 3,
+        "span_f1": 0.17909076378116626,
+        "span_precision": 0.13758560971265166,
+        "span_recall": 0.2732673267326733,
+        "exact_span_match": 0.0,
+        "source_valid": 0.9,
+        "nonempty": 0.9,
+        "actual_cost_usd": 0.01343632,
+        "input_tokens": 137973,
+        "output_tokens": 15824
+      }
+    },
+    "v003": {
+      "path": "evals/runs/quote_extraction/20261004-v003-dev-r3.json",
+      "sha256": "2d52d9f2470f40736a5046601ffed8a04f12974cd1997ba54a3bde3c89ad32d9",
+      "prompt_sha256": "8f7a7a3f1700d92bb79076f19edbdb5d4b29cbc78148be8e8f51b001f6d20431",
+      "extraction": {
+        "model": "openai/gpt-6-luna",
+        "count": 1,
+        "prompt_version": "v003",
+        "max_output_tokens": 8192,
+        "reasoning_effort": null
+      },
+      "summary": {
+        "case_count": 10,
+        "generation_count": 30,
+        "error_count": 0,
+        "span_f1": 0.2547799560282023,
+        "span_precision": 0.2285770249483125,
+        "span_recall": 0.32296880815901136,
+        "exact_span_match": 0.0,
+        "source_valid": 1.0,
+        "nonempty": 1.0,
+        "actual_cost_usd": 0.01323882,
+        "input_tokens": 139323,
+        "output_tokens": 15321
+      }
+    },
+    "v004": {
+      "path": "evals/runs/quote_extraction/20261004-v004-dev-r3.json",
+      "sha256": "c1402cf9d5755746c285420abbddad91384fa8cfc09f312addc3405f3d4417c3",
+      "prompt_sha256": "3326069e002c5ba7465142a27c18442db1cc0fd5dd89e3f0d294c36a0053f57a",
+      "extraction": {
+        "model": "openai/gpt-6-luna",
+        "count": 1,
+        "prompt_version": "v004",
+        "max_output_tokens": 8192,
+        "reasoning_effort": null
+      },
+      "summary": {
+        "case_count": 10,
+        "generation_count": 30,
+        "error_count": 0,
+        "span_f1": 0.18191367536391073,
+        "span_precision": 0.18375170167659335,
+        "span_recall": 0.19468671679197994,
+        "exact_span_match": 0.03333333333333333,
+        "source_valid": 1.0,
+        "nonempty": 1.0,
+        "actual_cost_usd": 0.01191662,
+        "input_tokens": 141093,
+        "output_tokens": 12535
+      }
+    },
+    "v005": {
+      "path": "evals/runs/quote_extraction/20261004-v005-dev-r3.json",
+      "sha256": "7cf2504b73b8f0cf214bdab460c322a81f609ef331a6a43478e04ea0fddfc7f0",
+      "prompt_sha256": "c76190cf1e182a110e8426b615a22d7670a0b6828d932098e2d9032eb3a7c603",
+      "extraction": {
+        "model": "openai/gpt-6-luna",
+        "count": 1,
+        "prompt_version": "v005",
+        "max_output_tokens": 8192,
+        "reasoning_effort": null
+      },
+      "summary": {
+        "case_count": 10,
+        "generation_count": 30,
+        "error_count": 0,
+        "span_f1": 0.25382392858608704,
+        "span_precision": 0.2098527348605791,
+        "span_recall": 0.34591478696741856,
+        "exact_span_match": 0.0,
+        "source_valid": 1.0,
+        "nonempty": 1.0,
+        "actual_cost_usd": 0.01425052,
+        "input_tokens": 131853,
+        "output_tokens": 17942
+      }
+    }
+  },
+  "development_comparisons": {
+    "v002": {
+      "mean_f1_delta": -0.0428183112440179,
+      "wins": 3,
+      "ties": 4,
+      "losses": 3,
+      "newly_failed": [
+        "2026-03-06-ally-piechowski"
+      ],
+      "source_validity_regressions": [
+        "2026-03-06-ally-piechowski"
+      ],
+      "passes_gate": false,
+      "paired_cases": [
+        {
+          "id": "2026-09-14-laurie-voss",
+          "delta": -0.4791111111111111
+        },
+        {
+          "id": "2026-08-21-matt-webb",
+          "delta": 0.6166666666666667
+        },
+        {
+          "id": "2026-08-10-openclaw",
+          "delta": 0.5769559032716928
+        },
+        {
+          "id": "2026-08-04-steve-yegge",
+          "delta": 0.0
+        },
+        {
+          "id": "2026-07-29-matthew-green",
+          "delta": 0.0
+        },
+        {
+          "id": "2026-05-16-julia-evans",
+          "delta": -0.9119170984455959
+        },
+        {
+          "id": "2026-05-05-john-gruber",
+          "delta": 0.1990950226244344
+        },
+        {
+          "id": "2026-05-04-andy-masley",
+          "delta": 0.0
+        },
+        {
+          "id": "2026-03-17-tim-schilling",
+          "delta": -0.4298724954462659
+        },
+        {
+          "id": "2026-03-06-ally-piechowski",
+          "delta": 0.0
+        }
+      ]
+    },
+    "v003": {
+      "mean_f1_delta": 0.032870881003018174,
+      "wins": 3,
+      "ties": 5,
+      "losses": 2,
+      "newly_failed": [],
+      "source_validity_regressions": [],
+      "passes_gate": true,
+      "paired_cases": [
+        {
+          "id": "2026-09-14-laurie-voss",
+          "delta": -0.4791111111111111
+        },
+        {
+          "id": "2026-08-21-matt-webb",
+          "delta": 0.7371317492138975
+        },
+        {
+          "id": "2026-08-10-openclaw",
+          "delta": 0.16216216216216217
+        },
+        {
+          "id": "2026-08-04-steve-yegge",
+          "delta": 0.0
+        },
+        {
+          "id": "2026-07-29-matthew-green",
+          "delta": 0.0
+        },
+        {
+          "id": "2026-05-16-julia-evans",
+          "delta": 0.0
+        },
+        {
+          "id": "2026-05-05-john-gruber",
+          "delta": 0.1990950226244344
+        },
+        {
+          "id": "2026-05-04-andy-masley",
+          "delta": 0.0
+        },
+        {
+          "id": "2026-03-17-tim-schilling",
+          "delta": -0.2905690128592012
+        },
+        {
+          "id": "2026-03-06-ally-piechowski",
+          "delta": 0.0
+        }
+      ]
+    },
+    "v004": {
+      "mean_f1_delta": -0.03999539966127343,
+      "wins": 1,
+      "ties": 6,
+      "losses": 3,
+      "newly_failed": [],
+      "source_validity_regressions": [],
+      "passes_gate": false,
+      "paired_cases": [
+        {
+          "id": "2026-09-14-laurie-voss",
+          "delta": -0.4791111111111111
+        },
+        {
+          "id": "2026-08-21-matt-webb",
+          "delta": 0.3333333333333333
+        },
+        {
+          "id": "2026-08-10-openclaw",
+          "delta": 0.0
+        },
+        {
+          "id": "2026-08-04-steve-yegge",
+          "delta": 0.0
+        },
+        {
+          "id": "2026-07-29-matthew-green",
+          "delta": 0.0
+        },
+        {
+          "id": "2026-05-16-julia-evans",
+          "delta": 0.0
+        },
+        {
+          "id": "2026-05-05-john-gruber",
+          "delta": -0.19909502262443438
+        },
+        {
+          "id": "2026-05-04-andy-masley",
+          "delta": 0.0
+        },
+        {
+          "id": "2026-03-17-tim-schilling",
+          "delta": -0.05508119621052221
+        },
+        {
+          "id": "2026-03-06-ally-piechowski",
+          "delta": 0.0
+        }
+      ]
+    },
+    "v005": {
+      "mean_f1_delta": 0.03191485356090288,
+      "wins": 3,
+      "ties": 5,
+      "losses": 2,
+      "newly_failed": [],
+      "source_validity_regressions": [],
+      "passes_gate": true,
+      "paired_cases": [
+        {
+          "id": "2026-09-14-laurie-voss",
+          "delta": -0.4791111111111111
+        },
+        {
+          "id": "2026-08-21-matt-webb",
+          "delta": 0.7266187050359711
+        },
+        {
+          "id": "2026-08-10-openclaw",
+          "delta": 0.1875
+        },
+        {
+          "id": "2026-08-04-steve-yegge",
+          "delta": 0.0
+        },
+        {
+          "id": "2026-07-29-matthew-green",
+          "delta": 0.0
+        },
+        {
+          "id": "2026-05-16-julia-evans",
+          "delta": -0.2207060084246767
+        },
+        {
+          "id": "2026-05-05-john-gruber",
+          "delta": 0.0
+        },
+        {
+          "id": "2026-05-04-andy-masley",
+          "delta": 0.0
+        },
+        {
+          "id": "2026-03-17-tim-schilling",
+          "delta": 0.10484695010884543
+        },
+        {
+          "id": "2026-03-06-ally-piechowski",
+          "delta": 0.0
+        }
+      ]
+    }
+  },
+  "test": {
+    "v001": {
+      "path": "evals/runs/quote_extraction/20261004-v001-test-r3-aggregate.json",
+      "sha256": "067288519968aeeebf95c4fa14f54f4e2a46dc13b64d00bfc31da14d0600aabe",
+      "prompt_sha256": "81772296aa947fb9d229859d705a972e0afab6a0174685667d8d2a008c7af3df",
+      "extraction": {
+        "model": "openai/gpt-6-luna",
+        "count": 1,
+        "prompt_version": "v001",
+        "max_output_tokens": 8192,
+        "reasoning_effort": null
+      },
+      "summary": {
+        "case_count": 40,
+        "generation_count": 120,
+        "error_count": 2,
+        "span_f1": 0.23456101177472657,
+        "span_precision": 0.24571960715130622,
+        "span_recall": 0.2382969009753978,
+        "exact_span_match": 0.09166666666666666,
+        "source_valid": 0.9833333333333333,
+        "nonempty": 0.9833333333333333,
+        "actual_cost_usd": 0.028304259999999998,
+        "input_tokens": 280278,
+        "output_tokens": 32153
+      }
+    },
+    "v003": {
+      "path": "evals/runs/quote_extraction/20261004-v003-test-r3-aggregate.json",
+      "sha256": "6d90eed22f2c7c55185e3aac1477880e433383a85fddf576affde3b563b37f82",
+      "prompt_sha256": "8f7a7a3f1700d92bb79076f19edbdb5d4b29cbc78148be8e8f51b001f6d20431",
+      "extraction": {
+        "model": "openai/gpt-6-luna",
+        "count": 1,
+        "prompt_version": "v003",
+        "max_output_tokens": 8192,
+        "reasoning_effort": null
+      },
+      "summary": {
+        "case_count": 40,
+        "generation_count": 120,
+        "error_count": 0,
+        "span_f1": 0.21090534757386217,
+        "span_precision": 0.21296270113742868,
+        "span_recall": 0.2292252793310879,
+        "exact_span_match": 0.041666666666666664,
+        "source_valid": 1.0,
+        "nonempty": 1.0,
+        "actual_cost_usd": 0.043006459999999996,
+        "input_tokens": 329718,
+        "output_tokens": 59278
+      }
+    },
+    "v005": {
+      "path": "evals/runs/quote_extraction/20261004-v005-test-r3.json",
+      "sha256": "0ce0e24acb4062ed95e11ff7e91848110c0b1ae9e4491480a404f8acd3ad9c67",
+      "prompt_sha256": "c76190cf1e182a110e8426b615a22d7670a0b6828d932098e2d9032eb3a7c603",
+      "extraction": {
+        "model": "openai/gpt-6-luna",
+        "count": 1,
+        "prompt_version": "v005",
+        "max_output_tokens": 8192,
+        "reasoning_effort": null
+      },
+      "summary": {
+        "case_count": 40,
+        "generation_count": 120,
+        "error_count": 0,
+        "span_f1": 0.22037853328820683,
+        "span_precision": 0.21616930008047236,
+        "span_recall": 0.24540757190231327,
+        "exact_span_match": 0.03333333333333333,
+        "source_valid": 1.0,
+        "nonempty": 1.0,
+        "actual_cost_usd": 0.04392,
+        "input_tokens": 299838,
+        "output_tokens": 62211
+      }
+    }
+  },
+  "test_comparisons": {
+    "v003": {
+      "mean_f1_delta": -0.023655664200864394,
+      "wins": 11,
+      "ties": 20,
+      "losses": 9,
+      "newly_failed": [],
+      "source_validity_regressions": [],
+      "passes_gate": false,
+      "paired_cases": [
+        {
+          "id": "2026-10-01-matthew-green",
+          "delta": 0.7412280701754387
+        },
+        {
+          "id": "2026-09-29-anthropic-frontier-red-team",
+          "delta": 0.0
+        },
+        {
+          "id": "2026-09-25-john-gruber",
+          "delta": 0.3081221572449643
+        },
+        {
+          "id": "2026-09-16-mustafa-suleyman",
+          "delta": 0.0
+        },
+        {
+          "id": "2026-09-10-calif-research",
+          "delta": 0.37559576661257565
+        },
+        {
+          "id": "2026-09-06-zach-kehs",
+          "delta": -0.1550387596899225
+        },
+        {
+          "id": "2026-09-01-tarn-adams",
+          "delta": 0.0
+        },
+        {
+          "id": "2026-08-26-paul-dix",
+          "delta": 0.0
+        },
+        {
+          "id": "2026-08-23-drew-breunig",
+          "delta": -0.6666666666666666
+        },
+        {
+          "id": "2026-08-22-linus-torvalds",
+          "delta": 0.0
+        },
+        {
+          "id": "2026-08-19-jeremy-morrell",
+          "delta": -1.0
+        },
+        {
+          "id": "2026-08-12-florian-herrengt",
+          "delta": 0.0
+        },
+        {
+          "id": "2026-08-08-john-gruber",
+          "delta": 0.0
+        },
+        {
+          "id": "2026-07-30-bruce-schneier",
+          "delta": 0.0
+        },
+        {
+          "id": "2026-07-23-seth-larson",
+          "delta": 0.0
+        },
+        {
+          "id": "2026-07-14-github-changeling",
+          "delta": 0.1654846335697399
+        },
+        {
+          "id": "2026-06-28-jon-udell",
+          "delta": -0.5890875591474394
+        },
+        {
+          "id": "2026-06-26-dean-w-ball",
+          "delta": 0.0
+        },
+        {
+          "id": "2026-06-24-tom-macwright",
+          "delta": 0.05897435897435899
+        },
+        {
+          "id": "2026-06-12-andrew-singleton",
+          "delta": 0.0
+        },
+        {
+          "id": "2026-06-05-andreas-kling",
+          "delta": -0.12775144730074306
+        },
+        {
+          "id": "2026-05-24-armin-ronacher",
+          "delta": 0.0
+        },
+        {
+          "id": "2026-05-11-james-shore",
+          "delta": 0.38766519823788537
+        },
+        {
+          "id": "2026-05-09-luke-curley",
+          "delta": -0.5745731547149987
+        },
+        {
+          "id": "2026-05-03-anthropic",
+          "delta": 0.0
+        },
+        {
+          "id": "2026-04-22-bobby-holley",
+          "delta": 0.0
+        },
+        {
+          "id": "2026-04-21-andreas-pahlsson-notini",
+          "delta": 0.0
+        },
+        {
+          "id": "2026-04-15-john-gruber",
+          "delta": 0.0
+        },
+        {
+          "id": "2026-04-15-kyle-kingsbury",
+          "delta": 0.25859491778774296
+        },
+        {
+          "id": "2026-04-13-bryan-cantrill",
+          "delta": -0.028098084456848027
+        },
+        {
+          "id": "2026-04-08-giles-turnbull",
+          "delta": 0.0
+        },
+        {
+          "id": "2026-04-01-soohoon-choi",
+          "delta": -0.6666666666666666
+        },
+        {
+          "id": "2026-03-28-matt-webb",
+          "delta": 0.10977982590885804
+        },
+        {
+          "id": "2026-03-17-ken-jin",
+          "delta": 0.0
+        },
+        {
+          "id": "2026-03-16-blackmail",
+          "delta": 0.0
+        },
+        {
+          "id": "2026-03-16-guilherme-rambo",
+          "delta": -0.09777777777777774
+        },
+        {
+          "id": "2026-03-14-jannis-leidel",
+          "delta": 0.28677839851024206
+        },
+        {
+          "id": "2026-03-13-craig-mod",
+          "delta": 0.11929355469801439
+        },
+        {
+          "id": "2026-03-12-les-orchard",
+          "delta": 0.0
+        },
+        {
+          "id": "2026-02-26-benedict-evans",
+          "delta": 0.14791666666666667
+        }
+      ],
+      "paired_document_bootstrap_95_percent_interval": [
+        -0.12248881934624593,
+        0.06879754429392952
+      ]
+    },
+    "v005": {
+      "mean_f1_delta": -0.014182478486519722,
+      "wins": 10,
+      "ties": 19,
+      "losses": 11,
+      "newly_failed": [],
+      "source_validity_regressions": [],
+      "passes_gate": false,
+      "paired_cases": [
+        {
+          "id": "2026-10-01-matthew-green",
+          "delta": 0.6118421052631579
+        },
+        {
+          "id": "2026-09-29-anthropic-frontier-red-team",
+          "delta": 0.0
+        },
+        {
+          "id": "2026-09-25-john-gruber",
+          "delta": 0.0
+        },
+        {
+          "id": "2026-09-16-mustafa-suleyman",
+          "delta": 0.0
+        },
+        {
+          "id": "2026-09-10-calif-research",
+          "delta": 0.6199238643438147
+        },
+        {
+          "id": "2026-09-06-zach-kehs",
+          "delta": -0.1550387596899225
+        },
+        {
+          "id": "2026-09-01-tarn-adams",
+          "delta": 0.0
+        },
+        {
+          "id": "2026-08-26-paul-dix",
+          "delta": 0.6666666666666666
+        },
+        {
+          "id": "2026-08-23-drew-breunig",
+          "delta": -0.6666666666666666
+        },
+        {
+          "id": "2026-08-22-linus-torvalds",
+          "delta": 0.0
+        },
+        {
+          "id": "2026-08-19-jeremy-morrell",
+          "delta": -1.0
+        },
+        {
+          "id": "2026-08-12-florian-herrengt",
+          "delta": 0.0
+        },
+        {
+          "id": "2026-08-08-john-gruber",
+          "delta": 0.0
+        },
+        {
+          "id": "2026-07-30-bruce-schneier",
+          "delta": 0.0
+        },
+        {
+          "id": "2026-07-23-seth-larson",
+          "delta": 0.3333333333333333
+        },
+        {
+          "id": "2026-07-14-github-changeling",
+          "delta": 0.1654846335697399
+        },
+        {
+          "id": "2026-06-28-jon-udell",
+          "delta": -0.8548218248817051
+        },
+        {
+          "id": "2026-06-26-dean-w-ball",
+          "delta": 0.0
+        },
+        {
+          "id": "2026-06-24-tom-macwright",
+          "delta": 0.0744336569579288
+        },
+        {
+          "id": "2026-06-12-andrew-singleton",
+          "delta": 0.0
+        },
+        {
+          "id": "2026-06-05-andreas-kling",
+          "delta": -0.12775144730074306
+        },
+        {
+          "id": "2026-05-24-armin-ronacher",
+          "delta": 0.0
+        },
+        {
+          "id": "2026-05-11-james-shore",
+          "delta": 0.3764052132268265
+        },
+        {
+          "id": "2026-05-09-luke-curley",
+          "delta": -0.29968137982322385
+        },
+        {
+          "id": "2026-05-03-anthropic",
+          "delta": 0.0
+        },
+        {
+          "id": "2026-04-22-bobby-holley",
+          "delta": 0.0
+        },
+        {
+          "id": "2026-04-21-andreas-pahlsson-notini",
+          "delta": 0.0
+        },
+        {
+          "id": "2026-04-15-john-gruber",
+          "delta": -0.20833333333333337
+        },
+        {
+          "id": "2026-04-15-kyle-kingsbury",
+          "delta": -0.3333333333333333
+        },
+        {
+          "id": "2026-04-13-bryan-cantrill",
+          "delta": -0.10467440222001745
+        },
+        {
+          "id": "2026-04-08-giles-turnbull",
+          "delta": 0.0
+        },
+        {
+          "id": "2026-04-01-soohoon-choi",
+          "delta": -0.6666666666666666
+        },
+        {
+          "id": "2026-03-28-matt-webb",
+          "delta": 0.10977982590885804
+        },
+        {
+          "id": "2026-03-17-ken-jin",
+          "delta": 0.0
+        },
+        {
+          "id": "2026-03-16-blackmail",
+          "delta": 0.0
+        },
+        {
+          "id": "2026-03-16-guilherme-rambo",
+          "delta": -0.3422222222222222
+        },
+        {
+          "id": "2026-03-14-jannis-leidel",
+          "delta": 0.6201117318435756
+        },
+        {
+          "id": "2026-03-13-craig-mod",
+          "delta": 0.6139098655631439
+        },
+        {
+          "id": "2026-03-12-les-orchard",
+          "delta": 0.0
+        },
+        {
+          "id": "2026-02-26-benedict-evans",
+          "delta": 0.0
+        }
+      ],
+      "paired_document_bootstrap_95_percent_interval": [
+        -0.1281743939556232,
+        0.09759891011744574
+      ]
+    }
+  },
+  "metered_generation_count": 510,
+  "recorded_cost_usd": 0.17779862999999999,
+  "cost_exclusions": "Two unmetered single-source CLI probes, and 30 locally rejected requests in the initial unsupported reasoning-effort run. Aggregate runs are counted once, never again through their constituent runs.",
+  "followup_test_is_exploratory": true,
+  "bootstrap_method": "20000 paired document resamples of three-generation per-document mean deltas, seed 20261004; descriptive percentile intervals, no correction for adaptive selection or multiple candidates."
+}

@@ -1,0 +1,237 @@
+{
+  "selected_at": "2026-10-04T17:36:24.356716+00:00",
+  "selected_before_held_out_test": true,
+  "baseline_version": "v001",
+  "selected_version": "v003",
+  "model": "openai/gpt-6-luna",
+  "dataset_sha256": "42dda5ed1406b2d4774690a0b7b0effb87bd54a68dba454aa9652c9787c0729a",
+  "scorer_version": "source-span-f1/v1",
+  "criterion": "highest development mean F1 passing paired gate after 3 repeats on each of 10 sources",
+  "gate": {
+    "minimum_mean_delta": 0.02,
+    "majority_win_or_tie": true,
+    "no_newly_failed_cases": true,
+    "no_source_validity_regressions": true
+  },
+  "baseline_summary": {
+    "case_count": 10,
+    "generation_count": 30,
+    "error_count": 0,
+    "span_f1": 0.22190907502518414,
+    "span_precision": 0.21574618251211888,
+    "span_recall": 0.25854636591478697,
+    "exact_span_match": 0.03333333333333333,
+    "source_valid": 1.0,
+    "nonempty": 1.0,
+    "actual_cost_usd": 0.00972563,
+    "input_tokens": 126963,
+    "output_tokens": 9109
+  },
+  "candidates": {
+    "v002": {
+      "summary": {
+        "case_count": 10,
+        "generation_count": 30,
+        "error_count": 3,
+        "span_f1": 0.17909076378116626,
+        "span_precision": 0.13758560971265166,
+        "span_recall": 0.2732673267326733,
+        "exact_span_match": 0.0,
+        "source_valid": 0.9,
+        "nonempty": 0.9,
+        "actual_cost_usd": 0.01343632,
+        "input_tokens": 137973,
+        "output_tokens": 15824
+      },
+      "comparison": {
+        "mean_f1_delta": -0.0428183112440179,
+        "wins": 3,
+        "ties": 4,
+        "losses": 3,
+        "newly_failed": [
+          "2026-03-06-ally-piechowski"
+        ],
+        "source_validity_regressions": [
+          "2026-03-06-ally-piechowski"
+        ],
+        "passes_gate": false,
+        "paired_cases": [
+          {
+            "id": "2026-09-14-laurie-voss",
+            "delta": -0.4791111111111111
+          },
+          {
+            "id": "2026-08-21-matt-webb",
+            "delta": 0.6166666666666667
+          },
+          {
+            "id": "2026-08-10-openclaw",
+            "delta": 0.5769559032716928
+          },
+          {
+            "id": "2026-08-04-steve-yegge",
+            "delta": 0.0
+          },
+          {
+            "id": "2026-07-29-matthew-green",
+            "delta": 0.0
+          },
+          {
+            "id": "2026-05-16-julia-evans",
+            "delta": -0.9119170984455959
+          },
+          {
+            "id": "2026-05-05-john-gruber",
+            "delta": 0.1990950226244344
+          },
+          {
+            "id": "2026-05-04-andy-masley",
+            "delta": 0.0
+          },
+          {
+            "id": "2026-03-17-tim-schilling",
+            "delta": -0.4298724954462659
+          },
+          {
+            "id": "2026-03-06-ally-piechowski",
+            "delta": 0.0
+          }
+        ]
+      }
+    },
+    "v003": {
+      "summary": {
+        "case_count": 10,
+        "generation_count": 30,
+        "error_count": 0,
+        "span_f1": 0.2547799560282023,
+        "span_precision": 0.2285770249483125,
+        "span_recall": 0.32296880815901136,
+        "exact_span_match": 0.0,
+        "source_valid": 1.0,
+        "nonempty": 1.0,
+        "actual_cost_usd": 0.01323882,
+        "input_tokens": 139323,
+        "output_tokens": 15321
+      },
+      "comparison": {
+        "mean_f1_delta": 0.032870881003018174,
+        "wins": 3,
+        "ties": 5,
+        "losses": 2,
+        "newly_failed": [],
+        "source_validity_regressions": [],
+        "passes_gate": true,
+        "paired_cases": [
+          {
+            "id": "2026-09-14-laurie-voss",
+            "delta": -0.4791111111111111
+          },
+          {
+            "id": "2026-08-21-matt-webb",
+            "delta": 0.7371317492138975
+          },
+          {
+            "id": "2026-08-10-openclaw",
+            "delta": 0.16216216216216217
+          },
+          {
+            "id": "2026-08-04-steve-yegge",
+            "delta": 0.0
+          },
+          {
+            "id": "2026-07-29-matthew-green",
+            "delta": 0.0
+          },
+          {
+            "id": "2026-05-16-julia-evans",
+            "delta": 0.0
+          },
+          {
+            "id": "2026-05-05-john-gruber",
+            "delta": 0.1990950226244344
+          },
+          {
+            "id": "2026-05-04-andy-masley",
+            "delta": 0.0
+          },
+          {
+            "id": "2026-03-17-tim-schilling",
+            "delta": -0.2905690128592012
+          },
+          {
+            "id": "2026-03-06-ally-piechowski",
+            "delta": 0.0
+          }
+        ]
+      }
+    },
+    "v004": {
+      "summary": {
+        "case_count": 10,
+        "generation_count": 30,
+        "error_count": 0,
+        "span_f1": 0.18191367536391073,
+        "span_precision": 0.18375170167659335,
+        "span_recall": 0.19468671679197994,
+        "exact_span_match": 0.03333333333333333,
+        "source_valid": 1.0,
+        "nonempty": 1.0,
+        "actual_cost_usd": 0.01191662,
+        "input_tokens": 141093,
+        "output_tokens": 12535
+      },
+      "comparison": {
+        "mean_f1_delta": -0.03999539966127343,
+        "wins": 1,
+        "ties": 6,
+        "losses": 3,
+        "newly_failed": [],
+        "source_validity_regressions": [],
+        "passes_gate": false,
+        "paired_cases": [
+          {
+            "id": "2026-09-14-laurie-voss",
+            "delta": -0.4791111111111111
+          },
+          {
+            "id": "2026-08-21-matt-webb",
+            "delta": 0.3333333333333333
+          },
+          {
+            "id": "2026-08-10-openclaw",
+            "delta": 0.0
+          },
+          {
+            "id": "2026-08-04-steve-yegge",
+            "delta": 0.0
+          },
+          {
+            "id": "2026-07-29-matthew-green",
+            "delta": 0.0
+          },
+          {
+            "id": "2026-05-16-julia-evans",
+            "delta": 0.0
+          },
+          {
+            "id": "2026-05-05-john-gruber",
+            "delta": -0.19909502262443438
+          },
+          {
+            "id": "2026-05-04-andy-masley",
+            "delta": 0.0
+          },
+          {
+            "id": "2026-03-17-tim-schilling",
+            "delta": -0.05508119621052221
+          },
+          {
+            "id": "2026-03-06-ally-piechowski",
+            "delta": 0.0
+          }
+        ]
+      }
+    }
+  }
+}
