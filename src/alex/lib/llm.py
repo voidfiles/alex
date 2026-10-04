@@ -9,6 +9,7 @@ model string works: "openai/gpt-5.6-sol", "anthropic/claude-opus-5",
 from __future__ import annotations
 
 import json
+import math
 import os
 import shutil
 import subprocess
@@ -191,6 +192,24 @@ class LlmError(RuntimeError):
 
 
 @dataclass(frozen=True)
+class CompletionUsage:
+    """Provider-reported token use and the corresponding USD cost, if known."""
+
+    input_tokens: int | None = None
+    output_tokens: int | None = None
+    total_tokens: int | None = None
+    cost_usd: float | None = None
+
+
+@dataclass(frozen=True)
+class MeteredCompletion:
+    """A completion paired with the usage metadata returned by its provider."""
+
+    text: str
+    usage: CompletionUsage
+
+
+@dataclass(frozen=True)
 class TranscriptSegment:
     text: str
     speaker: str | None
@@ -221,22 +240,39 @@ class LiteLlmCompleter:
     timeout_seconds: float = DEFAULT_LLM_TIMEOUT_SECONDS
     num_retries: int = DEFAULT_LLM_RETRIES
     reasoning_effort: str | None = None
+    temperature: float | None = None
+    system_prompt: str | None = None
 
     def complete(self, *, prompt: str, model: str, max_tokens: int) -> str:
+        return self.complete_metered(
+            prompt=prompt,
+            model=model,
+            max_tokens=max_tokens,
+        ).text
+
+    def complete_metered(
+        self, *, prompt: str, model: str, max_tokens: int
+    ) -> MeteredCompletion:
         # Imported lazily: litellm drags in a large dependency tree and the
         # CLI only needs it once a command actually calls a model.
         import litellm
 
         litellm.suppress_debug_info = True
+        messages: list[dict[str, str]] = []
+        if self.system_prompt is not None:
+            messages.append({"role": "system", "content": self.system_prompt})
+        messages.append({"role": "user", "content": prompt})
         request: dict[str, object] = {
             "model": model,
-            "messages": [{"role": "user", "content": prompt}],
+            "messages": messages,
             "max_tokens": max_tokens,
             "timeout": self.timeout_seconds,
             "num_retries": self.num_retries,
         }
         if self.reasoning_effort is not None:
             request["reasoning_effort"] = self.reasoning_effort
+        if self.temperature is not None:
+            request["temperature"] = self.temperature
         try:
             response = litellm.completion(**request)
         except Exception as error:
@@ -245,7 +281,128 @@ class LiteLlmCompleter:
         content = response.choices[0].message.content
         if not isinstance(content, str) or not content.strip():
             raise LlmError(f"Model {model} returned an empty completion.")
-        return content
+        return MeteredCompletion(
+            text=content,
+            usage=_completion_usage(response, model=model, litellm=litellm),
+        )
+
+
+LOCAL_MODEL_PREFIXES = ("ollama/", "localai/", "lm_studio/", "vllm/", "sglang/")
+
+
+def is_local_model(model: str) -> bool:
+    """Return whether a model is served locally and therefore has no API cost."""
+
+    return model.casefold().startswith(LOCAL_MODEL_PREFIXES)
+
+
+def estimate_completion_cost(
+    *,
+    prompt: str,
+    model: str,
+    max_tokens: int,
+    system_prompt: str | None = None,
+) -> float | None:
+    """Estimate a worst-case cost using LiteLLM's published model pricing.
+
+    ``None`` means that a remote model has no reliable published price. Callers
+    that enforce a budget must use :func:`preflight_completion_cost` rather
+    than treating an unknown price as free.
+    """
+
+    if is_local_model(model):
+        return 0.0
+    try:
+        import litellm
+
+        litellm_api: Any = litellm
+        model_info = litellm_api.get_model_info(model=model)
+        input_cost_per_token = _positive_finite_float(
+            _model_info_field(model_info, "input_cost_per_token")
+        )
+        output_cost_per_token = _positive_finite_float(
+            _model_info_field(model_info, "output_cost_per_token")
+        )
+        if input_cost_per_token is None or output_cost_per_token is None:
+            return None
+        messages: list[dict[str, str]] = []
+        if system_prompt is not None:
+            messages.append({"role": "system", "content": system_prompt})
+        messages.append({"role": "user", "content": prompt})
+        input_tokens = litellm_api.token_counter(model=model, messages=messages)
+    except Exception:
+        return None
+    if isinstance(input_tokens, bool) or not isinstance(input_tokens, int):
+        return None
+    return input_tokens * input_cost_per_token + max_tokens * output_cost_per_token
+
+
+def preflight_completion_cost(
+    *,
+    prompt: str,
+    model: str,
+    max_tokens: int,
+    system_prompt: str | None = None,
+) -> float:
+    """Return a budget-safe estimate or reject an unpriced remote model."""
+
+    cost = estimate_completion_cost(
+        prompt=prompt,
+        model=model,
+        max_tokens=max_tokens,
+        system_prompt=system_prompt,
+    )
+    if cost is None:
+        raise LlmError(
+            f"No pricing information is available for nonlocal model {model}."
+        )
+    return cost
+
+
+def _completion_usage(response: object, *, model: str, litellm: Any) -> CompletionUsage:
+    raw_usage = _response_field(response, "usage")
+    input_tokens = _optional_int(_response_field(raw_usage, "prompt_tokens"))
+    if input_tokens is None:
+        input_tokens = _optional_int(_response_field(raw_usage, "input_tokens"))
+    output_tokens = _optional_int(_response_field(raw_usage, "completion_tokens"))
+    if output_tokens is None:
+        output_tokens = _optional_int(_response_field(raw_usage, "output_tokens"))
+    total_tokens = _optional_int(_response_field(raw_usage, "total_tokens"))
+    if total_tokens is None and input_tokens is not None and output_tokens is not None:
+        total_tokens = input_tokens + output_tokens
+    return CompletionUsage(
+        input_tokens=input_tokens,
+        output_tokens=output_tokens,
+        total_tokens=total_tokens,
+        cost_usd=_response_cost(response, model=model, litellm=litellm),
+    )
+
+
+def _response_cost(response: object, *, model: str, litellm: Any) -> float | None:
+    if is_local_model(model):
+        return 0.0
+    completion_cost = getattr(litellm, "completion_cost", None)
+    if not callable(completion_cost):
+        return None
+    try:
+        return _positive_finite_float(
+            completion_cost(completion_response=response, model=model)
+        )
+    except Exception:
+        return None
+
+
+def _model_info_field(model_info: object, name: str) -> object | None:
+    if isinstance(model_info, Mapping):
+        return model_info.get(name)
+    return getattr(model_info, name, None)
+
+
+def _positive_finite_float(value: object | None) -> float | None:
+    if isinstance(value, bool) or not isinstance(value, int | float):
+        return None
+    as_float = float(value)
+    return as_float if math.isfinite(as_float) and as_float >= 0 else None
 
 
 class Transcriber(Protocol):
@@ -627,7 +784,7 @@ def count_embedding_tokens(text: str, *, model: str) -> int:
         encoding = tiktoken.encoding_for_model(model_name)
     except KeyError:
         encoding = tiktoken.get_encoding("cl100k_base")
-    return len(encoding.encode(text))
+    return len(encoding.encode(text, disallowed_special=()))
 
 
 def parse_embedding_response(
@@ -740,6 +897,14 @@ def _optional_float(value: object | None) -> float | None:
         return float(value)
     except ValueError:
         return None
+
+
+def _optional_int(value: object | None) -> int | None:
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, int):
+        return value
+    return None
 
 
 def complete_all(

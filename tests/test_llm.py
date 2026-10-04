@@ -41,13 +41,17 @@ from alex.lib.llm import (
     TRIAGE_LABEL_MODEL_ENV,
     TRIAGE_PROPOSAL_MODEL_ENV,
     AudioTranscript,
+    CompletionUsage,
     LiteLlmCompleter,
     LiteLlmEmbedder,
     LiteLlmTranscriber,
     LlmError,
+    MeteredCompletion,
     TranscriptSegment,
     complete_all,
+    estimate_completion_cost,
     ordered_parallel_map,
+    preflight_completion_cost,
     resolve_chunk_graph_max_claims,
     resolve_embedding_model,
     resolve_fast_summary_model,
@@ -108,6 +112,95 @@ def test_litellm_completer_returns_text_and_passes_request_parameters(
             "num_retries": 3,
         }
     ]
+
+
+def test_litellm_completer_applies_instance_system_prompt_and_temperature(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured_kwargs: list[dict[str, Any]] = []
+
+    def fake_completion(**kwargs: Any) -> SimpleNamespace:
+        captured_kwargs.append(kwargs)
+        return completion_response("A calibration result.")
+
+    install_fake_litellm(monkeypatch, fake_completion)
+
+    result = LiteLlmCompleter(
+        system_prompt="Return only calibrated JSON.", temperature=0.25
+    ).complete(prompt="Judge this.", model="openai/gpt-5", max_tokens=200)
+
+    assert result == "A calibration result."
+    assert captured_kwargs[0]["messages"] == [
+        {"role": "system", "content": "Return only calibrated JSON."},
+        {"role": "user", "content": "Judge this."},
+    ]
+    assert captured_kwargs[0]["temperature"] == 0.25
+
+
+def test_litellm_completer_complete_metered_returns_provider_usage_and_cost(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def fake_completion(**kwargs: Any) -> SimpleNamespace:
+        del kwargs
+        return SimpleNamespace(
+            choices=[SimpleNamespace(message=SimpleNamespace(content="Metered."))],
+            usage=SimpleNamespace(
+                prompt_tokens=11, completion_tokens=7, total_tokens=18
+            ),
+        )
+
+    install_fake_litellm(monkeypatch, fake_completion)
+    litellm_module = sys.modules["litellm"]
+    litellm_module.completion_cost = lambda **_: 0.0042  # type: ignore[attr-defined]
+
+    result = LiteLlmCompleter().complete_metered(
+        prompt="Calculate.", model="openai/gpt-5", max_tokens=50
+    )
+
+    assert result == MeteredCompletion(
+        text="Metered.",
+        usage=CompletionUsage(
+            input_tokens=11,
+            output_tokens=7,
+            total_tokens=18,
+            cost_usd=0.0042,
+        ),
+    )
+
+
+def test_estimate_completion_cost_uses_litellm_pricing_and_local_models_are_free(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    litellm_module: Any = ModuleType("litellm")
+    litellm_module.token_counter = lambda **_: 10
+    litellm_module.get_model_info = lambda model: {
+        "input_cost_per_token": 0.001,
+        "output_cost_per_token": 0.002,
+    }
+    monkeypatch.setitem(sys.modules, "litellm", litellm_module)
+
+    assert estimate_completion_cost(
+        prompt="ten input tokens", model="openai/gpt-5", max_tokens=20
+    ) == pytest.approx(0.05)
+    assert (
+        estimate_completion_cost(prompt="free", model="ollama/llama3", max_tokens=20)
+        == 0.0
+    )
+
+
+def test_preflight_completion_cost_rejects_an_unpriced_nonlocal_model(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    litellm_module: Any = ModuleType("litellm")
+    litellm_module.get_model_info = lambda model: (_ for _ in ()).throw(
+        ValueError("unknown model")
+    )
+    monkeypatch.setitem(sys.modules, "litellm", litellm_module)
+
+    with pytest.raises(LlmError, match="No pricing information"):
+        preflight_completion_cost(
+            prompt="price me", model="acme/unpriced", max_tokens=100
+        )
 
 
 def test_litellm_completer_wraps_provider_errors(
@@ -311,6 +404,16 @@ def test_litellm_embedder_batches_inputs_by_total_token_budget(
 
     assert captured_inputs == [["4", "4"], ["4", "4"]]
     assert result == ((1.0, 0.0), (1.0, 1.0), (2.0, 0.0), (2.0, 1.0))
+
+
+def test_count_embedding_tokens_treats_special_token_text_as_plain_text() -> None:
+    assert (
+        llm.count_embedding_tokens(
+            "A vault note may contain <|endoftext|> literally.",
+            model="openrouter/voyageai/voyage-4",
+        )
+        > 0
+    )
 
 
 def test_litellm_embedder_sends_single_input_over_batch_token_budget(

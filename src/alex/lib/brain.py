@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import hashlib
 import math
+import random
 import re
 import sqlite3
 import struct
@@ -20,11 +21,14 @@ from pathlib import Path
 
 from alex.lib.llm import Embedder, LiteLlmEmbedder, LlmError
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 CHUNKING_VERSION = 1
 DISCOVERY_VERSION = 2
 MAX_NORMAL_BYTES = 500_000
 MAX_FILE_BYTES = 5_000_000
+HYDRATED_SOURCE_LIMIT = 4_000
+RETRIEVAL_MARK_SECONDS = 5 * 60
+FAR_BANK_LIMIT = 256
 EXCLUDED_DIRS = frozenset(
     {"trash", "backup tests", "research-corpus", "attachments", "cache"}
 )
@@ -70,6 +74,23 @@ class SearchHit:
 
 
 @dataclass(frozen=True)
+class KnowledgePage:
+    """A lightweight retrieval page whose source is loaded only when needed."""
+
+    path: str
+    title: str
+    chunk_id: int
+    domain: str
+    inbound_links: int
+    last_retrieved_at: float | None
+    embedding: tuple[float, ...] | None = None
+    text: str = ""
+    line_start: int = 0
+    line_end: int = 0
+    score: float = 0.0
+
+
+@dataclass(frozen=True)
 class IndexResult:
     indexed_files: int
     skipped_files: int
@@ -89,7 +110,7 @@ def discover_notes(vault: Path) -> Iterator[DiscoveredNote]:
             part in EXCLUDED_DIRS for part in lowered[:-1]
         ):
             continue
-        if lowered[:2] == ("resources", "ideas"):
+        if lowered[:2] == ("resources", "ideas") and not _is_brainstorm_page(path):
             continue
         asset = _asset_root(root, path)
         if asset is not None:
@@ -200,7 +221,8 @@ class BrainIndex:
             CREATE TABLE IF NOT EXISTS brain_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
             CREATE TABLE IF NOT EXISTS notes (
                 id INTEGER PRIMARY KEY, path TEXT UNIQUE NOT NULL, source_hash TEXT NOT NULL,
-                title TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'indexed', updated_at REAL NOT NULL
+                title TEXT NOT NULL, domain TEXT NOT NULL, inbound_links INTEGER NOT NULL DEFAULT 0,
+                last_retrieved_at REAL, status TEXT NOT NULL DEFAULT 'indexed', updated_at REAL NOT NULL
             );
             CREATE TABLE IF NOT EXISTS chunks (
                 id INTEGER PRIMARY KEY, note_id INTEGER NOT NULL REFERENCES notes(id) ON DELETE CASCADE,
@@ -212,7 +234,8 @@ class BrainIndex:
             CREATE VIRTUAL TABLE IF NOT EXISTS chunks_fts USING fts5(body, title, path);
             CREATE TABLE IF NOT EXISTS links (
                 source_note_id INTEGER NOT NULL REFERENCES notes(id) ON DELETE CASCADE,
-                target TEXT NOT NULL
+                target TEXT NOT NULL,
+                UNIQUE(source_note_id, target)
             );
             """
         )
@@ -270,14 +293,21 @@ class BrainIndex:
                 "INSERT OR REPLACE INTO brain_meta(key, value) VALUES ('discovery_version', ?)",
                 (str(DISCOVERY_VERSION),),
             )
+            self._refresh_inbound_links()
         return IndexResult(indexed, skipped, self.stale_chunks(), large)
 
     def _record_skipped(self, path: str, status: str) -> None:
         with self.connection:
             self.connection.execute(
-                "INSERT INTO notes(path, source_hash, title, status, updated_at) VALUES (?, '', ?, ?, ?) "
+                "INSERT INTO notes(path, source_hash, title, domain, status, updated_at) VALUES (?, '', ?, ?, ?, ?) "
                 "ON CONFLICT(path) DO UPDATE SET status=excluded.status, updated_at=excluded.updated_at",
-                (path, Path(path).stem, status, time.time()),
+                (
+                    path,
+                    Path(path).stem,
+                    _domain_key(path),
+                    status,
+                    time.time(),
+                ),
             )
 
     def _ingest_note(self, path: str, content: str, *, force: bool = False) -> bool:
@@ -291,8 +321,8 @@ class BrainIndex:
         with self.connection:
             if old is None:
                 cursor = self.connection.execute(
-                    "INSERT INTO notes(path, source_hash, title, updated_at) VALUES (?, ?, ?, ?)",
-                    (path, source_hash, title, time.time()),
+                    "INSERT INTO notes(path, source_hash, title, domain, updated_at) VALUES (?, ?, ?, ?, ?)",
+                    (path, source_hash, title, _domain_key(path), time.time()),
                 )
                 if cursor.lastrowid is None:
                     raise BrainError("SQLite did not return a note identifier.")
@@ -318,8 +348,8 @@ class BrainIndex:
                     "DELETE FROM links WHERE source_note_id = ?", (note_id,)
                 )
                 self.connection.execute(
-                    "UPDATE notes SET source_hash=?, title=?, status='indexed', updated_at=? WHERE id=?",
-                    (source_hash, title, time.time(), note_id),
+                    "UPDATE notes SET source_hash=?, title=?, domain=?, status='indexed', updated_at=? WHERE id=?",
+                    (source_hash, title, _domain_key(path), time.time(), note_id),
                 )
             for ordinal, (body, start, end, hierarchy) in enumerate(
                 recursive_chunks(content, title=title)
@@ -347,12 +377,38 @@ class BrainIndex:
                 )
             self.connection.executemany(
                 "INSERT INTO links(source_note_id, target) VALUES (?, ?)",
-                (
-                    (note_id, match.group(1).strip())
-                    for match in WIKILINK.finditer(content)
-                ),
+                ((note_id, target) for target in _wikilink_targets(content)),
             )
         return True
+
+    def _refresh_inbound_links(self) -> None:
+        """Count only unambiguous source notes linking to an indexed target."""
+        notes = self.connection.execute(
+            "SELECT id, path FROM notes WHERE status = 'indexed'"
+        ).fetchall()
+        exact: dict[str, int] = {}
+        aliases: dict[str, set[int]] = {}
+        for row in notes:
+            note_id = int(row["id"])
+            path = str(row["path"])
+            exact[_link_key(path)] = note_id
+            aliases.setdefault(Path(path).stem.casefold(), set()).add(note_id)
+        inbound: dict[int, set[int]] = {}
+        for row in self.connection.execute(
+            "SELECT DISTINCT source_note_id, target FROM links"
+        ):
+            target = str(row["target"])
+            target_id = exact.get(_link_key(target))
+            if target_id is None and "/" not in target:
+                candidates = aliases.get(Path(target).stem.casefold(), set())
+                target_id = next(iter(candidates)) if len(candidates) == 1 else None
+            if target_id is not None:
+                inbound.setdefault(target_id, set()).add(int(row["source_note_id"]))
+        self.connection.execute("UPDATE notes SET inbound_links = 0")
+        self.connection.executemany(
+            "UPDATE notes SET inbound_links = ? WHERE id = ?",
+            ((len(sources), note_id) for note_id, sources in inbound.items()),
+        )
 
     def stale_chunk_ids(self) -> tuple[int, ...]:
         rows = self.connection.execute(
@@ -524,13 +580,16 @@ class BrainIndex:
         embedder: Embedder,
         limit: int = 20,
         scope: str | None = None,
+        query_embedding: Sequence[float] | None = None,
     ) -> tuple[SearchHit, ...]:
         try:
             import sqlite_vec
 
-            vector = _embed_for_role(
-                embedder, (query,), self.config.embedding_model, "query"
-            )[0]
+            vector = (
+                tuple(query_embedding)
+                if query_embedding is not None
+                else self.embed_question(query, embedder)
+            )
             blob = sqlite_vec.serialize_float32(list(vector))
             rows = self.connection.execute(
                 f"""SELECT n.path, n.title, c.body, c.line_start, c.line_end, v.distance
@@ -560,10 +619,17 @@ class BrainIndex:
         embedder: Embedder | None = None,
         limit: int = 20,
         scope: str | None = None,
+        query_embedding: Sequence[float] | None = None,
     ) -> tuple[SearchHit, ...]:
         lexical = self.search_lexical(query, limit=limit * 2, scope=scope)
         vector = (
-            self.search_vector(query, embedder=embedder, limit=limit * 2, scope=scope)
+            self.search_vector(
+                query,
+                embedder=embedder,
+                limit=limit * 2,
+                scope=scope,
+                query_embedding=query_embedding,
+            )
             if embedder
             else ()
         )
@@ -583,58 +649,248 @@ class BrainIndex:
         )
 
     def search_diverse_hybrid(
-        self, query: str, *, embedder: Embedder | None = None, limit: int = 20
+        self,
+        query: str,
+        *,
+        embedder: Embedder | None = None,
+        limit: int = 20,
+        query_embedding: Sequence[float] | None = None,
     ) -> tuple[SearchHit, ...]:
-        global_hits = self.search_hybrid(query, embedder=embedder, limit=limit * 20)
+        global_hits = self.search_hybrid(
+            query,
+            embedder=embedder,
+            limit=limit * 20,
+            query_embedding=query_embedding,
+        )
         scoped_hits = tuple(
             hit
             for scope in ("root", "assets", "nested")
             for hit in self.search_hybrid(
-                query, embedder=embedder, limit=1, scope=scope
+                query,
+                embedder=embedder,
+                limit=1,
+                scope=scope,
+                query_embedding=query_embedding,
             )
         )
         return select_diverse_hits((*global_hits, *scoped_hits), limit=limit)
 
+    def embed_question(self, question: str, embedder: Embedder) -> tuple[float, ...]:
+        """Embed a question once so close and far retrieval can share it."""
+        return _embed_for_role(
+            embedder, (question,), self.config.embedding_model, "query"
+        )[0]
+
+    def search_diverse_pages(
+        self,
+        query: str,
+        *,
+        embedder: Embedder | None = None,
+        limit: int = 20,
+        query_embedding: Sequence[float] | None = None,
+    ) -> tuple[KnowledgePage, ...]:
+        """Return ranked page handles; use :meth:`hydrate_page` for source text."""
+        hits = self.search_diverse_hybrid(
+            query,
+            embedder=embedder,
+            limit=limit,
+            query_embedding=query_embedding,
+        )
+        return tuple(
+            page for hit in hits if (page := self._page_for_hit(hit)) is not None
+        )
+
+    def hydrate_page(self, page: KnowledgePage) -> KnowledgePage:
+        """Load a capped source excerpt and record retrieval at most once per five minutes."""
+        row = self.connection.execute(
+            """SELECT n.title, n.domain, n.inbound_links, n.last_retrieved_at,
+                      c.body, c.line_start, c.line_end, c.embedding
+               FROM chunks c JOIN notes n ON n.id = c.note_id WHERE c.id = ?""",
+            (page.chunk_id,),
+        ).fetchone()
+        if row is None:
+            return page
+        now = time.time()
+        last = row["last_retrieved_at"]
+        marked = float(last) if last is not None else None
+        if marked is None or now - marked >= RETRIEVAL_MARK_SECONDS:
+            marked = now
+            with self.connection:
+                self.connection.execute(
+                    "UPDATE notes SET last_retrieved_at = ? WHERE path = ?",
+                    (marked, page.path),
+                )
+        embedding = (
+            _deserialize_vector(bytes(row["embedding"]))
+            if row["embedding"] is not None
+            else None
+        )
+        return KnowledgePage(
+            page.path,
+            str(row["title"]),
+            page.chunk_id,
+            str(row["domain"]),
+            int(row["inbound_links"]),
+            marked,
+            embedding,
+            str(row["body"])[:HYDRATED_SOURCE_LIMIT],
+            int(row["line_start"]),
+            int(row["line_end"]),
+            page.score,
+        )
+
+    def far_pages(
+        self,
+        close: Sequence[KnowledgePage],
+        *,
+        limit: int,
+        mode: str = "lsd",
+        question_embedding: Sequence[float] | None = None,
+    ) -> tuple[KnowledgePage, ...]:
+        """Choose cross-domain source handles from a randomized capped bank."""
+        close_domains = {page.domain for page in close}
+        close_vectors = tuple(
+            vector
+            for page in close
+            if (vector := page.embedding or self._page_embedding(page.chunk_id))
+            is not None
+        )
+        rows = self.connection.execute(
+            """SELECT c.id, n.path, n.title, n.domain, n.inbound_links,
+                      n.last_retrieved_at, c.embedding, c.line_start, c.line_end
+               FROM chunks c JOIN notes n ON n.id = c.note_id
+               WHERE n.status = 'indexed'
+               ORDER BY n.inbound_links DESC, n.path, c.id"""
+        ).fetchall()
+        eligible: dict[str, KnowledgePage] = {}
+        for row in rows:
+            domain = str(row["domain"])
+            if domain in close_domains or domain in eligible:
+                continue
+            vector = (
+                _deserialize_vector(bytes(row["embedding"]))
+                if row["embedding"] is not None
+                else None
+            )
+            eligible[domain] = KnowledgePage(
+                str(row["path"]),
+                str(row["title"]),
+                int(row["id"]),
+                domain,
+                int(row["inbound_links"]),
+                float(row["last_retrieved_at"])
+                if row["last_retrieved_at"] is not None
+                else None,
+                vector,
+                line_start=int(row["line_start"]),
+                line_end=int(row["line_end"]),
+            )
+        domains = tuple(eligible)
+        selected_domains = random.sample(domains, min(FAR_BANK_LIMIT, len(domains)))
+        bank = [eligible[domain] for domain in selected_domains]
+        if len(bank) < limit:
+            remaining = tuple(
+                domain for domain in domains if domain not in selected_domains
+            )
+            shortage = min(limit - len(bank), len(remaining))
+            bank.extend(
+                eligible[domain] for domain in random.sample(remaining, shortage)
+            )
+
+        def distance(page: KnowledgePage) -> float:
+            if page.embedding is None:
+                return 0.0
+            if close_vectors:
+                return _mean_cosine_distance(page.embedding, close_vectors)
+            if question_embedding is not None:
+                return _mean_cosine_distance(page.embedding, (question_embedding,))
+            return 0.0
+
+        if mode == "lsd":
+            ranked = sorted(
+                bank,
+                key=lambda page: (
+                    page.last_retrieved_at is not None,
+                    page.last_retrieved_at
+                    if page.last_retrieved_at is not None
+                    else 0.0,
+                    -distance(page),
+                    page.path,
+                ),
+            )
+        else:
+            ranked = sorted(
+                bank, key=lambda page: (-distance(page), -page.inbound_links, page.path)
+            )
+        return tuple(ranked[:limit])
+
+    def _page_for_hit(self, hit: SearchHit) -> KnowledgePage | None:
+        row = self.connection.execute(
+            """SELECT c.id, n.domain, n.inbound_links, n.last_retrieved_at, c.embedding
+               FROM chunks c JOIN notes n ON n.id = c.note_id
+               WHERE n.path = ? AND c.line_start = ? AND c.line_end = ?
+               ORDER BY c.id LIMIT 1""",
+            (hit.path, hit.line_start, hit.line_end),
+        ).fetchone()
+        if row is None:
+            # Legacy callers can construct a SearchHit with only a path. Keep
+            # their far-note behavior while page callers retain exact chunks.
+            row = self.connection.execute(
+                """SELECT c.id, n.domain, n.inbound_links, n.last_retrieved_at, c.embedding
+                   FROM chunks c JOIN notes n ON n.id = c.note_id
+                   WHERE n.path = ? ORDER BY c.id LIMIT 1""",
+                (hit.path,),
+            ).fetchone()
+        if row is None:
+            return None
+        embedding = (
+            _deserialize_vector(bytes(row["embedding"]))
+            if row["embedding"] is not None
+            else None
+        )
+        return KnowledgePage(
+            hit.path,
+            hit.title,
+            int(row["id"]),
+            str(row["domain"]),
+            int(row["inbound_links"]),
+            float(row["last_retrieved_at"])
+            if row["last_retrieved_at"] is not None
+            else None,
+            embedding,
+            line_start=hit.line_start,
+            line_end=hit.line_end,
+            score=hit.score,
+        )
+
+    def _page_embedding(self, chunk_id: int) -> tuple[float, ...] | None:
+        row = self.connection.execute(
+            "SELECT embedding FROM chunks WHERE id = ?", (chunk_id,)
+        ).fetchone()
+        return (
+            _deserialize_vector(bytes(row["embedding"]))
+            if row is not None and row["embedding"] is not None
+            else None
+        )
+
     def far_notes(
         self, close: Sequence[SearchHit], *, limit: int
     ) -> tuple[SearchHit, ...]:
-        close_domains = {_domain_key(hit.path) for hit in close}
-        close_vectors = self._note_vectors(hit.path for hit in close)
-        vector_candidates = self._far_vector_candidates(close_domains)
-        if close_vectors and vector_candidates:
-            ranked = sorted(
-                vector_candidates,
-                key=lambda item: (
-                    -_mean_cosine_distance(item[1], close_vectors),
-                    item[0].path,
-                ),
+        pages = tuple(
+            page for hit in close if (page := self._page_for_hit(hit)) is not None
+        )
+        return tuple(
+            SearchHit(
+                hydrated.path,
+                hydrated.title,
+                hydrated.text,
+                hydrated.line_start,
+                hydrated.line_end,
+                hydrated.score,
             )
-            return tuple(hit for hit, _ in ranked[:limit])
-        rows = self.connection.execute(
-            """SELECT n.path, n.title, c.body, c.line_start, c.line_end
-               FROM chunks c JOIN notes n ON n.id = c.note_id
-               WHERE n.status = 'indexed' ORDER BY n.updated_at ASC, c.id ASC"""
-        ).fetchall()
-        selected: list[SearchHit] = []
-        seen: set[str] = set()
-        for row in rows:
-            path = str(row["path"])
-            if _domain_key(path) in close_domains or path in seen:
-                continue
-            selected.append(
-                SearchHit(
-                    path,
-                    row["title"],
-                    row["body"],
-                    row["line_start"],
-                    row["line_end"],
-                    0.0,
-                )
-            )
-            seen.add(path)
-            if len(selected) >= limit:
-                break
-        return tuple(selected)
+            for page in self.far_pages(pages, limit=limit, mode="semantic")
+            for hydrated in (self.hydrate_page(page),)
+        )
 
     def _note_vectors(self, paths: Iterator[str]) -> tuple[tuple[float, ...], ...]:
         vectors: list[tuple[float, ...]] = []
@@ -689,6 +945,33 @@ def _title(content: str, fallback: str) -> str:
     return fallback
 
 
+def _is_brainstorm_page(path: Path) -> bool:
+    """Accept only explicitly labeled brainstorm output in the generated ideas lane."""
+    try:
+        content = path.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError):
+        return False
+    if not content.startswith("---"):
+        return False
+    frontmatter, separator, _ = content[3:].partition("\n---")
+    if not separator:
+        return False
+    return any(
+        re.fullmatch(r"mode:\s*['\"]?brainstorm['\"]?\s*", line, flags=re.IGNORECASE)
+        is not None
+        for line in frontmatter.splitlines()
+    )
+
+
+def _wikilink_targets(content: str) -> tuple[str, ...]:
+    return tuple({match.group(1).strip() for match in WIKILINK.finditer(content)})
+
+
+def _link_key(target: str) -> str:
+    normalized = target.strip().replace("\\", "/").removeprefix("./")
+    return str(Path(normalized).with_suffix("")).casefold()
+
+
 def _fts_query(query: str) -> str:
     """Turn arbitrary human text into an FTS5 expression, never SQL syntax."""
     terms = re.findall(r"[^\W_]+", query, flags=re.UNICODE)
@@ -697,7 +980,11 @@ def _fts_query(query: str) -> str:
 
 def _domain_key(path: str) -> str:
     parts = Path(path).parts
-    return "/".join(parts[:2]) if len(parts) >= 2 else f"root/{Path(path).stem}"
+    if len(parts) == 1:
+        return f"root/{Path(path).stem}"
+    if parts[0].casefold() == "assets" and len(parts) >= 2:
+        return "/".join(parts[:2])
+    return "/".join(parts[:2])
 
 
 def _source_scope(path: str) -> str:

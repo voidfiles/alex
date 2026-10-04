@@ -1,5 +1,7 @@
 default: check
 
+obsidian_root := env_var('OBSIDIAN_ROOT')
+
 # Run lint, typecheck, and tests — same as CI.
 check: lint typecheck test
 
@@ -32,18 +34,17 @@ brain-e2e VAULT QUESTION:
 
 brain-e2e-example:
     just brain-e2e \
-        /Users/alex/Dropbox/obsidian/Alex3/projects \
+        "{{obsidian_root}}/projects" \
         'How can a leader maintain team performance during organizational chaos?'
 
 brain-index:
-    uv run alex brain index "/Users/alex/Dropbox/obsidian/Alex3/" --embedding-model voyageai/voyage-4 --rebuild
-    uv run alex brain status "/Users/alex/Dropbox/obsidian/Alex3/" --embedding-model voyageai/voyage-4 --json
+    uv run alex brain index "{{obsidian_root}}/" --embedding-model voyageai/voyage-4 --rebuild
+    uv run alex brain status "{{obsidian_root}}/" --embedding-model voyageai/voyage-4 --json
 
 brain-query VAULT QUESTION:
-    uv run alex brain index "{{VAULT}}" --embedding-model voyageai/voyage-4 --defer-embeddings
-    uv run alex lsd "{{QUESTION}}" --vault "{{VAULT}}" --limit 1 --embedding-model voyageai/voyage-4 --model openai/gpt-5.6-terra --judge-model openai/gpt-5.6-terra --json
+    uv run alex lsd "{{QUESTION}}" --vault "{{VAULT}}" --limit 1 --embedding-model voyageai/voyage-4 --model openai/gpt-5.6-terra --judge-model openai/gpt-5.6-terra --max-cost 5 --json
 
 brain-query-example:
     just brain-query \
-        /Users/alex/Dropbox/obsidian/Alex3/ \
+        "{{obsidian_root}}/" \
         'How can a leader maintain team performance during organizational chaos?'

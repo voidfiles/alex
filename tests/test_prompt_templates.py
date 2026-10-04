@@ -159,6 +159,59 @@ def test_packaged_summary_prompts_ship_active_versions() -> None:
         assert active_version(name) in list_versions(name)
 
 
+@pytest.mark.parametrize(
+    ("name", "placeholders"),
+    [
+        (
+            "collision_generator",
+            frozenset(
+                {
+                    "question",
+                    "voice",
+                    "inversion_instruction",
+                    "idea_count",
+                    "close_source",
+                    "far_source",
+                }
+            ),
+        ),
+        ("collision_judge", frozenset({"calibration_tags"})),
+    ],
+)
+def test_packaged_collision_prompts_ship_active_versioned_contracts(
+    name: str, placeholders: frozenset[str]
+) -> None:
+    template = load_prompt(name)
+
+    assert template.version == "v001"
+    assert active_version(name) == "v001"
+    assert template.placeholders() == placeholders
+
+
+def test_collision_prompts_render_the_strict_generator_and_judge_contracts() -> None:
+    generator = load_prompt("collision_generator").render(
+        question="How can constraints produce novelty?",
+        voice="Be precise.",
+        inversion_instruction="Include distinct axiom fields.",
+        idea_count="4",
+        close_source="close source",
+        far_source="far source",
+    )
+    judge = load_prompt("collision_judge").render(calibration_tags="none")
+
+    assert '"idea"' in generator
+    assert '"original_axiom"' in generator
+    assert '"inverted_axiom"' in generator
+    assert "originality" in judge
+    assert "defensibility" in judge
+    assert "thesis_density" in judge
+    assert "concrete_grounding" in judge
+    assert "cognitive_load" in judge
+    assert "obviousness" in judge
+    assert "both_sources_material" in judge
+    assert "substantive_inversion" in judge
+
+
 def test_summary_prompts_load_uses_active_versions() -> None:
     prompts = SummaryPrompts.load()
 

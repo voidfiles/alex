@@ -132,6 +132,28 @@ Files above the transcription request size budget are transcoded to 16 kHz
 mono mp3 and split into bounded chunks automatically. Oversized inputs
 require `ffmpeg` and `ffprobe` on `PATH`.
 
+### brain, brainstorm, and lsd
+
+```bash
+alex brain index /path/to/vault --rebuild
+alex brainstorm 'How can teams preserve clarity under stress?' --vault /path/to/vault
+alex lsd 'What assumption about attention should we invert?' --vault /path/to/vault --limit 1 --save --json
+```
+
+`brain` is a disposable local SQLite index; a schema change requires
+`alex brain index VAULT --rebuild`. `brainstorm` crosses four close pages with
+six distant pages and saves passing/rejected results under `resources/ideas/`
+by default. `lsd` crosses two close pages with twelve distant pages, explicitly
+tests an axiom inversion, and remains ephemeral unless `--save` is passed.
+`--limit` only overrides the profile's distant-page count.
+
+Runs enforce a US$5 default ceiling with `--max-cost`; local models are treated
+as free and unpriced remote models fail before a call. JSON goes only to stdout;
+progress and errors go to stderr. A credentialed manual smoke run should use a
+small fixture vault and `--limit 1`, inspect the returned provenance and cost,
+then repeat with `--resume RUN_ID` after an interrupted run. Live provider runs
+are deliberately outside CI.
+
 ### eval-summary
 
 ```bash
