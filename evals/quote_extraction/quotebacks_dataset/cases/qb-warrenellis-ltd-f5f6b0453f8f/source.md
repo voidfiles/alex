@@ -1,0 +1,13 @@
+# Tiny 'Micro-Robots' in your Bloodstream Could Deliver Drugs with Greater Precision - Slashdot
+
+# [Tiny 'Micro-Robots' in your Bloodstream Could Deliver Drugs with Greater Precision](https://science.slashdot.org/story/25/11/22/0411225/tiny-micro-robots-in-your-bloodstream-could-deliver-drugs-with-greater-precision) [(msn.com)](https://www.msn.com/en-us/technology/biotechnology/robots-in-your-bloodstream-could-deliver-drugs-with-greater-precision/ar-AA1QJuPH) [30](https://science.slashdot.org/story/25/11/22/0411225/tiny-micro-robots-in-your-bloodstream-could-deliver-drugs-with-greater-precision#comments)
+
+[The Washington Post reports](https://www.msn.com/en-us/technology/biotechnology/robots-in-your-bloodstream-could-deliver-drugs-with-greater-precision/ar-AA1QJuPH):
+
+*Scientists in Switzerland have created a robot the size of a grain of sand that is controlled by magnets and can deliver drugs to a precise location in the human body, a breakthrough aimed at reducing the severe side effects that stop many medicines from advancing in clinical trials... "I think surgeons are going to look at this," [said Bradley J. Nelson, an author of  
+   
+When the capsule reaches its destination in the body, "we can trigger the capsule to dissolve," Nelson said.*
+
+[the paper in](https://www.science.org/doi/10.1126/science.adx1708)describing the discovery and a professor of robotics and intelligent systems at ETH Zurich]. I'm sure they're going to have a lot of ideas on how to use" the microrobot. The capsule, which is steered by magnets, might also be useful in treating aneurysms, very aggressive brain cancers, and abnormal connections between arteries and veins known as arteriovenous malformations, Nelson said. The capsules have been tested successfully in pigs, which have similar vasculature to humans, and in silicone models of the blood vessels in humans and animals... Nelson said drug-ferrying microrobots of this kind may be three to five years from being tested in clinical trials. The problem faced by many drugs under development is that they spread throughout the body instead of going only to the area in need... A major cause of side effects in patients is medications traveling to parts of the body that don't need them. The capsules developed in Switzerland, however, can be maneuvered into precise locations by a surgeon using a tool not that different from a PlayStation controller. The navigation system involves six electromagnetic coils positioned around the patient, each about 8 to 10 inches in diameter... The capsules are made of materials that have been found safe for people in other medical tools...*Science*
+
+When the capsule reaches its destination in the body, "we can trigger the capsule to dissolve," Nelson said.

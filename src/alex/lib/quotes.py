@@ -132,8 +132,13 @@ def prepare_quote_prompt(
 
 
 def parse_selected_quotes(
-    response: str, source_text: str, *, count: int
+    response: str,
+    source_text: str,
+    *,
+    count: int,
+    allow_extra_quotes: bool = False,
 ) -> tuple[SelectedQuote, ...]:
+    """Validate source text; eval mode permits extra and overlapping candidates."""
     raw = response.strip()
     if raw.startswith("```json\n") and raw.endswith("```"):
         raw = raw.removeprefix("```json\n").removesuffix("```").strip()
@@ -141,7 +146,7 @@ def parse_selected_quotes(
         payload = QuoteResponse.model_validate_json(raw)
     except ValidationError as error:
         raise QuoteError("The model returned invalid quote JSON.") from error
-    if len(payload.quotes) > count:
+    if len(payload.quotes) > count and not allow_extra_quotes:
         raise QuoteError(f"The model returned more than {count} quotes.")
     quotes: list[SelectedQuote] = []
     occupied: list[tuple[int, int]] = []
@@ -162,7 +167,7 @@ def parse_selected_quotes(
             if match is None:
                 raise QuoteError("A selected quote segment is absent from the source.")
             start, end = cursor + match.start(), cursor + match.end()
-            if any(
+            if not allow_extra_quotes and any(
                 start < old_end and end > old_start for old_start, old_end in occupied
             ):
                 raise QuoteError("Selected quotes contain overlapping source spans.")
@@ -188,6 +193,7 @@ def extract_quotes(
     *,
     completer: Completer | None = None,
     template: PromptTemplate | None = None,
+    allow_extra_quotes: bool = False,
 ) -> QuoteExtraction:
     settings = settings or QuoteSettings()
     template = template or load_prompt(
@@ -203,7 +209,12 @@ def extract_quotes(
         model=settings.model,
         prompt_version=template.version,
         prompt_sha256=sha256(template.text),
-        quotes=parse_selected_quotes(response, source_text, count=settings.count),
+        quotes=parse_selected_quotes(
+            response,
+            source_text,
+            count=settings.count,
+            allow_extra_quotes=allow_extra_quotes,
+        ),
     )
 
 

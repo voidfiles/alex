@@ -1,0 +1,420 @@
+{
+  "search_evidence": [
+    {
+      "batch": "single_query_0",
+      "queries": [
+        "\"quotebacks\" \"notes\" -site:tomcritchlow.com -site:quotebacks.net -site:interconnected.org"
+      ],
+      "results": [
+        {
+          "title": "notes I'm actively working on",
+          "url": "https://nebula.ketan.me/notes_i_m_actively_working_on"
+        },
+        {
+          "title": "Quote the web with Quotebacks - Ness Labs",
+          "url": "https://nesslabs.com/quotebacks"
+        },
+        {
+          "title": "How do I get content from websites into my notes? - #19 by randulfr - Share & showcase - Obsidian Forum",
+          "url": "https://forum.obsidian.md/t/how-do-i-get-content-from-websites-into-my-notes/1738/19"
+        },
+        {
+          "title": "Note clips — Boris Mann's Homepage",
+          "url": "https://bmannconsulting.com/notes/note-clips/"
+        },
+        {
+          "title": "Su Won Park. Problem Solving Through Problems",
+          "url": "https://sepiabrown.github.io/writing/"
+        },
+        {
+          "title": "rules of thumb",
+          "url": "https://nebula.ketan.me/rules_of_thumb"
+        },
+        {
+          "title": "202009260000 — Boris Mann's Homepage",
+          "url": "https://bmannconsulting.com/journal/2020/09/26/0000/"
+        },
+        {
+          "title": "Entries",
+          "url": "https://subpixel.space/entries/"
+        },
+        {
+          "title": "Digital Garden",
+          "url": "https://notes.treasurechest.design/digital-garden"
+        },
+        {
+          "title": "How do I get content from websites into my notes? - Workflows & Templates - Obsidian Forum",
+          "url": "https://forum.obsidian.md/t/how-do-i-get-content-from-websites-into-my-notes/1738"
+        },
+        {
+          "title": "People and Blogs: Tom Critchlow | Zachary Kai",
+          "url": "https://zacharykai.net/notes/pb/critchlow"
+        },
+        {
+          "title": "November 2020: Four Months of Notado",
+          "url": "https://notado.substack.com/p/november-2020-four-months-of-notado"
+        },
+        {
+          "title": "Microsoft Word - OR01Technical Specification Guide v1 13 Updated.doc",
+          "url": "https://www.examone.com/wp-content/uploads/2016/02/Fixed-Position-Format-for-Order-and-Status_0.pdf"
+        }
+      ]
+    },
+    {
+      "batch": "single_query_1",
+      "queries": [
+        "\"quotebacks\" \"quoting\" -site:tomcritchlow.com -site:quotebacks.net -site:nesslabs.com"
+      ],
+      "results": [
+        {
+          "title": "Quotebacks and hypertexts (Interconnected)",
+          "url": "https://interconnected.org/home/2020/06/16/quotebacks"
+        },
+        {
+          "title": "Introducing: Quotebacks",
+          "url": "https://sepiabrown.github.io/2020/06/09/quotebacks/"
+        },
+        {
+          "title": "replying [TheLitForum.com Wiki]",
+          "url": "https://thelitforum.com/litwiki/doku.php?id=replying"
+        },
+        {
+          "title": "Introducing Quotebacks",
+          "url": "https://subpixel.space/entries/introducing-quotebacks/"
+        },
+        {
+          "title": "Toby Shorin",
+          "url": "https://tobyshorin.com/"
+        },
+        {
+          "title": "Tom Critchlow – Manu",
+          "url": "https://manuelmoreale.com/interview/tom-critchlow"
+        },
+        {
+          "title": "Downes.ca ~ Quote, reply, and converse across the open web",
+          "url": "https://www.downes.ca/post/71763"
+        },
+        {
+          "title": "Manton Reece - Podcasts",
+          "url": "https://www.manton.org/categories/podcasts/"
+        },
+        {
+          "title": "Monthly Post Archive: May 2023 | Musings...",
+          "url": "https://www.sasamat-1.appspot.com/blog/2023/05"
+        },
+        {
+          "title": "Displaying embeds in the timeline - Cross-posting - Micro.blog Help Center",
+          "url": "https://help.micro.blog/t/displaying-embeds-in-the-timeline/2859"
+        },
+        {
+          "title": "Quotebacks support for TiddlyWiki - quotebacks - Talk TW",
+          "url": "https://talk.tiddlywiki.org/t/quotebacks-support-for-tiddlywiki/678"
+        },
+        {
+          "title": "Manton Reece - Mastodon quote posts draft",
+          "url": "https://www.manton.org/2025/02/18/mastodon-quote-posts-draft.html"
+        }
+      ]
+    },
+    {
+      "batch": "single_query_2",
+      "queries": [
+        "\"quotebacks\" \"blogroll\" -site:quotebacks.net -site:tomcritchlow.com"
+      ],
+      "results": [
+        {
+          "title": "Blogroll – Chuck Grimmett",
+          "url": "https://cagrimmett.com/blogroll/"
+        },
+        {
+          "title": "Routine Revelations",
+          "url": "https://frankmcpherson.blog/archive/"
+        },
+        {
+          "title": "2022/Pop-ups/Displaying Responses - IndieWeb",
+          "url": "https://indieweb.org/2022/Pop-ups/Displaying_Responses"
+        },
+        {
+          "title": "Bix dot Blog • Source: bix.blog",
+          "url": "https://bix.blog/source/bix-blog/"
+        },
+        {
+          "title": "Canion dot Blog",
+          "url": "https://canion.blog/archive/"
+        },
+        {
+          "title": "Manton Reece - Essays",
+          "url": "https://www.manton.org/categories/essays/"
+        },
+        {
+          "title": "Adactio: Tags—hyperlinks",
+          "url": "https://adactio.com/tags/hyperlinks"
+        },
+        {
+          "title": "events/2025-11-13-front-end-study-hall - IndieWeb",
+          "url": "https://indieweb.org/events/2025-11-13-front-end-study-hall"
+        },
+        {
+          "title": "People & Blogs Reader",
+          "url": "https://peopleandblogs.feedland.cloud/"
+        }
+      ]
+    },
+    {
+      "batch": "single_query_3",
+      "queries": [
+        "\"quotebacks\" \"2021\" -site:tomcritchlow.com -site:interconnected.org"
+      ],
+      "results": [
+        {
+          "title": "Quotebacks support for TiddlyWiki - quotebacks - Talk TW",
+          "url": "https://talk.tiddlywiki.org/t/quotebacks-support-for-tiddlywiki/678"
+        },
+        {
+          "title": "Raindrop.io exports of my **Blessed Web Utilities collection**](https://raindrop.io/davidblue/blessed-web-utilities-13380122). · GitHub",
+          "url": "https://gist.github.com/extratone/9ac1a0b37166537b5375d7d521a1a0fc"
+        },
+        {
+          "title": "Archives - A Common Place",
+          "url": "https://evan.blot.im/archives"
+        },
+        {
+          "title": "Su Won Park. Problem Solving Through Problems",
+          "url": "https://sepiabrown.github.io/writing/"
+        },
+        {
+          "title": "Home | Musings...",
+          "url": "https://sasamat-1.appspot.com/"
+        },
+        {
+          "title": "Distroid Issue 13: Digital Gardens - by Charles Adjovu",
+          "url": "https://distroid.substack.com/p/distroid-issue-13-digital-gardens"
+        },
+        {
+          "title": "Liked: Coding is not ‘fun’, it’s technically and ethically complex",
+          "url": "https://johnjohnston.info/blog/liked-coding-is-not-fun-its-technically-and-ethically-complex/"
+        },
+        {
+          "title": "Fragmentions | Chris Aldrich",
+          "url": "https://boffosocko.com/tag/fragmentions/"
+        },
+        {
+          "title": "Tom Critchlow — 201 essays on Curio",
+          "url": "https://curioportal.com/authors/tom-critchlow/"
+        },
+        {
+          "title": "Bursts of Focus + the /now Page — Brendan Langen",
+          "url": "https://www.brendanlangen.com/thoughts/2021/12/16/bursts-of-focus-the-now-page"
+        },
+        {
+          "title": "Saving the Origin of Dragged Tiddlers - Talk TW",
+          "url": "https://talk.tiddlywiki.org/t/saving-the-origin-of-dragged-tiddlers/595"
+        },
+        {
+          "title": "知乎 - 有问题，就会有答案",
+          "url": "https://www.zhihu.com/en/article/589240209"
+        }
+      ]
+    },
+    {
+      "batch": "single_query_4",
+      "queries": [
+        "\"quotebacks\" \"2022\" -site:tomcritchlow.com -site:interconnected.org"
+      ],
+      "results": [
+        {
+          "title": "Archives - A Common Place",
+          "url": "https://evan.blot.im/archives"
+        },
+        {
+          "title": "Quotebacks - quote the web - Chrome Web Store",
+          "url": "https://chromewebstore.google.com/detail/quotebacks-quote-the-web/makakhdegdcmmbbhepafcghpdkbemach"
+        },
+        {
+          "title": "Quotebacks",
+          "url": "https://scalingsynthesis.com/quotebacks/"
+        },
+        {
+          "title": "Su Won Park. Problem Solving Through Problems",
+          "url": "https://sepiabrown.github.io/writing/"
+        },
+        {
+          "title": "technology — Blog — Amy Huang",
+          "url": "https://amyhuang.work/blog/tag/technology"
+        },
+        {
+          "title": "Home | Musings...",
+          "url": "https://www.sasamat-1.appspot.com/"
+        },
+        {
+          "title": "Home | Musings...",
+          "url": "https://sasamat-1.appspot.com/"
+        },
+        {
+          "title": "2022/Pop-ups/Displaying Responses - IndieWeb",
+          "url": "https://indieweb.org/2022/Pop-ups/Displaying_Responses"
+        },
+        {
+          "title": "⚡️ emacs config",
+          "url": "https://nebula.ketan.me/emacs_config"
+        },
+        {
+          "title": "Travelling Without Moving – WARREN ELLIS LTD",
+          "url": "https://warrenellis.ltd/mc/travelling-without-moving/"
+        },
+        {
+          "title": "Raindrop.io exports of my **Blessed Web Utilities collection**](https://raindrop.io/davidblue/blessed-web-utilities-13380122). · GitHub",
+          "url": "https://gist.github.com/extratone/9ac1a0b37166537b5375d7d521a1a0fc"
+        },
+        {
+          "title": "tomcritchlow’s gists · GitHub",
+          "url": "https://gist.github.com/tomcritchlow"
+        }
+      ]
+    },
+    {
+      "batch": "single_query_5",
+      "queries": [
+        "\"quotebacks\" \"2023\" -site:tomcritchlow.com -site:interconnected.org"
+      ],
+      "results": [
+        {
+          "title": "I made a Quotebacks plugin for Marked",
+          "url": "https://johnwhiles.com/posts/marked-quotebacks"
+        },
+        {
+          "title": "Home | Musings...",
+          "url": "https://www.sasamat-1.appspot.com/"
+        },
+        {
+          "title": "Home | Musings...",
+          "url": "https://sasamat-1.appspot.com/"
+        },
+        {
+          "title": "Quoting with Quoteback | Musings...",
+          "url": "https://sasamat-1.appspot.com/blog/2023/05/07/test-quote"
+        },
+        {
+          "title": "sense of doubt: A Sense of Doubt blog post #4057 - Baseball is Back!! I am so Happy!",
+          "url": "https://sensedoubt.blogspot.com/2026/03/a-sense-of-doubt-blog-post-4057.html"
+        },
+        {
+          "title": "Micro.blog News",
+          "url": "https://news.micro.blog/archive/"
+        },
+        {
+          "title": "Monthly Post Archive: May 2023 | Musings...",
+          "url": "https://www.sasamat-1.appspot.com/blog/2023/05"
+        },
+        {
+          "title": "sense of doubt: A Sense of Doubt blog post #3696 - Baseball is Back! No Foolin'",
+          "url": "https://sensedoubt.blogspot.com/2025/04/a-sense-of-doubt-blog-post-3696.html"
+        },
+        {
+          "title": "I made a Quotebacks plugin for Marked - diff.blog",
+          "url": "https://diff.blog/post/i-made-a-quotebacks-plugin-for-marked-318999"
+        },
+        {
+          "title": "Blog | Simon Woods",
+          "url": "https://swoods.net/archive/"
+        },
+        {
+          "title": "Page 32 - Talk TW",
+          "url": "https://talk.tiddlywiki.org/top?page=31&per_page=50&period=all"
+        },
+        {
+          "title": "Raindrop.io exports of my **Blessed Web Utilities collection**](https://raindrop.io/davidblue/blessed-web-utilities-13380122). · GitHub",
+          "url": "https://gist.github.com/extratone/9ac1a0b37166537b5375d7d521a1a0fc"
+        }
+      ]
+    },
+    {
+      "batch": "single_query_6",
+      "queries": [
+        "\"quotebacks\" \"colophon\" -site:tomcritchlow.com"
+      ],
+      "results": [
+        {
+          "title": "Reply | Read Write Collect",
+          "url": "https://collect.readwriterespond.com/kind/reply/"
+        },
+        {
+          "title": "Raindrop.io exports of my **Blessed Web Utilities collection**](https://raindrop.io/davidblue/blessed-web-utilities-13380122). · GitHub",
+          "url": "https://gist.github.com/extratone/9ac1a0b37166537b5375d7d521a1a0fc"
+        },
+        {
+          "title": "My primary shared TextExpander snippet group. · GitHub",
+          "url": "https://gist.github.com/extratone/36c6ceeb48ab2eefd77256afa80a54c3"
+        },
+        {
+          "title": "Index | Chris Aldrich",
+          "url": "https://boffosocko.com/about/index/"
+        },
+        {
+          "title": "Social annotation, [**motherfucker**](https://hypothes.is/users/DavidBlue). · GitHub",
+          "url": "https://gist.github.com/extratone/0fd35ddac88727154eaf46db877f091c"
+        },
+        {
+          "title": "Bix dot Blog • Source: bix.blog",
+          "url": "https://bix.blog/source/bix-blog/"
+        }
+      ]
+    },
+    {
+      "batch": "single_query_7",
+      "queries": [
+        "\"quotebacks\" \"website\" -site:tomcritchlow.com -site:quotebacks.net -site:github.com -site:nesslabs.com -site:interconnected.org"
+      ],
+      "results": [
+        {
+          "title": "Quotebacks - quote the web - Chrome Web Store",
+          "url": "https://chromewebstore.google.com/detail/quotebacks-quote-the-web/makakhdegdcmmbbhepafcghpdkbemach"
+        },
+        {
+          "title": "weirdnet links",
+          "url": "https://links.weirdnet.org/"
+        },
+        {
+          "title": "Reply | Read Write Collect",
+          "url": "https://collect.readwriterespond.com/kind/reply/"
+        },
+        {
+          "title": "Toby Shorin",
+          "url": "https://tobyshorin.com/"
+        },
+        {
+          "title": "Quotebacks",
+          "url": "https://scalingsynthesis.com/quotebacks/"
+        },
+        {
+          "title": "⚡️ emacs config",
+          "url": "https://nebula.ketan.me/emacs_config"
+        },
+        {
+          "title": "org-mode",
+          "url": "https://nebula.ketan.me/org_mode"
+        },
+        {
+          "title": "Repeda Web Clipper Stats, Downloads & Safety Check | Chrome-Stats",
+          "url": "https://chrome-stats.com/d/hkbhmhfkkllocihccmcojdgijlgloeca"
+        },
+        {
+          "title": "User:Www.dozenialdragons.me.uk - IndieWeb",
+          "url": "https://indieweb.org/User%3AWww.dozenialdragons.me.uk"
+        },
+        {
+          "title": "the isles of blogging – WARREN ELLIS LTD",
+          "url": "https://warrenellis.ltd/category/isles/"
+        },
+        {
+          "title": "Downes.ca ~ Quote, reply, and converse across the open web",
+          "url": "https://www.downes.ca/post/71763"
+        },
+        {
+          "title": "Introducing Quotebacks",
+          "url": "https://subpixel.space/entries/introducing-quotebacks/"
+        }
+      ]
+    }
+  ]
+}

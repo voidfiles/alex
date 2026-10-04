@@ -1,0 +1,22 @@
+{
+  "checked_at": "2026-10-04T19:29:24.328124+00:00",
+  "model_calls": 0,
+  "status": "passed",
+  "datasets": {
+    "examples.jsonl": {
+      "cases": 119,
+      "loader_valid": true,
+      "references_found_in_actual_renderer": 119
+    },
+    "combined_examples.jsonl": {
+      "cases": 169,
+      "loader_valid": true,
+      "references_found_in_actual_renderer": 169
+    }
+  },
+  "published_quote_checks": {
+    "cases": 119,
+    "exact_published_text_and_citation_match": true,
+    "publisher_snapshot_checksums_match": true
+  }
+}

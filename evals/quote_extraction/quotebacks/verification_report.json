@@ -1,0 +1,15 @@
+{
+  "checked_at": "2026-10-04T18:52:44.540626+00:00",
+  "confirmed_publishers": 27,
+  "catalog_records": 43,
+  "example_pairs_checked": 77,
+  "all_example_pairs_match_cached_html": true,
+  "checks": [
+    "Confirmed status for each included verified publisher",
+    "Every example source URL and quote SHA-256 re-extracted from HTTP-200 cached publisher HTML",
+    "Quote page host equals recorded publisher host",
+    "No duplicate source URL/text hash pairs among each publisher's saved examples",
+    "Mirrored publisher and redirected alias excluded from independent publisher count"
+  ],
+  "scope": "Publisher embeds and citation metadata only; full original-source quote matching remains to be done."
+}

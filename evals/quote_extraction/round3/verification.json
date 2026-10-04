@@ -1,0 +1,33 @@
+{
+  "created_at": "2026-10-04T20:35:44.725428+00:00",
+  "focused_offline_tests": {
+    "passed": 46,
+    "targets": [
+      "tests/test_quote_eval.py",
+      "tests/test_quotes.py",
+      "tests/test_cli.py::test_cli_help_does_not_import_pdf_converter_dependencies"
+    ]
+  },
+  "ruff_check": "passed",
+  "ruff_format_check": "passed",
+  "strict_mypy": "passed for the three quote source modules and the offline audit script",
+  "cli_help_default_dataset": "evals/quote_extraction/quotebacks_dataset/combined_examples.jsonl",
+  "all_dataset_checksums_and_reference_alignments_valid": 169,
+  "run_audit": {
+    "reparsed_and_rescored_valid_generations": 2877,
+    "rejected_provider_outputs_revalidated": 165,
+    "failed_requests_without_provider_text": 0,
+    "total_verified_generations": 3042,
+    "dataset_and_frozen_prompt_hashes_match": true,
+    "source_offsets_and_stored_scores_match": true,
+    "stored_aggregates_match_recomputed_metrics": true
+  },
+  "repeated_dev_requests_equal_prior_round_request_hashes": 630,
+  "fresh_generations_used_for_entire_benchmark": true,
+  "source_snapshot_sha256": {
+    "src/alex/lib/quote_eval.py": "df24030f025d8b6b3d5aa3b29eac705cb4446a1c76971dbdf9dd2b89b1280e3b",
+    "src/alex/lib/quotes.py": "4c180a89ef8aa29b9dccff172f6edcf572456eb27bd0222d8b36dbe4d4eff044",
+    "src/alex/commands/eval_quotes.py": "fdb33f6a6bfa23bef038134e0fb676f2be275c2dd48047a727b1a525588bd5c7",
+    "evals/quote_extraction/round3/summarize_benchmark.py": "6588de0a85146cc39626db2ed751cb834da61b2f5ee4801a5c566832c4b3b343"
+  }
+}

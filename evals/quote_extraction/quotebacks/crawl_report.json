@@ -1,0 +1,27 @@
+{
+  "started_at": "2026-10-04T18:39:59.409110+00:00",
+  "user_agent": "AlexQuotebacksDiscovery/1.0",
+  "max_sites": 220,
+  "max_pages_per_site": 18,
+  "robots_policy": "Check robots rules; skip explicit disallows. Missing/unavailable rules are treated as unknown, not evidence of permission.",
+  "source_validation": "Quote text is observed in publishers' HTML. Original source links are recorded; full original-source matching is deferred.",
+  "requests": 477,
+  "cache_hits": 1865,
+  "discovered_sites": 184,
+  "completed_at": "2026-10-04T18:43:10.981541+00:00",
+  "sites_checked": 184,
+  "status_counts": {
+    "confirmed_embeds": 27,
+    "no_embed_observed": 88,
+    "mention_only": 28,
+    "unreachable_or_blocked": 30,
+    "redirected_elsewhere": 10,
+    "script_only": 1
+  },
+  "priority_counts": {
+    "high": 13,
+    "medium": 9,
+    "low": 162
+  },
+  "unvisited_sites": []
+}

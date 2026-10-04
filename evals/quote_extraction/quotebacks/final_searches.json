@@ -1,0 +1,63 @@
+{
+  "search_evidence": [
+    {
+      "batch": "clippings_journals_and_newsletters",
+      "queries": [
+        "\"quotebacks\" \"clippings\"",
+        "\"quotebacks\" \"journal\"",
+        "\"quotebacks\" \"newsletter\" -site:tomcritchlow.com",
+        "\"quotebacks\" \"blog\" \"French\""
+      ],
+      "results": [
+        {
+          "title": "202009260000 — Boris Mann's Homepage",
+          "url": "https://bmannconsulting.com/journal/2020/09/26/0000/"
+        },
+        {
+          "title": "Kullish: BYOL Comment Aggregation - The Notado Newsletter",
+          "url": "https://notado.substack.com/p/kullish-byol-comment-aggregation"
+        },
+        {
+          "title": "Distroid Issue 13: Digital Gardens - by Charles Adjovu",
+          "url": "https://distroid.substack.com/p/distroid-issue-13-digital-gardens"
+        },
+        {
+          "title": "Twitter: a re-evauation — ICT & Computing in Education",
+          "url": "https://www.ictineducation.org/home-page/twitter-a-re-evauation"
+        },
+        {
+          "title": "Understanding Micro.blog - Micro.blog Help Center",
+          "url": "https://help.micro.blog/c/understanding-micro-blog/6"
+        },
+        {
+          "title": "Reply | Read Write Collect",
+          "url": "https://collect.readwriterespond.com/kind/reply/"
+        },
+        {
+          "title": "technology — Blog — Amy Huang",
+          "url": "https://amyhuang.work/blog/tag/technology"
+        },
+        {
+          "title": "Toby Shorin",
+          "url": "https://tobyshorin.com/"
+        },
+        {
+          "title": "List of links : Les liens de Corentin",
+          "url": "https://links.l3m.in/en/?author=corentin&page=520&sort=author"
+        },
+        {
+          "title": "Su Won Park. Problem Solving Through Problems",
+          "url": "https://sepiabrown.github.io/writing/"
+        },
+        {
+          "title": "the isles of blogging – WARREN ELLIS LTD",
+          "url": "https://warrenellis.ltd/category/isles/"
+        },
+        {
+          "title": "Digital Garden Transclusion — Boris Mann's Homepage",
+          "url": "https://bmannconsulting.com/blog/2024/03/17/digital-garden-transclusion/"
+        }
+      ]
+    }
+  ]
+}

@@ -6,7 +6,9 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from click.testing import CliRunner
 
+from alex.commands.eval_quotes import build_eval_quotes_command
 from alex.lib.quote_eval import (
     QuoteCase,
     QuoteEvalError,
@@ -70,6 +72,84 @@ def test_whole_document_quote_is_penalized_for_low_precision() -> None:
     metrics = score_extraction(result, source, reference_positions(case, source))
     assert metrics["span_recall"] == 1.0
     assert 0 < metrics["span_f1"] < 1
+    assert 0 < metrics["quote_match_score"] < 0.5
+
+
+def test_exact_quote_keeps_full_credit_with_extra_and_overlapping_quotes() -> None:
+    case = QuoteCase.model_validate(case_payload())
+    source = markdown_to_text(SOURCE)
+    reference = reference_positions(case, source)
+    correct = extract_quotes(SOURCE, completer=prediction())
+    extra = extract_quotes(
+        SOURCE,
+        QuoteSettings(count=1),
+        completer=RecordingCompleter(
+            compression_response=json.dumps(
+                {"quotes": [{"segments": [q]} for q in (SECOND, source, FIRST)]}
+            )
+        ),
+        allow_extra_quotes=True,
+    )
+    single_metrics = score_extraction(correct, source, reference, FIRST)
+    extra_metrics = score_extraction(extra, source, reference, FIRST)
+    for key in (
+        "quote_match_score",
+        "span_f1",
+        "span_precision",
+        "span_recall",
+        "exact_span_match",
+        "exact_quote_match",
+    ):
+        assert extra_metrics[key] == single_metrics[key]
+    assert extra_metrics["quote_match_score"] == 1.0
+    assert extra_metrics["quote_count"] == 3
+
+
+def test_exact_text_beats_same_words_with_different_punctuation() -> None:
+    case = QuoteCase.model_validate(case_payload())
+    source = markdown_to_text(SOURCE)
+    reference = reference_positions(case, source)
+    exact = extract_quotes(SOURCE, completer=prediction())
+    near = extract_quotes(SOURCE, completer=prediction(FIRST.removesuffix(".")))
+    assert score_extraction(exact, source, reference, FIRST)["quote_match_score"] == 1
+    near_metrics = score_extraction(near, source, reference, FIRST)
+    assert near_metrics["exact_span_match"] is True
+    assert near_metrics["exact_quote_match"] is False
+    assert near_metrics["quote_match_score"] == 0.75
+
+
+def test_different_quotes_cannot_collectively_claim_an_exact_match() -> None:
+    source = markdown_to_text(SOURCE)
+    case = QuoteCase.model_validate(case_payload())
+    result = extract_quotes(
+        SOURCE,
+        completer=RecordingCompleter(
+            compression_response=json.dumps(
+                {
+                    "quotes": [
+                        {"segments": ["The first passage"]},
+                        {"segments": ["is useful."]},
+                    ]
+                }
+            )
+        ),
+    )
+    metrics = score_extraction(result, source, reference_positions(case, source), FIRST)
+    assert metrics["reference_recall"] == 1
+    assert metrics["exact_span_match"] is False
+    assert metrics["exact_quote_match"] is False
+    assert metrics["quote_match_score"] < 0.5
+
+
+def test_empty_quotes_have_zero_match_score() -> None:
+    source = markdown_to_text(SOURCE)
+    case = QuoteCase.model_validate(case_payload())
+    result = extract_quotes(
+        SOURCE, completer=RecordingCompleter(compression_response='{"quotes": []}')
+    )
+    metrics = score_extraction(result, source, reference_positions(case, source), FIRST)
+    assert metrics["quote_match_score"] == 0
+    assert metrics["nonempty"] is False
 
 
 def test_editorial_gaps_reference_multiple_source_spans() -> None:
@@ -120,6 +200,43 @@ def test_cost_ceiling_is_checked_before_calls(tmp_path: Path) -> None:
             cost_estimator=lambda *_: 0.5,
         )
     assert completer.calls == []
+
+
+def test_eval_accepts_extra_quotes_without_leaking_reference(tmp_path: Path) -> None:
+    row = case_payload()
+    row["reference_quote"] = FIRST
+    dataset = write_dataset(tmp_path, [row])
+    fake = RecordingCompleter(
+        compression_response=json.dumps(
+            {"quotes": [{"segments": [SECOND]}, {"segments": [FIRST]}]}
+        )
+    )
+    run = evaluate_quotes(
+        QuoteEvalSettings(dataset=dataset, extraction=QuoteSettings(count=1)),
+        tmp_path / "extra.json",
+        completer_factory=lambda _: fake,
+        cost_estimator=lambda *_: 0,
+    )
+    assert run["summary"]["quote_match_score"] == 1
+    assert run["summary"]["exact_quote_match"] == 1
+    assert run["summary"]["error_count"] == 0
+
+
+def test_eval_command_requests_five_candidates_by_default(tmp_path: Path) -> None:
+    dataset = write_dataset(tmp_path, [case_payload()])
+    captured: list[QuoteEvalSettings] = []
+
+    def evaluator(
+        settings: QuoteEvalSettings, _: Path, **kwargs: Any
+    ) -> dict[str, Any]:
+        captured.append(settings)
+        return {"summary": {"error_count": 0}}
+
+    result = CliRunner().invoke(
+        build_eval_quotes_command(evaluator), ["--dataset", str(dataset)]
+    )
+    assert result.exit_code == 0, result.output
+    assert captured[0].extraction.count == 5
 
 
 @pytest.mark.parametrize("max_cost", [float("nan"), float("inf"), 0.0, -1.0])
@@ -214,10 +331,20 @@ def test_paired_comparison_checks_config_and_reports_gate(tmp_path: Path) -> Non
     comparison = compare_quote_runs(baseline, candidate)
     assert comparison["passes_gate"] is True
     assert comparison["mean_f1_delta"] == 1.0
+    assert comparison["mean_score_delta"] == 0.75
+    assert comparison["metric"] == "quote_match_score"
     assert comparison["wins"] == 1
     different = copy.deepcopy(candidate)
     different["extraction"]["model"] = "different-model"
     with pytest.raises(QuoteEvalError, match="different model"):
+        compare_quote_runs(baseline, different)
+    different = copy.deepcopy(candidate)
+    different["scorer_version"] = "source-span-f1/v1"
+    with pytest.raises(QuoteEvalError, match="different scorer_version"):
+        compare_quote_runs(baseline, different)
+    different = copy.deepcopy(candidate)
+    different["repeats"] = 2
+    with pytest.raises(QuoteEvalError, match="different repeats"):
         compare_quote_runs(baseline, different)
 
 

@@ -1,0 +1,224 @@
+{
+  "search_evidence": [
+    {
+      "batch": "breadth_tail_0",
+      "queries": [
+        "\"quotebacks\" \"archive\" -site:sasamat-1.appspot.com -site:sepiabrown.github.io -site:tomcritchlow.com -site:manton.org"
+      ],
+      "results": [
+        {
+          "title": "Blog | Simon Woods",
+          "url": "https://swoods.net/archive/"
+        },
+        {
+          "title": "Archive • Tom Critchlow",
+          "url": "https://buttondown.com/tomcritchlow/archive/"
+        },
+        {
+          "title": "RemarQ.com Shutting Down - Slashdot",
+          "url": "https://slashdot.org/story/00/08/12/0440235/remarqcom-shutting-down?sdsrc=next"
+        },
+        {
+          "title": "Issue | Chris Aldrich",
+          "url": "https://boffosocko.com/category/social-stream/issue/"
+        },
+        {
+          "title": "issue | Chris Aldrich",
+          "url": "https://boffosocko.com/kind/issue/"
+        },
+        {
+          "title": "flyrotary@lancaironline.net Mailing List Archive",
+          "url": "https://mail.lancair.net/Lists/flyrotary/Message/1613.html?altLanguage=japanese"
+        },
+        {
+          "title": "Raindrop.io exports of my **Blessed Web Utilities collection**](https://raindrop.io/davidblue/blessed-web-utilities-13380122). · GitHub",
+          "url": "https://gist.github.com/extratone/9ac1a0b37166537b5375d7d521a1a0fc"
+        },
+        {
+          "title": "Adactio: Tags—xanadu",
+          "url": "https://adactio.com/tags/xanadu"
+        },
+        {
+          "title": "the isles of blogging – WARREN ELLIS LTD",
+          "url": "https://warrenellis.ltd/category/isles/"
+        },
+        {
+          "title": "Toby Shorin",
+          "url": "https://tobyshorin.com/"
+        },
+        {
+          "title": "Running list of people doing deep design work — Malcolm Ocean’s tweets",
+          "url": "https://tweets.malcolmocean.com/threads/deep-design-twitter-list/"
+        }
+      ]
+    },
+    {
+      "batch": "breadth_tail_1",
+      "queries": [
+        "\"quotebacks\" \"Micro.blog\" -site:help.micro.blog -site:manton.org -site:numericcitizen.me -site:tomcritchlow.com"
+      ],
+      "results": [
+        {
+          "title": "Micro.blog - @help",
+          "url": "https://micro.blog/help"
+        },
+        {
+          "title": "Linkblogging · Indie Microblogging",
+          "url": "https://book.micro.blog/linkblogging/"
+        },
+        {
+          "title": "Using HTML · Indie Microblogging",
+          "url": "https://book.micro.blog/using-html/"
+        },
+        {
+          "title": "Quotebacks - Quote the web",
+          "url": "https://quotebacks.net/"
+        },
+        {
+          "title": "quotation - IndieWeb",
+          "url": "https://indieweb.org/quotation"
+        },
+        {
+          "title": "Quotebacks - Quote the web",
+          "url": "https://quotebacks.net/?author=Tom+Critchlow+and+Toby+Shorin&quote=Quotebacks+brings+structured+discourse+to+blogs+and+personal+websites.&title=Quotebacks&url=https%3A%2F%2Fquotebacks.net%2F%23extensions"
+        },
+        {
+          "title": "Micro.blog News",
+          "url": "https://news.micro.blog/archive/"
+        },
+        {
+          "title": "quotebacks testing - A Common Place",
+          "url": "https://evan.blot.im/2022/05/12/quotebacks-testing"
+        },
+        {
+          "title": "Baldur Bjarnason -",
+          "url": "https://notes.baldurbjarnason.com/2020/07/15/manton-reece-ive.html"
+        },
+        {
+          "title": "Canion dot Blog",
+          "url": "https://canion.blog/archive/"
+        },
+        {
+          "title": "Blog | Simon Woods",
+          "url": "https://swoods.net/archive/"
+        },
+        {
+          "title": "Routine Revelations",
+          "url": "https://frankmcpherson.blog/archive/"
+        }
+      ]
+    },
+    {
+      "batch": "breadth_tail_2",
+      "queries": [
+        "\"quotebacks\" \"weeknotes\""
+      ],
+      "results": [
+        {
+          "title": "Yacht Rock – DONFOOLERY",
+          "url": "https://donfoolery.com/category/yacht-rock/"
+        },
+        {
+          "title": "Don – DONFOOLERY",
+          "url": "https://donfoolery.com/author/donpizarro/"
+        },
+        {
+          "title": "People and Blogs: Tom Critchlow | Zachary Kai",
+          "url": "https://zacharykai.net/notes/pb/critchlow"
+        },
+        {
+          "title": "the isles of blogging – WARREN ELLIS LTD",
+          "url": "https://warrenellis.ltd/category/isles/"
+        },
+        {
+          "title": "Tom Critchlow – Manu",
+          "url": "https://manuelmoreale.com/interview/tom-critchlow"
+        },
+        {
+          "title": "Kicks Condor",
+          "url": "https://www.kickscondor.com/page2/"
+        },
+        {
+          "title": "Nearly Doable | Weeknotes #436 - thejaymo.net",
+          "url": "https://thejaymo.net/2026/04/28/436-nearly-doable/"
+        },
+        {
+          "title": "Links — Boris Mann's Homepage",
+          "url": "https://bmannconsulting.com/links/"
+        },
+        {
+          "title": "Tom Critchlow. Move. Think. Create.",
+          "url": "https://tomcritchlow.com/library/?query=tag%3Abusinessmagik"
+        },
+        {
+          "title": "People & Blogs Reader",
+          "url": "https://peopleandblogs.feedland.cloud/"
+        },
+        {
+          "title": "6 Years on the Road",
+          "url": "https://tomcritchlow.com/2020/11/10/6-years/"
+        }
+      ]
+    },
+    {
+      "batch": "breadth_tail_3",
+      "queries": [
+        "\"quotebacks\" blog -\"Introducing\" -\"Chrome\" -\"extension\" -site:tomcritchlow.com"
+      ],
+      "results": [
+        {
+          "title": "Introducing: Quotebacks",
+          "url": "https://sepiabrown.github.io/2020/06/09/quotebacks/"
+        },
+        {
+          "title": "Reply | Read Write Collect",
+          "url": "https://collect.readwriterespond.com/kind/reply/"
+        },
+        {
+          "title": "GitHub - Blogger-Peer-Review/quotebacks: Quote the web · GitHub",
+          "url": "https://github.com/Blogger-Peer-Review/quotebacks"
+        },
+        {
+          "title": "Quotebacks - Quote the web",
+          "url": "https://quotebacks.net/"
+        },
+        {
+          "title": "Su Won Park. Problem Solving Through Problems",
+          "url": "https://sepiabrown.github.io/writing/"
+        },
+        {
+          "title": "Introducing Quotebacks",
+          "url": "https://subpixel.space/entries/introducing-quotebacks/"
+        },
+        {
+          "title": "Quotebacks - quote the web - Chrome Web Store",
+          "url": "https://chromewebstore.google.com/detail/quotebacks-quote-the-web/makakhdegdcmmbbhepafcghpdkbemach"
+        },
+        {
+          "title": "Quotebacks and hypertexts (Interconnected)",
+          "url": "https://interconnected.org/home/2020/06/16/quotebacks"
+        },
+        {
+          "title": "Quotebacks - Quote the web",
+          "url": "https://quotebacks.net/?author=Tom+Critchlow+and+Toby+Shorin&quote=Quotebacks+brings+structured+discourse+to+blogs+and+personal+websites.&title=Quotebacks&url=https%3A%2F%2Fquotebacks.net%2F%23extensions"
+        },
+        {
+          "title": "Share what you are working on and using! - Page 6 - Development - Discuss Write.as",
+          "url": "https://discuss.write.as/t/share-what-you-are-working-on-and-using/401?page=6"
+        },
+        {
+          "title": "I made a Quotebacks plugin for Marked",
+          "url": "https://johnwhiles.com/posts/marked-quotebacks"
+        },
+        {
+          "title": "Quote the web with Quotebacks - Ness Labs",
+          "url": "https://nesslabs.com/quotebacks"
+        },
+        {
+          "title": "Microsoft Word - OR01Technical Specification Guide v1 13 Updated.doc",
+          "url": "https://www.examone.com/wp-content/uploads/2016/02/Fixed-Position-Format-for-Order-and-Status_0.pdf"
+        }
+      ]
+    }
+  ]
+}

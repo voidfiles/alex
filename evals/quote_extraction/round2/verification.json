@@ -1,0 +1,35 @@
+{
+  "created_at": "2026-10-04T20:02:01.346970+00:00",
+  "focused_offline_tests": {
+    "passed": 81,
+    "files": [
+      "tests/test_quote_eval.py",
+      "tests/test_quotes.py",
+      "tests/test_prompt_templates.py",
+      "tests/test_prompt_improvement.py"
+    ]
+  },
+  "lightweight_help_import_test": {
+    "passed": 1,
+    "test": "tests/test_cli.py::test_cli_help_does_not_import_pdf_converter_dependencies"
+  },
+  "ruff_check": "passed for the three changed source modules and two quote test files",
+  "ruff_format_check": "passed for the three changed source modules and two quote test files",
+  "strict_mypy": "passed for the three changed source modules",
+  "git_diff_check": "passed",
+  "run_audit": {
+    "source_valid_generations_reparsed_and_rescored": 607,
+    "rejected_outputs_revalidated_with_zero_score": 23,
+    "total_generations_verified": 630,
+    "all_source_offsets_and_stored_scores_match": true,
+    "dataset_and_prompt_hashes_match": true,
+    "exact_case_repeat_combinations_per_version": 105,
+    "prompt_placeholder_sets_verified": 6
+  },
+  "active_prompt": "v001",
+  "source_snapshot_sha256": {
+    "src/alex/lib/quote_eval.py": "5a69e6c71893b2be9700db592ab5b702f555b9798af8ec7995e5817b29f30a35",
+    "src/alex/lib/quotes.py": "4c180a89ef8aa29b9dccff172f6edcf572456eb27bd0222d8b36dbe4d4eff044",
+    "src/alex/commands/eval_quotes.py": "fdb33f6a6bfa23bef038134e0fb676f2be275c2dd48047a727b1a525588bd5c7"
+  }
+}

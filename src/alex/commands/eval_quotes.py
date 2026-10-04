@@ -12,6 +12,7 @@ import click
 
 from alex.lib.llm import resolve_quote_model
 from alex.lib.quote_eval import (
+    DEFAULT_EVAL_QUOTE_COUNT,
     DEFAULT_QUOTE_DATASET,
     QuoteEvalSettings,
     evaluate_quotes,
@@ -37,7 +38,16 @@ def build_eval_quotes_command(
     )
     @click.option("--prompt-version", help="Pin a quote_extraction prompt version.")
     @click.option("--model", default=resolve_quote_model)
-    @click.option("--count", type=click.IntRange(1, 10), default=1, show_default=True)
+    @click.option(
+        "--count",
+        type=click.IntRange(1, 10),
+        default=DEFAULT_EVAL_QUOTE_COUNT,
+        show_default=True,
+        help=(
+            "Requested pull-quote candidates; extra source-valid quotes "
+            "are not penalized."
+        ),
+    )
     @click.option("--repeats", type=click.IntRange(1), default=1, show_default=True)
     @click.option("--workers", type=click.IntRange(1), default=4, show_default=True)
     @click.option(

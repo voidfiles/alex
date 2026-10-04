@@ -1,0 +1,132 @@
+{
+  "schema_version": 1,
+  "created_at": "2026-10-04T19:58:02.240078+00:00",
+  "scorer_version": "best-pull-quote-match/v2",
+  "baseline": "v001",
+  "candidates": [
+    "v003",
+    "v006",
+    "v007",
+    "v008",
+    "v009"
+  ],
+  "active_before": "v001",
+  "active_after": "v001",
+  "promoted": false,
+  "reason": "Every candidate scored lower than baseline and failed the development gate.",
+  "development_gate": {
+    "minimum_repeats": 3,
+    "minimum_mean_quote_match_score_delta": 0.02,
+    "majority_paired_sources_win_or_tie": true,
+    "no_newly_failed_source": true,
+    "no_per_source_validity_regression": true,
+    "mechanism_check_required_before_promotion": true,
+    "fresh_test_required_before_promotion": true
+  },
+  "candidate_results": {
+    "v003": {
+      "metric": "quote_match_score",
+      "mean_score_delta": -0.0973933106382011,
+      "mean_f1_delta": -0.12335804984783075,
+      "wins": 7,
+      "ties": 9,
+      "losses": 19,
+      "newly_failed": [
+        "2026-08-04-steve-yegge",
+        "2026-05-04-andy-masley",
+        "2026-03-06-ally-piechowski"
+      ],
+      "source_validity_regressions": [
+        "2026-08-04-steve-yegge",
+        "2026-05-04-andy-masley",
+        "2026-03-06-ally-piechowski"
+      ],
+      "passes_gate": false
+    },
+    "v006": {
+      "metric": "quote_match_score",
+      "mean_score_delta": -0.040135656838195546,
+      "mean_f1_delta": -0.05169988510496251,
+      "wins": 8,
+      "ties": 12,
+      "losses": 15,
+      "newly_failed": [
+        "2026-08-04-steve-yegge",
+        "2026-05-04-andy-masley",
+        "2026-03-06-ally-piechowski",
+        "qb-michaeldempsey-me-f885d6f64200",
+        "qb-thejaymo-net-3cff14f411b2",
+        "qb-warrenellis-ltd-7716674e9a74"
+      ],
+      "source_validity_regressions": [
+        "2026-08-04-steve-yegge",
+        "2026-05-04-andy-masley",
+        "2026-03-06-ally-piechowski",
+        "qb-michaeldempsey-me-f885d6f64200",
+        "qb-thejaymo-net-3cff14f411b2",
+        "qb-warrenellis-ltd-7716674e9a74"
+      ],
+      "passes_gate": false
+    },
+    "v007": {
+      "metric": "quote_match_score",
+      "mean_score_delta": -0.06849714118936842,
+      "mean_f1_delta": -0.10842285380730825,
+      "wins": 7,
+      "ties": 12,
+      "losses": 16,
+      "newly_failed": [
+        "2026-08-04-steve-yegge",
+        "2026-03-06-ally-piechowski"
+      ],
+      "source_validity_regressions": [
+        "2026-08-04-steve-yegge",
+        "2026-03-06-ally-piechowski"
+      ],
+      "passes_gate": false
+    },
+    "v008": {
+      "metric": "quote_match_score",
+      "mean_score_delta": -0.08942789682335343,
+      "mean_f1_delta": -0.14076055555146874,
+      "wins": 6,
+      "ties": 12,
+      "losses": 17,
+      "newly_failed": [
+        "2026-08-21-matt-webb",
+        "2026-03-06-ally-piechowski",
+        "qb-thejaymo-net-a95ffd247c78",
+        "qb-tomcritchlow-com-71f5d7fa1ef3"
+      ],
+      "source_validity_regressions": [
+        "2026-08-21-matt-webb",
+        "2026-03-06-ally-piechowski",
+        "qb-thejaymo-net-a95ffd247c78",
+        "qb-tomcritchlow-com-71f5d7fa1ef3"
+      ],
+      "passes_gate": false
+    },
+    "v009": {
+      "metric": "quote_match_score",
+      "mean_score_delta": -0.06775218964288944,
+      "mean_f1_delta": -0.10217104595244553,
+      "wins": 7,
+      "ties": 12,
+      "losses": 16,
+      "newly_failed": [
+        "2026-08-04-steve-yegge",
+        "2026-03-06-ally-piechowski",
+        "qb-cagrimmett-com-d1e53523ec41"
+      ],
+      "source_validity_regressions": [
+        "2026-08-04-steve-yegge",
+        "2026-03-06-ally-piechowski",
+        "qb-cagrimmett-com-d1e53523ec41"
+      ],
+      "passes_gate": false
+    }
+  },
+  "fresh_test_evaluated": false,
+  "fresh_test_count": 94,
+  "evidence": "evals/quote_extraction/round2/benchmark_summary.json"
+}

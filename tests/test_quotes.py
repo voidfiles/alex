@@ -139,6 +139,24 @@ def test_reversed_segments_and_overlapping_quotes_are_rejected() -> None:
         parse_selected_quotes(raw, TEXT, count=1)
 
 
+@pytest.mark.parametrize(
+    "segments",
+    [
+        ["A patient tutor helps you learn!"],
+        ["Last sentence.", TEXT],
+        [TEXT, TEXT],
+    ],
+)
+def test_extra_quote_mode_still_rejects_unfaithful_segments(
+    segments: list[str],
+) -> None:
+    raw = json.dumps({"quotes": [{"segments": [TEXT]}, {"segments": segments}]})
+    with pytest.raises(QuoteError, match="absent"):
+        parse_selected_quotes(
+            raw, TEXT + " Last sentence.", count=1, allow_extra_quotes=True
+        )
+
+
 def test_empty_document_fails_before_model_call() -> None:
     completer = RecordingCompleter()
     with pytest.raises(QuoteError, match="no readable text"):

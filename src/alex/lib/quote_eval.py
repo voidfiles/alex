@@ -34,8 +34,11 @@ from alex.lib.quotes import (
     sha256,
 )
 
-SCORER_VERSION = "source-span-f1/v1"
-DEFAULT_QUOTE_DATASET = Path("evals/quote_extraction/simonwillison/examples.jsonl")
+SCORER_VERSION = "best-pull-quote-match/v2"
+DEFAULT_EVAL_QUOTE_COUNT = 5
+DEFAULT_QUOTE_DATASET = Path(
+    "evals/quote_extraction/quotebacks_dataset/combined_examples.jsonl"
+)
 Progress = Callable[[str], None]
 
 
@@ -68,7 +71,9 @@ class QuoteCase(BaseModel):
 class QuoteEvalSettings:
     dataset: Path = DEFAULT_QUOTE_DATASET
     split: Literal["dev", "test", "all"] = "dev"
-    extraction: QuoteSettings = field(default_factory=lambda: QuoteSettings(count=1))
+    extraction: QuoteSettings = field(
+        default_factory=lambda: QuoteSettings(count=DEFAULT_EVAL_QUOTE_COUNT)
+    )
     repeats: int = 1
     workers: int = 4
     max_cost: float = 5.0
@@ -98,22 +103,58 @@ def reference_positions(case: QuoteCase, source_text: str) -> set[int]:
 
 
 def score_extraction(
-    result: QuoteExtraction, source_text: str, reference: set[int]
+    result: QuoteExtraction,
+    source_text: str,
+    reference: set[int],
+    reference_text: str | None = None,
 ) -> dict[str, float | bool]:
-    selected: set[int] = set()
+    """Best individual pull quote; other valid candidates never lower the score."""
+    candidates: list[dict[str, float | bool]] = []
+    all_selected: set[int] = set()
     for quote in result.quotes:
+        selected: set[int] = set()
         for segment in quote.segments:
             first = len(words(source_text[: segment.char_start]))
             selected.update(range(first, first + len(words(segment.text))))
-    common = len(selected & reference)
-    precision = common / len(selected) if selected else 0.0
-    recall = common / len(reference) if reference else 0.0
-    f1 = 2 * precision * recall / (precision + recall) if precision + recall else 0.0
+        all_selected.update(selected)
+        common = len(selected & reference)
+        precision = common / len(selected) if selected else 0.0
+        recall = common / len(reference) if reference else 0.0
+        f1 = (
+            2 * precision * recall / (precision + recall) if precision + recall else 0.0
+        )
+        exact_span = selected == reference
+        exact_text = reference_text is not None and " ".join(
+            quote.text.split()
+        ) == " ".join(reference_text.split())
+        candidates.append(
+            {
+                "quote_match_score": 0.5 * f1 + 0.25 * exact_span + 0.25 * exact_text,
+                "span_precision": precision,
+                "span_recall": recall,
+                "span_f1": f1,
+                "exact_span_match": exact_span,
+                "exact_quote_match": exact_text,
+            }
+        )
+    best = max(
+        candidates,
+        key=lambda item: (item["quote_match_score"], item["span_f1"]),
+        default={
+            "quote_match_score": 0.0,
+            "span_precision": 0.0,
+            "span_recall": 0.0,
+            "span_f1": 0.0,
+            "exact_span_match": False,
+            "exact_quote_match": False,
+        },
+    )
     return {
-        "span_precision": precision,
-        "span_recall": recall,
-        "span_f1": f1,
-        "exact_span_match": selected == reference,
+        **best,
+        "reference_recall": len(all_selected & reference) / len(reference)
+        if reference
+        else 0.0,
+        "quote_count": len(result.quotes),
         "source_valid": True,
         "nonempty": bool(result.quotes),
     }
@@ -175,10 +216,14 @@ def estimate_quote_cost(prompt: str, settings: QuoteSettings) -> float:
 
 def summarize_scores(records: list[dict[str, Any]]) -> dict[str, Any]:
     metrics = (
+        "quote_match_score",
         "span_f1",
         "span_precision",
         "span_recall",
         "exact_span_match",
+        "exact_quote_match",
+        "reference_recall",
+        "quote_count",
         "source_valid",
         "nonempty",
     )
@@ -252,22 +297,31 @@ def evaluate_quotes(
         artifact = None
         try:
             result = extract_quotes(
-                case.source_markdown, extraction, completer=recorder, template=template
+                case.source_markdown,
+                extraction,
+                completer=recorder,
+                template=template,
+                allow_extra_quotes=True,
             )
             artifact = result.to_dict()
-            metrics = score_extraction(result, source, reference)
+            metrics = score_extraction(result, source, reference, case.reference_quote)
         except (OSError, RuntimeError, ValueError) as failure:
             error = str(failure)
             metrics = {
+                "quote_match_score": 0.0,
                 "span_f1": 0.0,
                 "span_precision": 0.0,
                 "span_recall": 0.0,
                 "exact_span_match": False,
+                "exact_quote_match": False,
+                "reference_recall": 0.0,
+                "quote_count": 0,
                 "source_valid": False,
                 "nonempty": False,
             }
         progress(
-            f"{case.id} #{repeat}: F1 {metrics['span_f1']:.3f}"
+            f"{case.id} #{repeat}: match {metrics['quote_match_score']:.3f}, "
+            f"exact {metrics['exact_quote_match']}"
             + (f" ERROR {error}" if error else "")
         )
         return {
@@ -296,6 +350,21 @@ def evaluate_quotes(
     run = {
         "schema_version": 1,
         "scorer_version": SCORER_VERSION,
+        "scoring_contract": {
+            "aggregation": "maximum score of an individual quote",
+            "weights": {
+                "span_f1": 0.5,
+                "exact_span_match": 0.25,
+                "exact_quote_match": 0.25,
+            },
+            "exact_text_normalization": (
+                "whitespace only; case and punctuation preserved"
+            ),
+            "extra_quotes": "no penalty, including overlapping candidates",
+            "source_validation": (
+                "every returned segment must remain verbatim and in order"
+            ),
+        },
         "started_at": started,
         "completed_at": datetime.now(UTC).isoformat(),
         "dataset": str(settings.dataset.resolve()),
@@ -335,7 +404,15 @@ def compare_quote_runs(
             raise QuoteEvalError(f"Cannot compare runs with different {key}.")
     if set(baseline["case_ids"]) != set(candidate["case_ids"]):
         raise QuoteEvalError("Cannot compare runs on different cases.")
+    if baseline["repeats"] != candidate["repeats"]:
+        raise QuoteEvalError("Cannot compare runs with different repeats.")
+    metric = (
+        "quote_match_score"
+        if baseline["scorer_version"] == SCORER_VERSION
+        else "span_f1"
+    )
     deltas = []
+    f1_deltas = []
     newly_failed = []
     validity_regressions = []
     for case_id in baseline["case_ids"]:
@@ -345,7 +422,8 @@ def compare_quote_runs(
         def average(rows: list[dict[str, Any]], metric: str) -> float:
             return float(sum(r["metrics"][metric] for r in rows) / len(rows))
 
-        delta = average(after, "span_f1") - average(before, "span_f1")
+        delta = average(after, metric) - average(before, metric)
+        f1_deltas.append(average(after, "span_f1") - average(before, "span_f1"))
         deltas.append({"id": case_id, "delta": delta})
         if any(r["error"] for r in after) and not any(r["error"] for r in before):
             newly_failed.append(case_id)
@@ -355,7 +433,9 @@ def compare_quote_runs(
     ties = sum(abs(d["delta"]) <= 1e-9 for d in deltas)
     mean_delta = sum(d["delta"] for d in deltas) / len(deltas)
     return {
-        "mean_f1_delta": mean_delta,
+        "metric": metric,
+        "mean_score_delta": mean_delta,
+        "mean_f1_delta": sum(f1_deltas) / len(f1_deltas),
         "wins": wins,
         "ties": ties,
         "losses": len(deltas) - wins - ties,

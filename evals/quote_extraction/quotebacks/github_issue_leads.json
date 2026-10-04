@@ -1,0 +1,367 @@
+[
+  {
+    "url": "https://github.com/Blogger-Peer-Review/quotebacks/issues/52",
+    "title": "Add the ability to change the shortcut",
+    "username": "HarshitSohaney",
+    "linked_urls": []
+  },
+  {
+    "url": "https://github.com/Blogger-Peer-Review/quotebacks/pull/51",
+    "title": "Support for running as Safari extension",
+    "username": "stigi",
+    "linked_urls": [
+      "https://github.com/stigi/quotebacks-safari",
+      "https://github.com/stigi/quotebacks-safari/releases/tag/1.1.3",
+      "https://github.com/Blogger-Peer-Review/quotebacks/assets/13815/257f5732-4bba-49e0-8724-feecac145e2b",
+      "https://github.com/Blogger-Peer-Review/quotebacks/assets/13815/cb1e7d34-290a-4406-a2fd-6bd42c92ee4b",
+      "https://github.com/Blogger-Peer-Review/quotebacks/assets/13815/faa4beb0-5d88-4397-8496-e6af7f200ac9",
+      "https://github.com/Blogger-Peer-Review/quotebacks/assets/13815/80fa3ca6-861c-430f-adeb-4f255aa2fc91"
+    ]
+  },
+  {
+    "url": "https://github.com/Blogger-Peer-Review/quotebacks/issues/50",
+    "title": "Enable Switching to Darkmode based on website template ",
+    "username": "sdavidprince",
+    "linked_urls": []
+  },
+  {
+    "url": "https://github.com/Blogger-Peer-Review/quotebacks/issues/49",
+    "title": "Is there any way to make a quoteback link to a book passage?",
+    "username": "ketan0",
+    "linked_urls": []
+  },
+  {
+    "url": "https://github.com/Blogger-Peer-Review/quotebacks/pull/48",
+    "title": "Toby branch",
+    "username": "tomcritchlow",
+    "linked_urls": []
+  },
+  {
+    "url": "https://github.com/Blogger-Peer-Review/quotebacks/issues/47",
+    "title": "quotebacks.net no longer available, replaced by Namecheap domain parking site",
+    "username": "msewell",
+    "linked_urls": [
+      "http://quotebacks.net/",
+      "https://user-images.githubusercontent.com/4273846/120992125-95553f80-c782-11eb-8e65-cc5f0ffc6585.png"
+    ]
+  },
+  {
+    "url": "https://github.com/Blogger-Peer-Review/quotebacks/issues/46",
+    "title": "Trying to lazy-load quoteback.js",
+    "username": "luisivan",
+    "linked_urls": [
+      "https://github.com/luisivan/gatsby-plugin-quotebacks",
+      "https://www.gatsbyjs.com",
+      "https://github.com/Blogger-Peer-Review/quotebacks/blob/30f3451d33d34e6991ece72cc0aa3d003a426b69/quoteback.js#L4"
+    ]
+  },
+  {
+    "url": "https://github.com/Blogger-Peer-Review/quotebacks/issues/45",
+    "title": "Annotating PDFs viewed in a browser",
+    "username": "mrchrisadams",
+    "linked_urls": [
+      "https://twitter.com/mrchrisadams/status/1356259712912732162",
+      "https://web.hypothes.is/blog/annotating-pdfs-without-urls/",
+      "https://web.hypothes.is/help/annotating-locally-saved-pdfs/",
+      "https://web.hypothes.is/help/how-hypothesis-interacts-with-document-metadata/",
+      "https://www.seanh.cc/2017/11/22/pdf-fingerprinting/",
+      "https://github.com/mozilla/pdf.js/blob/3ed2290c5b9c72b80f9a7335f41351cd949d9712/src/display/api.js#L507-L508"
+    ]
+  },
+  {
+    "url": "https://github.com/Blogger-Peer-Review/quotebacks/issues/44",
+    "title": "Incorrect key shortcut glyphs on Windows",
+    "username": "lmorchard",
+    "linked_urls": [
+      "https://user-images.githubusercontent.com/21687/107607440-214cc580-6bee-11eb-8a3c-11251a1372fe.PNG"
+    ]
+  },
+  {
+    "url": "https://github.com/Blogger-Peer-Review/quotebacks/issues/43",
+    "title": "Export to Org",
+    "username": "jakeisnt",
+    "linked_urls": [
+      "https://logseq.com",
+      "https://org-roam.com"
+    ]
+  },
+  {
+    "url": "https://github.com/Blogger-Peer-Review/quotebacks/issues/42",
+    "title": "Exporting Markdown to Roam on Wikipedia pages breaks due to [txt](url \"url\") link format",
+    "username": "MaskyS",
+    "linked_urls": [
+      "https://twitter.com/maskys_/status/1347478705216528385?s=20"
+    ]
+  },
+  {
+    "url": "https://github.com/Blogger-Peer-Review/quotebacks/issues/41",
+    "title": "feature request: automatically highlight comment field in extension",
+    "username": "tobyshorin",
+    "linked_urls": []
+  },
+  {
+    "url": "https://github.com/Blogger-Peer-Review/quotebacks/issues/40",
+    "title": "Support for code highlighting in markdown output",
+    "username": "maurelian",
+    "linked_urls": []
+  },
+  {
+    "url": "https://github.com/Blogger-Peer-Review/quotebacks/issues/39",
+    "title": "consider switching position of author and article title in embed",
+    "username": "Korede-TA",
+    "linked_urls": [
+      "https://user-images.githubusercontent.com/16245199/90040851-78e99300-dc96-11ea-9ef9-a2b168ce4e06.png",
+      "https://user-images.githubusercontent.com/16245199/90040852-79822980-dc96-11ea-9195-8fbb8c08df18.png",
+      "https://republic.com.ng/june-july-2019/african-mega-city-addiction/",
+      "https://www.bloomberg.com/news/articles/2018-05-29/eko-atlantic-city-eyes-2023-finish-as-nigeria-economy-rebounds",
+      "https://republic.com.ng/june-july-2019/african-mega-city-addiction/",
+      "https://republic.com.ng/june-july-2019/african-mega-city-addiction/",
+      "https://cdn.jsdelivr.net/gh/Blogger-Peer-Review/quotebacks@1/quoteback.js"
+    ]
+  },
+  {
+    "url": "https://github.com/Blogger-Peer-Review/quotebacks/issues/38",
+    "title": "Privacy Policy",
+    "username": "desk7",
+    "linked_urls": []
+  },
+  {
+    "url": "https://github.com/Blogger-Peer-Review/quotebacks/issues/37",
+    "title": "Request: remove colon from file name",
+    "username": "Jackymancs4",
+    "linked_urls": [
+      "https://github.com/Blogger-Peer-Review/quotebacks/blob/master/styles/scss:styles.css"
+    ]
+  },
+  {
+    "url": "https://github.com/Blogger-Peer-Review/quotebacks/pull/36",
+    "title": "#35 Default key suggestion",
+    "username": "spidfire",
+    "linked_urls": []
+  },
+  {
+    "url": "https://github.com/Blogger-Peer-Review/quotebacks/issues/35",
+    "title": "Can't install chrome extension ",
+    "username": "spidfire",
+    "linked_urls": [
+      "https://chrome.google.com/webstore/detail/quotebacks-quote-the-web/makakhdegdcmmbbhepafcghpdkbemach",
+      "https://user-images.githubusercontent.com/156694/88188798-9d72c200-cc38-11ea-8a43-6304797b6f63.png"
+    ]
+  },
+  {
+    "url": "https://github.com/Blogger-Peer-Review/quotebacks/pull/34",
+    "title": "CTRL Windows/Linux changes",
+    "username": "nd9600",
+    "linked_urls": []
+  },
+  {
+    "url": "https://github.com/Blogger-Peer-Review/quotebacks/issues/33",
+    "title": "What is the \"standard\"?",
+    "username": "philgyford",
+    "linked_urls": [
+      "https://quotebacks.net"
+    ]
+  },
+  {
+    "url": "https://github.com/Blogger-Peer-Review/quotebacks/issues/32",
+    "title": "Alt+S keyboard shortcut needs changing for Firefox",
+    "username": "francisbarton",
+    "linked_urls": []
+  },
+  {
+    "url": "https://github.com/Blogger-Peer-Review/quotebacks/issues/31",
+    "title": "Editing title and author not working in Firefox",
+    "username": "volt4ire",
+    "linked_urls": []
+  },
+  {
+    "url": "https://github.com/Blogger-Peer-Review/quotebacks/pull/30",
+    "title": "updated quoteback-internal with label rendering",
+    "username": "tobyshorin",
+    "linked_urls": []
+  },
+  {
+    "url": "https://github.com/Blogger-Peer-Review/quotebacks/pull/29",
+    "title": "Toby branch",
+    "username": "tobyshorin",
+    "linked_urls": []
+  },
+  {
+    "url": "https://github.com/Blogger-Peer-Review/quotebacks/pull/28",
+    "title": "Added a few more files to gitignore",
+    "username": "tobyshorin",
+    "linked_urls": []
+  },
+  {
+    "url": "https://github.com/Blogger-Peer-Review/quotebacks/pull/27",
+    "title": "updated jquery and removed unnecessary files",
+    "username": "tobyshorin",
+    "linked_urls": []
+  },
+  {
+    "url": "https://github.com/Blogger-Peer-Review/quotebacks/issues/26",
+    "title": "feature request: add \"copy image\" in the standard Quotebacks window",
+    "username": "aborruso",
+    "linked_urls": []
+  },
+  {
+    "url": "https://github.com/Blogger-Peer-Review/quotebacks/issues/25",
+    "title": "CTRL+shift+s does not work",
+    "username": "aborruso",
+    "linked_urls": []
+  },
+  {
+    "url": "https://github.com/Blogger-Peer-Review/quotebacks/issues/24",
+    "title": "Not working in Vivaldi",
+    "username": "archizoo",
+    "linked_urls": []
+  },
+  {
+    "url": "https://github.com/Blogger-Peer-Review/quotebacks/pull/23",
+    "title": "V1.0.4 - Firefox support & bug fixes",
+    "username": "tomcritchlow",
+    "linked_urls": []
+  },
+  {
+    "url": "https://github.com/Blogger-Peer-Review/quotebacks/pull/22",
+    "title": "V1.0.4",
+    "username": "tomcritchlow",
+    "linked_urls": []
+  },
+  {
+    "url": "https://github.com/Blogger-Peer-Review/quotebacks/issues/21",
+    "title": "Not pulling the full URL?",
+    "username": "MikeTannenbaum",
+    "linked_urls": [
+      "https://www.tolerance.org/magazine/ally-or-accomplice-the-language-of-activism"
+    ]
+  },
+  {
+    "url": "https://github.com/Blogger-Peer-Review/quotebacks/pull/20",
+    "title": "markup with Web Annotation ontology microdata. fixes #19",
+    "username": "jauntywunderkind",
+    "linked_urls": []
+  },
+  {
+    "url": "https://github.com/Blogger-Peer-Review/quotebacks/issues/19",
+    "title": "Express the quoteback as structured, linked data",
+    "username": "jauntywunderkind",
+    "linked_urls": [
+      "https://schema.org/Quotation",
+      "https://www.w3.org/TR/annotation-model/#cardinality-of-bodies-and-targets"
+    ]
+  },
+  {
+    "url": "https://github.com/Blogger-Peer-Review/quotebacks/pull/18",
+    "title": "Toby branch",
+    "username": "tobyshorin",
+    "linked_urls": []
+  },
+  {
+    "url": "https://github.com/Blogger-Peer-Review/quotebacks/issues/17",
+    "title": "Question: Why does each quote need a link to the script?",
+    "username": "caraya",
+    "linked_urls": []
+  },
+  {
+    "url": "https://github.com/Blogger-Peer-Review/quotebacks/pull/16",
+    "title": "Moves license to standard location",
+    "username": "TheLonelyGhost",
+    "linked_urls": []
+  },
+  {
+    "url": "https://github.com/Blogger-Peer-Review/quotebacks/issues/15",
+    "title": "Feature Request: Firefox Extension",
+    "username": "toddgrotenhuis",
+    "linked_urls": []
+  },
+  {
+    "url": "https://github.com/Blogger-Peer-Review/quotebacks/issues/14",
+    "title": "quotes should have a field for a signature using a public key",
+    "username": "neuroradiology",
+    "linked_urls": []
+  },
+  {
+    "url": "https://github.com/Blogger-Peer-Review/quotebacks/issues/13",
+    "title": "Embedded in Ghost: Page does not load",
+    "username": "jaesmail",
+    "linked_urls": []
+  },
+  {
+    "url": "https://github.com/Blogger-Peer-Review/quotebacks/pull/12",
+    "title": "Add rel=\"noopener\" to every target=\"_blank\"",
+    "username": "limbero",
+    "linked_urls": [
+      "https://web.dev/external-anchors-use-rel-noopener/"
+    ]
+  },
+  {
+    "url": "https://github.com/Blogger-Peer-Review/quotebacks/issues/11",
+    "title": "Mark text fragments",
+    "username": "kiru",
+    "linked_urls": [
+      "https://sometimesright.com/2020/04/25/blogging-vs-twitter/#:~:text=To%20me,quantity",
+      "https://twitter.com/david_bokan/status/1267902225281622020"
+    ]
+  },
+  {
+    "url": "https://github.com/Blogger-Peer-Review/quotebacks/issues/10",
+    "title": "keyboard shortcut for saving quotes",
+    "username": "freegovinfo",
+    "linked_urls": []
+  },
+  {
+    "url": "https://github.com/Blogger-Peer-Review/quotebacks/pull/9",
+    "title": "Toby branch",
+    "username": "tobyshorin",
+    "linked_urls": []
+  },
+  {
+    "url": "https://github.com/Blogger-Peer-Review/quotebacks/issues/8",
+    "title": "Dark mode",
+    "username": "Fastidious",
+    "linked_urls": []
+  },
+  {
+    "url": "https://github.com/Blogger-Peer-Review/quotebacks/issues/7",
+    "title": "[mac extension] Key remapping or alternative usage",
+    "username": "micimize",
+    "linked_urls": []
+  },
+  {
+    "url": "https://github.com/Blogger-Peer-Review/quotebacks/pull/6",
+    "title": "Update manifest URL / Icon / URL save image",
+    "username": "tomcritchlow",
+    "linked_urls": []
+  },
+  {
+    "url": "https://github.com/Blogger-Peer-Review/quotebacks/pull/5",
+    "title": "Toby branch",
+    "username": "tobyshorin",
+    "linked_urls": []
+  },
+  {
+    "url": "https://github.com/Blogger-Peer-Review/quotebacks/pull/4",
+    "title": "adding some nonsense for testing versioning",
+    "username": "tobyshorin",
+    "linked_urls": []
+  },
+  {
+    "url": "https://github.com/Blogger-Peer-Review/quotebacks/pull/3",
+    "title": "Bring Master to V0.1",
+    "username": "tomcritchlow",
+    "linked_urls": []
+  },
+  {
+    "url": "https://github.com/Blogger-Peer-Review/quotebacks/pull/2",
+    "title": "Toby branch",
+    "username": "tobyshorin",
+    "linked_urls": []
+  },
+  {
+    "url": "https://github.com/Blogger-Peer-Review/quotebacks/pull/1",
+    "title": "Toby branch",
+    "username": "tobyshorin",
+    "linked_urls": []
+  }
+]

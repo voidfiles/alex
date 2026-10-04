@@ -1,0 +1,27 @@
+# Releasing (myself from) music
+
+‘Releasing music’ is a pretty loaded and romantic term if you come at it with fresh eyes. It pushes the idea that music has some innate agency or magic. That it is an object that exists in the world, something with hard edges and intentions that wants to escape from the calloused hands of its maker and spend its pent up energy communicating itself to the world.
+
+I am usually all for romance, and for many years I subscribed to this kind of magical thinking. You are encouraged to, as a band, a musician, an artist. These songs are your serious pieces of art and you are their sculptor. They are artifacts hewn from the raw materials of your own consciousness and you are SO GOOD at doing this look: you have *literally* created something with a life of its own.
+
+But! Thanks to years of self-imposed, patchy, historically materialist re-education, I now see this framing of things as yet one more example of how capitalism belligerently forecloses all kinds of better ways of living or of even being able to see and understand the world.
+
+These days, I see a piece of music as an assemblage of social relations. Like all of us are, like pretty much everything is. A composer might *think* that they wrote it, and sure, in any given set of social relations that we tend to recognise as 'a piece of music', the composer does play a significant role in terms of sculpting the part that makes speakers vibrate air at organised frequencies. But that is only one small part of what music is.
+
+Last year I ‘[released some music](https://paulwolinski.bandcamp.com/album/blood-original-score)’. And for reasons I don’t fully understand, for this particular record I had either been not getting round to it, or putting it off, for ten years.
+
+In a not-rare-enough moment of ill-advised interrogation of the self, I sat down and wondered why. Why had I been sitting on this? Why didn’t I release it before? What does ‘releasing’ even mean in the age of the internet? And this led me to *"now that I think about it, isn’t the framing of ‘releasing music’ kind of weird?"* The music was never trapped, it wasn't trying to escape. It had just been sitting there on a hard drive, inert. It doesn’t have the critical faculties to be anything. In fact, maybe it is the other way round. Maybe the idea of this particular music, for whatever reason, had been weighing on *me* for the last ten years. What if *I* was the one who was trapped? What if the act of making music available to other people is actually *me* getting released from the music??
+
+And it was true. Putting this music out into the world did feel like a release. I can forget about it now, if I want to. It has served its purpose. It is no longer a weight to carry around. Perhaps musicians are not supposed to say this. It's not that I don't care about this collection of music. I am proud of it and stand by it, otherwise I wouldn't have put it into the world, but mostly I am relieved that it has gone. Because for me music is a ballast. And it plays this role perfectly. When I am making it, it keeps me steady. Keeps me together. Gives me a weight in the world. I feel like I am moving through life with intention. But also, as the noise slowly coalesces into something more song-like, it can get heavier. And when it feels like it is dragging me down, I dump it overboard so I can float free.
+
+I guess this is a neat little metaphor, but I wonder if I am just a fan of finding neat little metaphors for things or if I really think this? Because if I do it calls into question another aphorism I had been leaning on for years: ‘Music is communication’. I have always thought this. Music was always the thing that I made to say all of the things in my head that I had no words to articulate. But what if that is actually far too grand a concept? What if music is primarily a tool I use to keep my head above water and producing audio flotsam is an act of self care? If so, in what way is this communication?
+
+Maybe my mistake was a kind of alienated thinking: That a piece of music was an act of communication from me, the music maker, to other people, the listeners.
+
+No.
+
+While I am lucky enough to have a talent for re-framing, re-contextualising and re-presenting various socially constructed components of vibrating audio in shapes that are generally accepted as being pleasing to listen to, (yes, I totally get that this is the least romantic way possible of describing music), these components are not special to me. They exist inside anybody who enjoys my music too, otherwise how would it even be understood as music in the first place? None of these fragments of shared musical understanding are mine. None of them are private property, no matter what copyright law says. They are social constructions belonging to and getting maintained by all of us.
+
+So I would now say that yes music is absolutely communication, but that the communication is omnidirectional. More like community-cation. Commune-ication. Commun…ism? Now we get to the heart of the matter! All music is a kind of communism. And any piece of music is part of an ongoing conversation we’re all having with each other through history, conducted through every piece of music ever written, improvised, performed, listened to, danced to or discussed in overwrought blog posts. Of course it is still communication! Just not the blinkered, reductive kind I thought it was for so long.
+
+Does any of this make it easier for me to release music? No of course not. I wonder why.

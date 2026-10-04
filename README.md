@@ -398,21 +398,36 @@ are deliberately outside CI.
 ```bash
 alex eval-quotes --split dev --prompt-version v001 --repeats 3
 alex eval-quotes --split test --prompt-version v001 --output /tmp/quotes-test.json
+alex eval-quotes --split all --prompt-version v001 --repeats 3
 ```
 
 Runs the real quote extractor on the
-[50 source/quote pairs](evals/quote_extraction/simonwillison/README.md).
-The default requests one quote on the 10 development cases. Use development
-cases to tune new immutable `quote_extraction/vNNN.md` versions; reserve the
-40 test cases for a final comparison. The reference quote and editorial
-metadata are withheld from the model.
+[expanded corpus of 169 source/quote pairs](evals/quote_extraction/quotebacks_dataset/README.md):
+the original 50 Simon Willison pairs plus 119 from other curators. The default
+requests five candidate quotes on the 35 development cases; `--split test`
+selects 134 test cases, and `--split all` selects all 169. Use development cases
+to tune new immutable `quote_extraction/vNNN.md` versions; reserve test cases
+for comparisons with fixed prompts. The reference quote and editorial metadata
+are withheld from the model. To reproduce the original corpus, pass
+`--dataset evals/quote_extraction/simonwillison/examples.jsonl` explicitly.
 
-The primary score is F1 over the source-word positions selected by the model
-and the reference, with precision, recall, exact span agreement, nonempty
-selection rate, and source validity reported separately. Editorial insertions
-and ellipses in the reference are excluded from source matching. Valid alternate
-quotes can score zero agreement. Selecting the entire article loses precision;
-failed extractions remain in the denominator with F1 zero. There is no LLM judge.
+The `best-pull-quote-match/v2` scorer takes the **best individual quote**:
+50% source-span F1, 25% exact source-span agreement, and 25% exact reference text
+agreement (whitespace may reflow; case and punctuation must match). A complete
+text/span match scores 1.0; a complete span with editorial or typographic
+differences scores 0.75. Without an exact match, partial passages score below
+0.5. Extra quotes,
+including overlapping candidates and more than the requested count, never
+reduce agreement. Separate quotes cannot jointly claim an exact match.
+
+Only independently source-validated segments are scored. Every returned
+segment must be verbatim and in source order; invalid outputs remain in the
+denominator with zero score. Precision/recall describe the best quote, and
+total reference coverage, exact-match rates, quote count and source validity
+are separate diagnostics. Valid alternative quotes can score zero reference
+agreement. Quoting the whole article loses precision. There is no LLM judge.
+The interactive `quotes` command retains its requested-count and non-overlap
+limits. Historical `source-span-f1/v1` runs are not comparable to this scorer.
 
 `--repeats` retains independent generations to measure variation. Request
 settings, prompt text/hash, source hashes, raw responses, errors, token usage,
@@ -423,7 +438,12 @@ model calls. These live benchmarks are local/manual and outside CI.
 
 The first [benchmark and prompt-iteration report](evals/quote_extraction/RESULTS.md)
 retains `v001`: development gains from the revised prompts did not survive the
-repeated test comparison.
+repeated test comparison. The new scoring experiment is documented in
+[the pull-quote matching report](evals/quote_extraction/PULL_QUOTE_RESULTS.md).
+The [expanded benchmark](evals/quote_extraction/EXPANDED_BENCHMARK.md) reruns six
+fixed prompts on all 169 sources with three generations each. `v006` has the
+highest overall mean, but `v001` performs best on the 94 new test sources and
+remains active.
 
 ### eval-summary
 

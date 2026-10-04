@@ -1,0 +1,15 @@
+{
+  "checked_at": "2026-10-04T19:27:43.502931+00:00",
+  "new_cases": 119,
+  "combined_cases": 169,
+  "status": "passed",
+  "checks": [
+    "unique source documents and IDs, including the original 50 cases",
+    "independently fetched source hashes and file/JSONL agreement",
+    "all published quote words matched in source order; only explicit ellipses omit text",
+    "reference Markdown agrees with the plain reference",
+    "dev/test manifest agreement and no source leakage",
+    "original 50 cases and splits preserved",
+    "negative checks reject changed numbers, reordered passages, inserted bracketed words and fabricated wording"
+  ]
+}

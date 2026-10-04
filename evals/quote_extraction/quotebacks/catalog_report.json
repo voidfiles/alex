@@ -1,0 +1,39 @@
+{
+  "crawl_completed_at": "2026-10-04T18:43:10.981541+00:00",
+  "base_sites_checked": 184,
+  "supplemental_sites_checked": 2,
+  "distinct_sites_checked": 186,
+  "raw_status_counts": {
+    "confirmed_embeds": 28,
+    "no_embed_observed": 89,
+    "mention_only": 28,
+    "unreachable_or_blocked": 30,
+    "redirected_elsewhere": 10,
+    "script_only": 1
+  },
+  "catalog_counts": {
+    "recommended": 17,
+    "limited": 10,
+    "unverified": 16
+  },
+  "confirmed_independent_publishers": 27,
+  "observed_unique_embeds_on_confirmed_publishers": 199,
+  "excluded": {
+    "sepiabrown.github.io": {
+      "reason": "Sampled posts mirror Tom Critchlow's content; this is not counted as an independent curator.",
+      "original_url": "https://tomcritchlow.com/2024/03/27/linkedin-learning/",
+      "mirror_url": "https://sepiabrown.github.io/2024/03/27/linkedin-learning/",
+      "original_substantial_paragraphs": 46,
+      "mirror_substantial_paragraphs": 46,
+      "identical_paragraphs": 45,
+      "comparison_rule": "Exact text intersection of HTML p elements whose rendered text exceeds 80 characters."
+    }
+  },
+  "aliases": {
+    "amyhuang.work": {
+      "canonical_domain": "mirhuang.com",
+      "evidence_url": "https://amyhuang.work/blog/tag/technology",
+      "reason": "Redirect target checked separately and genuine embeds confirmed; do not count both domains as separate curators."
+    }
+  }
+}

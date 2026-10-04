@@ -1,0 +1,51 @@
+{
+  "search_evidence": [
+    {
+      "batch": "named_profile_search",
+      "queries": [
+        "\"quotebacks\" \"gyford\"",
+        "\"quotebacks\" \"grotenhuis\"",
+        "\"quotebacks\" \"Tannenbaum\"",
+        "\"quotebacks\" \"francis\""
+      ],
+      "results": [
+        {
+          "title": "Kullish: BYOL Comment Aggregation - The Notado Newsletter",
+          "url": "https://notado.substack.com/p/kullish-byol-comment-aggregation"
+        },
+        {
+          "title": "Index | Chris Aldrich",
+          "url": "https://boffosocko.com/about/index/"
+        },
+        {
+          "title": "Bix dot Blog • Source: bix.blog",
+          "url": "https://bix.blog/source/bix-blog/"
+        },
+        {
+          "title": "Kicks Condor",
+          "url": "https://www.kickscondor.com/page2/"
+        },
+        {
+          "title": "events/2025-11-13-front-end-study-hall - IndieWeb",
+          "url": "https://indieweb.org/events/2025-11-13-front-end-study-hall"
+        },
+        {
+          "title": "gunnar.se",
+          "url": "https://gunnar.se/archive/"
+        },
+        {
+          "title": "Tom Critchlow. Move. Think. Create.",
+          "url": "https://tomcritchlow.com/library/?query=tag%3Abusinessmagik"
+        },
+        {
+          "title": "Blogroll – Chuck Grimmett",
+          "url": "https://cagrimmett.com/blogroll/"
+        },
+        {
+          "title": "Dr. Adam Procter",
+          "url": "https://discursive.adamprocter.co.uk/archive/"
+        }
+      ]
+    }
+  ]
+}

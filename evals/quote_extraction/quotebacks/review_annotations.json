@@ -1,0 +1,325 @@
+{
+  "confirmed": {
+    "tomcritchlow.com": [
+      "Tom Critchlow",
+      "recommended",
+      "high",
+      "Strategy, learning, organizations, digital gardens",
+      "The library is a rich collection of attributed excerpts. Archive and query views repeat entries; deduplicate quotes before sampling."
+    ],
+    "thejaymo.net": [
+      "Jay Springett / thejaymo",
+      "recommended",
+      "high",
+      "Culture, games, technology, virtual worlds",
+      "Weeknotes and research posts use substantial excerpts. Some source documents are long SEC filings; choose a range of topics and quote lengths."
+    ],
+    "interconnected.org": [
+      "Matt Webb / Interconnected",
+      "recommended",
+      "high",
+      "Technology, design, science, everyday life",
+      "Strong essay context around substantive quotes; includes recent posts and older essays."
+    ],
+    "aaronzlewis.com": [
+      "Aaron Z. Lewis",
+      "recommended",
+      "high",
+      "Networks, education, platforms",
+      "Four substantial quotes from two sources in the sampled essay. More posts need checking before assuming regular use."
+    ],
+    "subpixel.space": [
+      "Toby Shorin / Subpixel",
+      "recommended",
+      "high",
+      "Culture, technology, economics",
+      "Thoughtful essay excerpts from several sources. Some original links use older HTTP URLs or a Mirror publication."
+    ],
+    "sonyasupposedly.com": [
+      "Sonya, Supposedly",
+      "recommended",
+      "high",
+      "Reading, culture, technology",
+      "Reading notes and essays provide substantive excerpts. Source availability and paywalls need checking."
+    ],
+    "warrenellis.ltd": [
+      "Warren Ellis",
+      "recommended",
+      "high",
+      "Culture, technology, media",
+      "Multiple externally attributed excerpts in the Isles collection. Category pages repeat individual posts."
+    ],
+    "brendanlangen.com": [
+      "Brendan Langen",
+      "recommended",
+      "high",
+      "Digital environments, learning, attention",
+      "Several substantive excerpts, including Steven Johnson and Andy Matuschak. Substack sources may need access checks."
+    ],
+    "cagrimmett.com": [
+      "Chuck Grimmett",
+      "recommended",
+      "high",
+      "Learning, blogging, weekly notes",
+      "The sampled weeknote explicitly describes using Quotebacks and contains two useful source-linked excerpts."
+    ],
+    "velcro-city.co.uk": [
+      "Velcro City Tourist Board",
+      "recommended",
+      "high",
+      "Culture, work, hobbies",
+      "Two substantial excerpts from one essay source. Expand to more posts before drawing conclusions about volume."
+    ],
+    "michaeldempsey.me": [
+      "Michael Dempsey",
+      "recommended",
+      "medium",
+      "AI, robotics, investing",
+      "Substantial technical and strategy excerpts. Some citations point to the author's own notes subdomain, so external-domain counts overstate independent sourcing."
+    ],
+    "blog.numericcitizen.me": [
+      "Numeric Citizen",
+      "recommended",
+      "medium",
+      "Apple, blogging, technology",
+      "Newsletter excerpts include ordinary blog posts and Micro.blog conversations. Prefer complete original articles over timeline replies."
+    ],
+    "donfoolery.com": [
+      "Don Pizarro / DONFOOLERY",
+      "recommended",
+      "medium",
+      "Arts, news, popular culture",
+      "Several short attributed news and arts excerpts. Sources include commercial news publishers; verify full-text availability."
+    ],
+    "sensedoubt.blogspot.com": [
+      "Sense of Doubt",
+      "recommended",
+      "medium",
+      "Sports, culture, media",
+      "Substantial attributed excerpts, with repeated and republished material. Check originality of selections and avoid duplicate reference quotes."
+    ],
+    "swoods.net": [
+      "Simon Woods",
+      "recommended",
+      "medium",
+      "Blogging, politics, technology",
+      "One substantive externally attributed excerpt verified. Larger-scale curation quality remains unassessed."
+    ],
+    "writingslowly.com": [
+      "Writing Slowly",
+      "recommended",
+      "medium",
+      "Writing, note-taking, learning",
+      "One substantial excerpt verified; it contains a nested quotation. Track the immediate cited page and any underlying attribution separately."
+    ],
+    "dozenialdragons.me.uk": [
+      "Dozenial Dragons",
+      "limited",
+      "medium",
+      "Personal writing, politics",
+      "One substantive quote on the About page. This establishes an embed, but ongoing quote curation was not observed."
+    ],
+    "coincenter.org": [
+      "Coin Center",
+      "limited",
+      "medium",
+      "Cryptocurrency policy, legal analysis",
+      "Six substantive embeds observed, all citing other Coin Center pages. Useful for document-to-excerpt pairs, but these are same-publisher citations."
+    ],
+    "ictineducation.org": [
+      "Terry Freedman / ICT & Computing in Education",
+      "limited",
+      "medium",
+      "Education, technology",
+      "One substantial embed quoting the author's own earlier article. Same-author selection rather than independent curation."
+    ],
+    "nesslabs.com": [
+      "Ness Labs",
+      "limited",
+      "low",
+      "Learning, note-taking",
+      "Embeds are demonstrated in a Quotebacks tutorial; regular use elsewhere was not established. One example is a social post."
+    ],
+    "kickscondor.com": [
+      "Kicks Condor",
+      "limited",
+      "low",
+      "Web culture, independent publishing",
+      "Two embeds in a discussion of Quotebacks. The author says they normally prefer native blockquotes; treat these as examples, not evidence of regular use."
+    ],
+    "discursive.adamprocter.co.uk": [
+      "Dr. Adam Procter / Discursive",
+      "limited",
+      "low",
+      "Design, education, technology",
+      "One substantive excerpt in a post explicitly trying the Quotebacks feature. Regular use was not established."
+    ],
+    "sasamat-1.appspot.com": [
+      "Musings",
+      "limited",
+      "low",
+      "Web publishing",
+      "A single test quote appears on the post, homepage, and archive. These are one selection, not three independent quotes."
+    ],
+    "gunnar.se": [
+      "Gunnar.se",
+      "limited",
+      "low",
+      "Personal blogging",
+      "A short 25-word description of Quotebacks is embedded. No substantive source excerpt found in the bounded crawl."
+    ],
+    "evan.blot.im": [
+      "Evan Petrack / A Common Place",
+      "limited",
+      "low",
+      "Personal blogging",
+      "A five-word test quotes the author's other blog. This confirms integration but provides little evaluation value."
+    ],
+    "manton.org": [
+      "Manton Reece",
+      "limited",
+      "low",
+      "Blogging, software, podcasts",
+      "One short same-author podcast announcement was observed in several archive views. The official blogroll lists this site; further post discovery is needed."
+    ],
+    "mirhuang.com": [
+      "Mir Huang (formerly amyhuang.work)",
+      "recommended",
+      "medium",
+      "Literature, culture, technology",
+      "A substantial literary excerpt links to an Avidly / Los Angeles Review of Books essay. The old amyhuang.work domain redirects here; count this publisher once."
+    ]
+  },
+  "unverified": {
+    "collect.readwriterespond.com": [
+      "Aaron Davis / Read Write Collect",
+      "medium",
+      "Reading, education, linked responses",
+      "Search-indexed first-person discussion describes historical Quotebacks use and later CSS alternatives. The crawler could not access the pages, so current embeds are unverified.",
+      "https://collect.readwriterespond.com/kind/reply/"
+    ],
+    "bix.blog": [
+      "Bix",
+      "low",
+      "Independent publishing",
+      "A historical source archive appeared in Quotebacks searches. It now redirects to slow.dog; current use was not confirmed.",
+      "https://bix.blog/source/bix-blog/"
+    ],
+    "notado.substack.com": [
+      "The Notado Newsletter",
+      "low",
+      "Reading, annotations, comment aggregation",
+      "Search results mention Quotebacks. The original pages were blocked or unavailable to this crawl; no live embed was verified.",
+      "https://notado.substack.com/p/november-2020-four-months-of-notado"
+    ],
+    "distroid.substack.com": [
+      "Charles Adjovu / Distroid",
+      "low",
+      "Digital gardens",
+      "A digital-gardens issue appeared in Quotebacks searches. The page was unavailable to this crawl; this is a mention lead, not confirmed use.",
+      "https://distroid.substack.com/p/distroid-issue-13-digital-gardens"
+    ],
+    "bmannconsulting.com": [
+      "Boris Mann",
+      "low",
+      "Digital gardens, note clips, transclusion",
+      "Several posts discuss Quotebacks and transclusion. No embed was found in the sampled pages.",
+      "https://bmannconsulting.com/blog/2024/03/17/digital-garden-transclusion/"
+    ],
+    "reeswrites.com": [
+      "Rees Writes",
+      "low",
+      "Web publishing",
+      "A post discusses Quotebacks as a way to preserve quoted material. A mention alone does not establish use.",
+      "https://reeswrites.com/posts/dont-break-links/"
+    ],
+    "johnwhiles.com": [
+      "John Whiles",
+      "low",
+      "Markdown, publishing, software",
+      "The author built a Quotebacks plugin for Marked. This is integration evidence, but no published embed was found in the sampled pages.",
+      "https://johnwhiles.com/posts/marked-quotebacks"
+    ],
+    "rtl.chrisadams.me.uk": [
+      "Chris Adams / Reads, Takes and Links",
+      "low",
+      "Publishing, technology",
+      "A Wagtail project-template post discusses Quotebacks integration. No rendered embed was observed.",
+      "https://rtl.chrisadams.me.uk/2024/12/the-wagtail-project-template-i-wish-existed/"
+    ],
+    "publishing-project.rivendellweb.net": [
+      "Carlos Araya / The Publishing Project",
+      "low",
+      "Web publishing",
+      "A WordPress implementation tutorial contains code examples. Code snippets were excluded from embed detection; ongoing use was not established.",
+      "https://publishing-project.rivendellweb.net/implementing-quotebacks-in-wordpress/"
+    ],
+    "jplattel.nl": [
+      "Joost Plattel",
+      "low",
+      "Knowledge tools, note-taking",
+      "An Obsidian clipper article mentions Quotebacks. No embed was found in the sampled pages.",
+      "https://jplattel.nl/post/2020-10-09-obsidian-clipper-chrome-extension/"
+    ],
+    "frankmcpherson.blog": [
+      "Frank McPherson",
+      "low",
+      "Personal blogging, technology",
+      "A 2020 post describes the Quotebacks tool. No embed was found in the sampled pages.",
+      "https://frankmcpherson.blog/2020/06/16/quotebacks-is-a.html"
+    ],
+    "canion.blog": [
+      "Andrew Canion",
+      "low",
+      "Personal blogging, technology",
+      "The archive mentions Quotebacks. Published embeds were not verified in the bounded sample.",
+      "https://canion.blog/archive/"
+    ],
+    "adactio.com": [
+      "Jeremy Keith / Adactio",
+      "low",
+      "Web design, hypertext",
+      "A Quotebacks tag and related bookmarks were found. The sampled pages link to the tool but did not contain detected embeds.",
+      "https://adactio.com/tags/quotebacks"
+    ],
+    "notes.baldurbjarnason.com": [
+      "Baldur Bjarnason",
+      "low",
+      "Web publishing, hypertext",
+      "Several notes discuss Quotebacks. The sampled excerpts use other markup; actual Quotebacks embeds were not verified.",
+      "https://notes.baldurbjarnason.com/2020/06/16/quotebacks-and-hypertexts.html"
+    ],
+    "notes.treasurechest.design": [
+      "Treasure Chest notes",
+      "low",
+      "Design, digital gardens",
+      "A digital-garden note mentions Quotebacks. No embed was found in the sampled pages.",
+      "https://notes.treasurechest.design/digital-garden"
+    ],
+    "links.weirdnet.org": [
+      "Weirdnet links",
+      "low",
+      "Web culture, link collections",
+      "A links archive mentions Quotebacks. This is a possible curator to inspect, but use was not established.",
+      "https://links.weirdnet.org/"
+    ]
+  },
+  "excluded": {
+    "sepiabrown.github.io": {
+      "reason": "Sampled posts mirror Tom Critchlow's content; this is not counted as an independent curator.",
+      "original_url": "https://tomcritchlow.com/2024/03/27/linkedin-learning/",
+      "mirror_url": "https://sepiabrown.github.io/2024/03/27/linkedin-learning/",
+      "original_substantial_paragraphs": 46,
+      "mirror_substantial_paragraphs": 46,
+      "identical_paragraphs": 45,
+      "comparison_rule": "Exact text intersection of HTML p elements whose rendered text exceeds 80 characters."
+    }
+  },
+  "aliases": {
+    "amyhuang.work": {
+      "canonical_domain": "mirhuang.com",
+      "evidence_url": "https://amyhuang.work/blog/tag/technology",
+      "reason": "Redirect target checked separately and genuine embeds confirmed; do not count both domains as separate curators."
+    }
+  }
+}
