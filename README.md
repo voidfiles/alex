@@ -327,6 +327,11 @@ regeneration to add explicit logic before this exporter can consume them.
 
 ### quotes
 
+For reusable selection by paragraph IDs or short boundary snippets, see the
+[text anchoring library](docs/text-anchors.md). It provides a versioned LLM
+selection prompt, exact source extraction, and separate source-backed quote
+records through `alex.lib.text_anchors`.
+
 ```bash
 alex quotes article.md                         # up to three ranked pull quotes
 alex quotes article.md --count 1 -o quote.md
